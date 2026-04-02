@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "buildCommand": "cd dumpster && npm install && npm run build",
+  "outputDirectory": "dumpster/dist",
   "framework": "vite"
 }

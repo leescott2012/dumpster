@@ -115,20 +115,21 @@ export default function App() {
                 {mainMenuOpen && (
                   <div style={{
                     position: 'absolute', top: 42, right: 0, zIndex: 200,
-                    background: '#1a1a1a', border: '1px solid var(--border2)',
+                    background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                    border: '1px solid var(--border2)',
                     borderRadius: 12, padding: 16, minWidth: 220,
-                    boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
                   }}>
                     {/* Color mode */}
                     <p style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', marginBottom: 10 }}>COLOR MODE</p>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
                       {(['dark', 'day', 'system'] as const).map(m => (
                         <button key={m} onClick={() => { setColorMode(m); setMainMenuOpen(false); }} style={{
-                          flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 10, fontWeight: 600,
-                          background: colorMode === m ? 'var(--gold-dim)' : 'var(--bg3)',
+                          width: '100%', padding: '8px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                          background: colorMode === m ? 'var(--gold-dim)' : 'transparent',
                           border: `1px solid ${colorMode === m ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
                           color: colorMode === m ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer',
-                          textTransform: 'capitalize',
+                          textTransform: 'capitalize', textAlign: 'left',
                         }}>{m}</button>
                       ))}
                     </div>

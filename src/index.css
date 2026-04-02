@@ -23,6 +23,7 @@
   --red: #E05C5C;
   --green: #4CAF50;
   --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --menu-bg: rgba(20, 20, 20, 0.75);
 }
 
 @keyframes fadeIn {

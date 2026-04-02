@@ -297,10 +297,11 @@ export default function PhotoCard({
 
         {menuOpen && (
           <div style={{
-            position: 'absolute', top: 30, right: 0,
-            background: '#1a1a1a', border: '1px solid var(--border2)',
-            borderRadius: 8, overflow: 'hidden',
-            minWidth: 150, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 50,
+            position: 'absolute', top: 30, left: '50%', transform: 'translateX(-50%)',
+            background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+            border: '1px solid var(--border2)',
+            borderRadius: 10, overflow: 'hidden',
+            minWidth: 160, boxShadow: '0 8px 32px rgba(0,0,0,0.25)', zIndex: 50,
           }}>
             <MenuItem label={photo.isHuji ? 'Unmark Huji' : 'Mark as Huji'}
               onClick={() => { onToggleHuji(); setMenuOpen(false); }} />

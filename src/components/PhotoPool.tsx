@@ -149,27 +149,35 @@ export default function PhotoPool() {
             ))}
           </button>
 
-          {menuOpen && (
-            <div style={{
+          <div
+            className={`pool-filter-drawer ${menuOpen ? 'open' : ''}`}
+            style={{
               position: 'absolute', top: 38, left: 0, zIndex: 100,
-              background: 'var(--bg2)', border: '1px solid var(--border2)',
-              borderRadius: 10, padding: 12, minWidth: 180,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-            }}>
-              <p style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', marginBottom: 10 }}>FILTERS</p>
-              {FILTER_OPTIONS.map(({ key, label }) => (
-                <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={activeFilters.includes(key)}
-                    onChange={() => toggleActiveFilter(key)}
-                    style={{ accentColor: 'var(--gold)' }}
-                  />
-                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>{label}</span>
-                </label>
-              ))}
-            </div>
-          )}
+              background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+              border: '1px solid var(--border2)',
+              borderRadius: 10, padding: menuOpen ? 12 : 0, minWidth: 180,
+              boxShadow: menuOpen ? '0 8px 32px rgba(0,0,0,0.25)' : 'none',
+              maxHeight: menuOpen ? 300 : 0,
+              opacity: menuOpen ? 1 : 0,
+              overflow: 'hidden',
+              transform: menuOpen ? 'translateY(0)' : 'translateY(-8px)',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              pointerEvents: menuOpen ? 'auto' : 'none',
+            }}
+          >
+            <p style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', marginBottom: 10 }}>FILTERS</p>
+            {FILTER_OPTIONS.map(({ key, label }) => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={activeFilters.includes(key)}
+                  onChange={() => toggleActiveFilter(key)}
+                  style={{ accentColor: 'var(--gold)' }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text2)' }}>{label}</span>
+              </label>
+            ))}
+          </div>
         </div>
 
         {/* Active filter chips (scrollable) */}

@@ -473,6 +473,7 @@ export function applyColorMode(mode: ColorMode) {
     root.style.setProperty('--text', '#e8e8e8');
     root.style.setProperty('--text2', '#999');
     root.style.setProperty('--text3', '#555');
+    root.style.setProperty('--menu-bg', 'rgba(20, 20, 20, 0.75)');
   } else {
     // Day mode — warm tan
     root.style.setProperty('--bg', '#f0ebe0');
@@ -485,6 +486,7 @@ export function applyColorMode(mode: ColorMode) {
     root.style.setProperty('--text', '#1a1610');
     root.style.setProperty('--text2', '#5a5040');
     root.style.setProperty('--text3', '#8a7a60');
+    root.style.setProperty('--menu-bg', 'rgba(230, 224, 210, 0.75)');
   }
 }
 

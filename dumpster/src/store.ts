@@ -480,13 +480,40 @@ export function applyColorMode(mode: ColorMode) {
 
 export async function loadPhotosFromServer() {
   try {
+    // Skip if we already have persisted server photos
+    const existing = useStore.getState().photos;
+    if (existing.some(p => p.url.startsWith('/photos/') || p.url.startsWith('/sample-photos/'))) return;
+
+    // Try loading sample photos first (preloaded examples)
+    try {
+      const sampleRes = await fetch('/sample-photos.json');
+      if (sampleRes.ok) {
+        const samplePhotos: Array<{ id: string; filename: string; url: string; category: string; labels: string[]; colorTemp?: number }> = await sampleRes.json();
+        const photos: Photo[] = samplePhotos.map((p) => ({
+          id: p.id,
+          url: p.url,
+          filename: p.filename,
+          category: p.category,
+          labels: p.labels || [],
+          starred: false,
+          isHuji: false,
+        }));
+
+        useStore.setState({ photos });
+        const s = useStore.getState();
+        saveState({
+          photos: s.photos, dumps: s.dumps, activeDumpId: s.activeDumpId,
+          captions: s.captions, colorMode: s.colorMode, poolSize: s.poolSize,
+          filter: s.filter, activeFilters: s.activeFilters,
+        });
+        return;
+      }
+    } catch { /* continue to server photos */ }
+
+    // Fallback to server photos endpoint
     const res = await fetch('/photos/');
     if (!res.ok) return;
     const filenames: string[] = await res.json();
-
-    // Skip if we already have persisted server photos
-    const existing = useStore.getState().photos;
-    if (existing.some(p => p.url.startsWith('/photos/'))) return;
 
     const presetFilenames = new Set(PRESET_DUMPS.flatMap((d) => d.photoFilenames));
     const presetFiles = filenames.filter((f) => presetFilenames.has(f));

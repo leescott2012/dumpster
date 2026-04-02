@@ -1,0 +1,98 @@
+[
+  {
+    "id": "sample-01",
+    "filename": "01.jpeg",
+    "url": "/sample-photos/01.jpeg",
+    "category": "Portrait",
+    "labels": ["face", "indoor"],
+    "colorTemp": 5500
+  },
+  {
+    "id": "sample-02",
+    "filename": "02.jpg",
+    "url": "/sample-photos/02.jpg",
+    "category": "Landscape",
+    "labels": ["nature", "outdoor"],
+    "colorTemp": 6200
+  },
+  {
+    "id": "sample-03",
+    "filename": "03.jpg",
+    "url": "/sample-photos/03.jpg",
+    "category": "Fashion",
+    "labels": ["style", "person"],
+    "colorTemp": 5800
+  },
+  {
+    "id": "sample-04",
+    "filename": "04.jpg",
+    "url": "/sample-photos/04.jpg",
+    "category": "Detail",
+    "labels": ["macro", "closeup"],
+    "colorTemp": 6000
+  },
+  {
+    "id": "sample-05",
+    "filename": "05.jpg",
+    "url": "/sample-photos/05.jpg",
+    "category": "Landscape",
+    "labels": ["outdoor", "sky"],
+    "colorTemp": 6500
+  },
+  {
+    "id": "sample-06",
+    "filename": "06.mov",
+    "url": "/sample-photos/06.mov",
+    "category": "Video",
+    "labels": ["motion", "dynamic"],
+    "colorTemp": 5500
+  },
+  {
+    "id": "sample-07",
+    "filename": "07.jpeg",
+    "url": "/sample-photos/07.jpeg",
+    "category": "Culture",
+    "labels": ["street", "people"],
+    "colorTemp": 5900
+  },
+  {
+    "id": "sample-08",
+    "filename": "08.png",
+    "url": "/sample-photos/08.png",
+    "category": "Atmosphere",
+    "labels": ["mood", "artistic"],
+    "colorTemp": 6100
+  },
+  {
+    "id": "sample-09",
+    "filename": "09.jpeg",
+    "url": "/sample-photos/09.jpeg",
+    "category": "Portrait",
+    "labels": ["expression", "character"],
+    "colorTemp": 5400
+  },
+  {
+    "id": "sample-10",
+    "filename": "10.jpeg",
+    "url": "/sample-photos/10.jpeg",
+    "category": "Detail",
+    "labels": ["texture", "abstract"],
+    "colorTemp": 6300
+  },
+  {
+    "id": "sample-11",
+    "filename": "11.jpeg",
+    "url": "/sample-photos/11.jpeg",
+    "category": "Culture",
+    "labels": ["documentary", "moment"],
+    "colorTemp": 5700
+  },
+  {
+    "id": "sample-12",
+    "filename": "12.jpeg",
+    "url": "/sample-photos/12.jpeg",
+    "category": "Fashion",
+    "labels": ["styling", "aesthetic"],
+    "colorTemp": 6000
+  }
+]

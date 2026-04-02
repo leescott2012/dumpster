@@ -74,12 +74,17 @@ input, textarea {
   opacity: 1 !important;
 }
 
-/* Hide horizontal scrollbar on photo rows */
+/* Show scrollbar on hover for photo rows */
 .dump-photos-row {
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border3) transparent;
 }
 .dump-photos-row::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+.dump-photos-row::-webkit-scrollbar-thumb {
+  background: var(--border3);
+  border-radius: 3px;
 }
 
 /* Drag over highlight for drop zones */

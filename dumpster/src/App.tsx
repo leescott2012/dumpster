@@ -4,6 +4,7 @@ import { useStore, applyColorMode, loadPhotosFromServer } from './store';
 import DumpCard from './components/DumpCard';
 import PhotoPool from './components/PhotoPool';
 import Lightbox from './components/Lightbox';
+import { InstallPrompt } from './components/InstallPrompt';
 
 export default function App() {
   const {
@@ -58,6 +59,7 @@ export default function App() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <Lightbox />
+      <InstallPrompt />
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 32px' }}>
 
         {/* ── Header ──────────────────────────────────────── */}

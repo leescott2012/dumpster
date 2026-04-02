@@ -5,6 +5,7 @@ import DumpCard from './components/DumpCard';
 import PhotoPool from './components/PhotoPool';
 import Lightbox from './components/Lightbox';
 import { InstallPrompt } from './components/InstallPrompt';
+import { Onboarding } from './components/Onboarding';
 
 export default function App() {
   const {
@@ -14,6 +15,7 @@ export default function App() {
   } = useStore();
 
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const mainMenuRef = useRef<HTMLDivElement>(null);
   const usedIds = new Set(dumps.flatMap((d) => d.photos));
   const usedCount = usedIds.size;
@@ -32,6 +34,14 @@ export default function App() {
   useEffect(() => {
     if (photos.length === 0) loadPhotosFromServer();
   }, []);
+
+  // Show onboarding on first visit
+  useEffect(() => {
+    const completed = localStorage.getItem('onboardingCompleted');
+    if (!completed && dumps.length === 0) {
+      setShowOnboarding(true);
+    }
+  }, [dumps.length]);
 
   // Close main menu on outside click
   useEffect(() => {
@@ -60,6 +70,7 @@ export default function App() {
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <Lightbox />
       <InstallPrompt />
+      {showOnboarding && <Onboarding onComplete={() => setShowOnboarding(false)} />}
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 32px' }}>
 
         {/* ── Header ──────────────────────────────────────── */}

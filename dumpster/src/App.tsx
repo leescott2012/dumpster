@@ -150,6 +150,28 @@ export default function App() {
                       Hook → Contrast → Detail → Fashion<br />
                       Never same category back-to-back
                     </p>
+
+                    <div style={{ borderTop: '1px solid var(--border2)', margin: '8px 0' }} />
+
+                    {/* Tutorial button */}
+                    <button
+                      onClick={() => { setShowOnboarding(true); setMainMenuOpen(false); }}
+                      style={{
+                        width: '100%', padding: '10px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                        background: 'var(--gold-dim)', border: '1px solid rgba(200,169,110,0.4)',
+                        color: 'var(--gold)', cursor: 'pointer', marginTop: 8
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold)';
+                        (e.currentTarget as HTMLButtonElement).style.color = '#000';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)';
+                        (e.currentTarget as HTMLButtonElement).style.color = 'var(--gold)';
+                      }}
+                    >
+                      👁️ View Tutorial
+                    </button>
                   </div>
                 )}
               </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { Photo } from '../types';
 import { useStore } from '../store';
 import { getSlotRole, SLOT_LABELS } from '../formula';
+import CropEditor from './CropEditor';
 
 interface PhotoCardProps {
   photo: Photo;
@@ -36,10 +37,11 @@ export default function PhotoCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelInput, setLabelInput] = useState('');
+  const [cropOpen, setCropOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const labelInputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef(0);
-  const { setLightbox, addLabel, removeLabel, setCategory } = useStore();
+  const { setLightbox, addLabel, removeLabel, setCategory, cropPhoto } = useStore();
   const [editingCategory, setEditingCategory] = useState(false);
   const [categoryInput, setCategoryInput] = useState(photo.category);
 
@@ -306,6 +308,8 @@ export default function PhotoCard({
               onClick={() => { onToggleStar(); setMenuOpen(false); }} />
             <MenuItem label="🔍 Lightbox"
               onClick={() => { setLightbox(photo.id); setMenuOpen(false); }} />
+            <MenuItem label="📐 Crop"
+              onClick={() => { setCropOpen(true); setMenuOpen(false); }} />
             <MenuItem label="💾 Save to Photos"
               onClick={() => {
                 const a = document.createElement('a');
@@ -350,6 +354,18 @@ export default function PhotoCard({
           </div>
         )}
       </div>
+
+      {/* Crop Editor */}
+      {cropOpen && (
+        <CropEditor
+          photoUrl={photo.url}
+          onCropComplete={(croppedBlob) => {
+            cropPhoto(photo.id, croppedBlob);
+            setCropOpen(false);
+          }}
+          onCancel={() => setCropOpen(false)}
+        />
+      )}
     </div>
   );
 }

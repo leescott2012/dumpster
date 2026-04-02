@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
+import CropEditor from './CropEditor';
 
 export default function Lightbox() {
-  const { lightboxPhotoId, photos, setLightbox } = useStore();
+  const { lightboxPhotoId, photos, setLightbox, cropPhoto } = useStore();
   const photo = photos.find(p => p.id === lightboxPhotoId);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [cropOpen, setCropOpen] = useState(false);
 
   useEffect(() => {
     if (!lightboxPhotoId) return;
@@ -82,6 +84,21 @@ export default function Lightbox() {
           )}
         </div>
 
+        {/* Crop button */}
+        {!isVideo && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setCropOpen(true); }}
+            style={{
+              position: 'absolute', top: 10, right: 45,
+              width: 30, height: 30, borderRadius: '50%',
+              background: 'rgba(0,0,0,0.6)', border: 'none',
+              color: 'var(--gold)', fontSize: 14, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            title="Crop photo"
+          >📐</button>
+        )}
+
         {/* Close button */}
         <button
           onClick={() => setLightbox(null)}
@@ -93,6 +110,18 @@ export default function Lightbox() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >×</button>
+
+        {/* Crop Editor */}
+        {cropOpen && (
+          <CropEditor
+            photoUrl={photo.url}
+            onCropComplete={(croppedBlob) => {
+              cropPhoto(photo.id, croppedBlob);
+              setCropOpen(false);
+            }}
+            onCancel={() => setCropOpen(false)}
+          />
+        )}
       </div>
     </div>
   );

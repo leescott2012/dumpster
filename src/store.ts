@@ -121,6 +121,7 @@ interface Store {
   setCategory: (photoId: string, category: string) => void;
   addLabel: (photoId: string, label: string) => void;
   removeLabel: (photoId: string, label: string) => void;
+  cropPhoto: (photoId: string, croppedBlob: Blob) => void;
 
   // dumps
   addPhotoToDump: (photoId: string, dumpId: string) => void;
@@ -251,6 +252,17 @@ export const useStore = create<Store>((set, get) => {
       set((s) => ({
         photos: s.photos.map((p) =>
           p.id === photoId ? { ...p, labels: p.labels.filter((l) => l !== label) } : p
+        ),
+      }));
+      persist();
+    },
+
+    cropPhoto: (photoId, croppedBlob) => {
+      snap();
+      const blobUrl = URL.createObjectURL(croppedBlob);
+      set((s) => ({
+        photos: s.photos.map((p) =>
+          p.id === photoId ? { ...p, url: blobUrl } : p
         ),
       }));
       persist();

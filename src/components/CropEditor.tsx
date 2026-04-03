@@ -15,12 +15,11 @@ interface CropRect {
 
 export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const [crop, setCrop] = useState<CropRect>({ x: 0, y: 0, width: 300, height: 300 });
   const [imgDim, setImgDim] = useState({ width: 0, height: 0 });
-  const [dragging, setDragging] = useState<'move' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null>(null);
+  const [dragging, setDragging] = useState<'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Load image and set initial crop
@@ -118,7 +117,7 @@ export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropE
         { x: crop.x, y: crop.y + crop.height / 2, cursor: 'w-resize' }, // w
       ];
 
-      handles.forEach((handle, idx) => {
+      handles.forEach((handle) => {
         ctx.fillStyle = 'var(--gold)';
         ctx.fillRect(handle.x - 5, handle.y - 5, 10, 10);
         ctx.strokeStyle = '#fff';
@@ -166,7 +165,7 @@ export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropE
 
     const handle = getHandleAtPos(x, y);
     if (handle) {
-      setDragging(handle as any);
+      setDragging(handle as 'move' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw');
       setDragStart({ x, y });
     }
   }, [crop]);

@@ -203,7 +203,7 @@ export default function CaptionPool() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filteredCaptions.map((caption, idx) => (
+          {filteredCaptions.map((caption) => (
             <CaptionCard
               key={caption.id}
               caption={caption}

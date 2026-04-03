@@ -102,12 +102,11 @@ export const Onboarding = ({ onComplete }: OnboardingProps) => {
       </div>
 
       {/* Content container */}
-      <div style={{
+      <div key={currentStep} className="onboarding-step-enter" style={{
         position: 'relative',
         zIndex: 1,
         maxWidth: '500px',
         textAlign: 'center',
-        animation: 'fadeIn 0.5s ease-out'
       }}>
         {/* Icon */}
         <div style={{
@@ -274,7 +273,7 @@ export const Onboarding = ({ onComplete }: OnboardingProps) => {
             transform: translateY(0);
           }
           50% {
-            transform: translateY(-20px);
+            transform: translateY(-16px);
           }
         }
 
@@ -285,6 +284,11 @@ export const Onboarding = ({ onComplete }: OnboardingProps) => {
           50% {
             transform: translateY(30px) rotate(180deg);
           }
+        }
+
+        /* Onboarding step transitions */
+        .onboarding-step-enter {
+          animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
       `}</style>
     </div>

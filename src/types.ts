@@ -11,7 +11,7 @@ export interface Photo {
 export interface Caption {
   id: string;
   text: string;
-  style: 'punchy' | 'storytelling' | 'emoji' | 'clean' | 'numbered';
+  style: 'storytelling' | 'emoji' | 'clean' | 'numbered';
   rating: number; // 0–5
   dumpId?: string;
   createdAt: number;

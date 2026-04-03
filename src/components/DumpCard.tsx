@@ -53,12 +53,14 @@ export default function DumpCard({ dump, onActivate }: Props) {
 
   return (
     <div
+      className="dump-card-enter"
       onClick={onActivate}
       style={{
         marginBottom: 56, cursor: 'default',
+        overflow: 'hidden',
         opacity: deleting ? 0 : 1,
         transform: deleting ? 'translateY(-8px) scale(0.98)' : 'none',
-        transition: 'opacity 0.35s ease, transform 0.35s ease',
+        transition: 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* Header row */}
@@ -94,7 +96,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
       {/* Sortable photo row */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={dump.photos} strategy={horizontalListSortingStrategy}>
-          <div className="dump-photos-row" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 24 }}>
+          <div className="dump-photos-row" style={{ display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', paddingBottom: 24 }}>
             {dumpPhotos.map((photo, idx) => (
               <SortableSlot
                 key={photo.id}

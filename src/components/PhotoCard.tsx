@@ -104,7 +104,7 @@ export default function PhotoCard({
         touchAction: dragListeners ? 'none' : 'auto',
         background: 'var(--bg2)',
         opacity: isDragging ? 0.45 : used ? 0.38 : 1,
-        transition: 'border-color 0.15s, opacity 0.15s',
+        transition: 'border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
         pointerEvents: used ? 'none' : 'auto',
       }}
       onMouseEnter={(e) => {
@@ -296,7 +296,7 @@ export default function PhotoCard({
         </button>
 
         {menuOpen && (
-          <div style={{
+          <div className="menu-dropdown" style={{
             position: 'absolute', top: 30, left: '50%', transform: 'translateX(-50%)',
             background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
             border: '1px solid var(--border2)',

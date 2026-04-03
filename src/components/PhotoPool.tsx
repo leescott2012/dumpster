@@ -142,40 +142,51 @@ export default function PhotoPool() {
               border: `1px solid ${menuOpen ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
               cursor: 'pointer', display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 3,
+              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+              transform: menuOpen ? 'rotate(90deg)' : 'rotate(0deg)',
             }}
           >
             {[0, 1, 2].map(i => (
-              <div key={i} style={{ width: 12, height: 1.5, background: menuOpen ? 'var(--gold)' : 'var(--text3)', borderRadius: 1 }} />
+              <div key={i} style={{
+                width: 12, height: 1.5, borderRadius: 1,
+                background: menuOpen ? 'var(--gold)' : 'var(--text3)',
+                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+              }} />
             ))}
           </button>
 
           <div
-            className={`pool-filter-drawer ${menuOpen ? 'open' : ''}`}
             style={{
-              position: 'absolute', top: 38, left: 0, zIndex: 100,
+              position: 'absolute', top: 0, left: 38, zIndex: 100,
               background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
               border: '1px solid var(--border2)',
-              borderRadius: 10, padding: menuOpen ? 12 : 0, minWidth: 180,
+              borderRadius: 10, padding: '6px 8px',
               boxShadow: menuOpen ? '0 8px 32px rgba(0,0,0,0.25)' : 'none',
-              maxHeight: menuOpen ? 300 : 0,
               opacity: menuOpen ? 1 : 0,
               overflow: 'hidden',
-              transform: menuOpen ? 'translateY(0)' : 'translateY(-8px)',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: menuOpen ? 'translateX(0) scale(1)' : 'translateX(-12px) scale(0.96)',
+              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
               pointerEvents: menuOpen ? 'auto' : 'none',
+              display: 'flex', gap: 4, alignItems: 'center',
+              whiteSpace: 'nowrap',
             }}
           >
-            <p style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', marginBottom: 10 }}>FILTERS</p>
             {FILTER_OPTIONS.map(({ key, label }) => (
-              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={activeFilters.includes(key)}
-                  onChange={() => toggleActiveFilter(key)}
-                  style={{ accentColor: 'var(--gold)' }}
-                />
-                <span style={{ fontSize: 12, color: 'var(--text2)' }}>{label}</span>
-              </label>
+              <button
+                key={key}
+                onClick={() => toggleActiveFilter(key)}
+                style={{
+                  padding: '6px 12px', borderRadius: 16,
+                  fontSize: 11, fontWeight: 600,
+                  background: activeFilters.includes(key) ? 'var(--gold-dim)' : 'transparent',
+                  border: `1px solid ${activeFilters.includes(key) ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
+                  color: activeFilters.includes(key) ? 'var(--gold)' : 'var(--text3)',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </button>
             ))}
           </div>
         </div>
@@ -213,9 +224,11 @@ export default function PhotoPool() {
               value={poolSearchQuery}
               onChange={e => setPoolSearch(e.target.value)}
               placeholder="Search labels..."
+              className="menu-dropdown"
               style={{
                 position: 'absolute', top: 0, right: 36,
-                background: 'var(--bg2)', border: '1px solid var(--border2)',
+                background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                border: '1px solid var(--border2)',
                 borderRadius: 8, padding: '6px 12px', color: 'var(--text)',
                 fontSize: 12, width: 160, fontFamily: 'var(--font)',
                 outline: 'none',
@@ -243,7 +256,7 @@ export default function PhotoPool() {
 
       {/* Adding-to-dump banner */}
       {addingToDumpId && (
-        <div style={{
+        <div className="menu-dropdown" style={{
           background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.3)',
           borderRadius: 10, padding: '12px 16px', marginBottom: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',

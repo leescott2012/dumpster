@@ -21,15 +21,17 @@ export default function Lightbox() {
 
   return (
     <div
+      className="lightbox-overlay"
       onClick={() => setLightbox(null)}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        animation: 'fadeIn 0.15s ease',
       }}
     >
       <div
+        className="lightbox-img"
         onClick={e => e.stopPropagation()}
         style={{
           position: 'relative', maxWidth: '92vw', maxHeight: '92vh',

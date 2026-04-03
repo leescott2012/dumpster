@@ -2,24 +2,69 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Viewport: edge-to-edge for Dynamic Island / notched iPhones -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+
+    <!-- Theme & Color Scheme -->
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F5F0E8" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="description" content="Organize your photos into curated dumps with carousel formula guidance" />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- iOS PWA Meta -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="DUMPSTER" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Disable auto-detection -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- SEO -->
+    <meta name="description" content="Organize your photos into curated dumps with carousel formula guidance" />
     <title>DUMPSTER</title>
+
+    <!-- iOS Safe Area CSS Variables -->
+    <style>
+      :root {
+        --sat: env(safe-area-inset-top);
+        --sar: env(safe-area-inset-right);
+        --sab: env(safe-area-inset-bottom);
+        --sal: env(safe-area-inset-left);
+      }
+    </style>
+
+    <!-- Apple Splash Screens (iPhone) -->
+    <!-- iPhone 15 Pro Max / 16 Plus -->
+    <link rel="apple-touch-startup-image"
+      media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1290 2796'><rect fill='%230a0a0a' width='1290' height='2796'/><text x='645' y='1398' font-size='200' font-weight='800' fill='%23C8A96E' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>D</text></svg>" />
+    <!-- iPhone 15 Pro / 16 -->
+    <link rel="apple-touch-startup-image"
+      media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1179 2556'><rect fill='%230a0a0a' width='1179' height='2556'/><text x='590' y='1278' font-size='200' font-weight='800' fill='%23C8A96E' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>D</text></svg>" />
+    <!-- iPhone 14 / 15 -->
+    <link rel="apple-touch-startup-image"
+      media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1170 2532'><rect fill='%230a0a0a' width='1170' height='2532'/><text x='585' y='1266' font-size='200' font-weight='800' fill='%23C8A96E' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>D</text></svg>" />
+    <!-- iPhone SE 3 -->
+    <link rel="apple-touch-startup-image"
+      media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 750 1334'><rect fill='%230a0a0a' width='750' height='1334'/><text x='375' y='667' font-size='160' font-weight='800' fill='%23C8A96E' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>D</text></svg>" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/service-worker.js').catch(() => {
-          // Service worker registration failed, app will still work
-        });
+        navigator.serviceWorker.register('/service-worker.js').catch(() => {});
       }
     </script>
   </body>

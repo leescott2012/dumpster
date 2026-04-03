@@ -295,6 +295,7 @@ export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropE
   return (
     <div
       ref={overlayRef}
+      className="crop-editor-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -302,6 +303,8 @@ export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropE
         right: 0,
         bottom: 0,
         background: 'rgba(0, 0, 0, 0.92)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

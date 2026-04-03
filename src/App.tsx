@@ -3,6 +3,7 @@ import './index.css';
 import { useStore, applyColorMode, loadPhotosFromServer } from './store';
 import DumpCard from './components/DumpCard';
 import PhotoPool from './components/PhotoPool';
+import CaptionPool from './components/CaptionPool';
 import Lightbox from './components/Lightbox';
 import { InstallPrompt } from './components/InstallPrompt';
 import { Onboarding } from './components/Onboarding';
@@ -16,6 +17,7 @@ export default function App() {
 
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [activePool, setActivePool] = useState<'photos' | 'captions'>('photos');
   const mainMenuRef = useRef<HTMLDivElement>(null);
   const usedIds = new Set(dumps.flatMap((d) => d.photos));
   const usedCount = usedIds.size;
@@ -105,15 +107,21 @@ export default function App() {
                     border: `1px solid ${mainMenuOpen ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
                     cursor: 'pointer', display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center', gap: 4,
+                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                    transform: mainMenuOpen ? 'rotate(90deg)' : 'rotate(0deg)',
                   }}
                 >
                   {[0, 1, 2].map(i => (
-                    <div key={i} style={{ width: 14, height: 1.5, background: mainMenuOpen ? 'var(--gold)' : 'var(--text3)', borderRadius: 1 }} />
+                    <div key={i} style={{
+                      width: 14, height: 1.5, borderRadius: 1,
+                      background: mainMenuOpen ? 'var(--gold)' : 'var(--text3)',
+                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                    }} />
                   ))}
                 </button>
 
                 {mainMenuOpen && (
-                  <div style={{
+                  <div className="menu-dropdown" style={{
                     position: 'absolute', top: 42, right: 0, zIndex: 200,
                     background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
                     border: '1px solid var(--border2)',
@@ -122,14 +130,14 @@ export default function App() {
                   }}>
                     {/* Color mode */}
                     <p style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', marginBottom: 10 }}>COLOR MODE</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
                       {(['dark', 'day', 'system'] as const).map(m => (
                         <button key={m} onClick={() => { setColorMode(m); setMainMenuOpen(false); }} style={{
-                          width: '100%', padding: '8px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                          background: colorMode === m ? 'var(--gold-dim)' : 'transparent',
+                          flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 10, fontWeight: 600,
+                          background: colorMode === m ? 'var(--gold-dim)' : 'var(--bg3)',
                           border: `1px solid ${colorMode === m ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
                           color: colorMode === m ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer',
-                          textTransform: 'capitalize', textAlign: 'left',
+                          textTransform: 'capitalize',
                         }}>{m}</button>
                       ))}
                     </div>
@@ -199,14 +207,16 @@ export default function App() {
         <div style={{ borderTop: '1px solid var(--border2)', marginBottom: 48 }} />
 
         {/* ── Dump Cards ───────────────────────────────────── */}
-        {dumps.map((dump) => (
-          <DumpCard
-            key={dump.id}
-            dump={dump}
-            active={dump.id === activeDumpId}
-            onActivate={() => setActiveDump(dump.id)}
-          />
-        ))}
+        <div style={{ overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+          {dumps.map((dump) => (
+            <DumpCard
+              key={dump.id}
+              dump={dump}
+              active={dump.id === activeDumpId}
+              onActivate={() => setActiveDump(dump.id)}
+            />
+          ))}
+        </div>
 
         {/* ── Actions ──────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 72, marginTop: 8 }}>
@@ -215,8 +225,49 @@ export default function App() {
 
         <div style={{ borderTop: '1px solid var(--border2)', marginBottom: 48 }} />
 
-        {/* ── Photo Pool ───────────────────────────────────── */}
-        <PhotoPool />
+        {/* ── Pool Toggle ──────────────────────────────────── */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+          <div style={{
+            display: 'flex', width: 260, height: 40,
+            borderRadius: 20, background: 'var(--bg2)',
+            border: '1px solid var(--border2)', position: 'relative',
+            overflow: 'hidden', cursor: 'pointer',
+          }}>
+            {/* Sliding pill */}
+            <div style={{
+              position: 'absolute', top: 3, bottom: 3,
+              width: '50%', borderRadius: 17,
+              background: 'var(--gold-dim)', border: '1px solid rgba(200,169,110,0.3)',
+              transition: 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+              transform: activePool === 'photos' ? 'translateX(3px)' : 'translateX(calc(100% - 3px))',
+            }} />
+            <button
+              onClick={() => setActivePool('photos')}
+              style={{
+                flex: 1, zIndex: 1, background: 'transparent', border: 'none',
+                fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+                color: activePool === 'photos' ? 'var(--gold)' : 'var(--text3)',
+                cursor: 'pointer', transition: 'color 0.2s',
+                textTransform: 'uppercase', fontFamily: 'var(--font)',
+              }}
+            >Photos</button>
+            <button
+              onClick={() => setActivePool('captions')}
+              style={{
+                flex: 1, zIndex: 1, background: 'transparent', border: 'none',
+                fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+                color: activePool === 'captions' ? 'var(--gold)' : 'var(--text3)',
+                cursor: 'pointer', transition: 'color 0.2s',
+                textTransform: 'uppercase', fontFamily: 'var(--font)',
+              }}
+            >Captions</button>
+          </div>
+        </div>
+
+        {/* ── Photo Pool / Caption Pool ──────────────────── */}
+        <div className="pool-section" key={activePool} style={{ position: 'relative', zIndex: 2 }}>
+          {activePool === 'photos' ? <PhotoPool /> : <CaptionPool />}
+        </div>
 
         <div style={{ height: 80 }} />
       </div>
@@ -233,8 +284,9 @@ function undoRedoStyle(disabled: boolean): React.CSSProperties {
     color: disabled ? 'var(--border3)' : 'var(--text2)',
     cursor: disabled ? 'default' : 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'all 0.15s',
+    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
     opacity: disabled ? 0.4 : 1,
+    transform: 'scale(1)',
   };
 }
 

@@ -4,7 +4,7 @@ import {
   closestCenter, type DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  SortableContext, rectSortingStrategy, useSortable,
+  SortableContext, horizontalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Dump, Photo } from '../types';
@@ -25,7 +25,6 @@ export default function DumpCard({ dump, onActivate }: Props) {
   } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [deleting, setDeleting] = useState(false);
-  const [gridSize, setGridSize] = useState<'small' | 'medium' | 'large'>('medium');
 
   const dumpPhotos = dump.photos
     .map((id) => photos.find((p) => p.id === id))
@@ -80,15 +79,6 @@ export default function DumpCard({ dump, onActivate }: Props) {
           )}
         </p>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {/* Grid size controls */}
-          {(['small', 'medium', 'large'] as const).map(s => (
-            <button key={s} onClick={(e) => { e.stopPropagation(); setGridSize(s); }} style={{
-              width: 22, height: 22, borderRadius: 4, fontSize: 8, fontWeight: 700,
-              background: gridSize === s ? 'var(--gold-dim)' : 'var(--bg2)',
-              border: `1px solid ${gridSize === s ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-              color: gridSize === s ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer',
-            }}>{s === 'small' ? 'S' : s === 'medium' ? 'M' : 'L'}</button>
-          ))}
           <SmallBtn label="Check Vibe" onClick={(e) => { e.stopPropagation(); checkDumpVibe(dump.id); }} />
           <SmallBtn label="✕ Delete" onClick={(e) => { e.stopPropagation(); handleDelete(); }} danger />
         </div>
@@ -117,85 +107,75 @@ export default function DumpCard({ dump, onActivate }: Props) {
         );
       })()}
 
-      {/* Sortable photo grid */}
-      {(() => {
-        const cols = gridSize === 'small' ? 3 : gridSize === 'medium' ? 2 : 1;
-        const slotHeight = gridSize === 'small' ? 140 : gridSize === 'medium' ? 220 : 340;
-        return (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={dump.photos} strategy={rectSortingStrategy}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                gap: 8, marginBottom: 16,
-              }}>
-                {dumpPhotos.map((photo, idx) => (
-                  <SortableSlot
-                    key={photo.id}
-                    photo={photo}
-                    index={idx}
-                    totalInDump={dumpPhotos.length}
-                    height={slotHeight}
-                    onRemoveFromDump={() => removePhotoFromDump(photo.id, dump.id)}
-                    onToggleStar={() => toggleStar(photo.id)}
-                    onToggleHuji={() => toggleHuji(photo.id)}
-                  />
-                ))}
+      {/* Sortable photo row */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={dump.photos} strategy={horizontalListSortingStrategy}>
+          <div className="dump-photos-row" style={{ display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', paddingBottom: 24 }}>
+            {dumpPhotos.map((photo, idx) => (
+              <SortableSlot
+                key={photo.id}
+                photo={photo}
+                index={idx}
+                totalInDump={dumpPhotos.length}
+                onRemoveFromDump={() => removePhotoFromDump(photo.id, dump.id)}
+                onToggleStar={() => toggleStar(photo.id)}
+                onToggleHuji={() => toggleHuji(photo.id)}
+              />
+            ))}
 
-                {/* Add slot */}
-                {dump.photos.length < 20 && (
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAddingToDump(dump.id);
-                      document.getElementById('photo-pool')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }}
-                    style={{
-                      height: slotHeight, borderRadius: 10,
-                      border: '1.5px dashed var(--border3)',
-                      background: 'rgba(255,255,255,0.02)',
-                      display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center', gap: 8,
-                      cursor: 'pointer', color: 'var(--text3)', transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--gold)'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text3)'; }}
-                  >
-                    <span style={{ fontSize: 22, lineHeight: 1 }}>+</span>
-                    <span style={{ fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>Add Photos</span>
-                    {(() => {
-                      const nextSlot = getSlotRole(dump.photos.length, Math.max(dump.photos.length + 1, 7));
-                      return nextSlot ? (
-                        <span style={{ fontSize: 6, color: 'rgba(200,169,110,0.45)', letterSpacing: '0.1em', textAlign: 'center', padding: '0 8px' }}>
-                          {SLOT_LABELS[nextSlot]}
-                        </span>
-                      ) : null;
-                    })()}
-                  </div>
-                )}
-
-                {/* Upload slot */}
-                <div
-                  onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
-                  style={{
-                    height: slotHeight, borderRadius: 10,
-                    border: '1.5px dashed var(--border3)',
-                    background: 'var(--bg2)', display: 'flex',
-                    flexDirection: 'column', alignItems: 'center',
-                    justifyContent: 'center', gap: 8,
-                    cursor: 'pointer', color: 'var(--text3)', transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--gold)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text3)'; }}
-                >
-                  <span style={{ fontSize: 18, lineHeight: 1 }}>↑</span>
-                  <span style={{ fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>Upload</span>
-                </div>
+            {/* Add slot — always at the end */}
+            {dump.photos.length < 20 && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAddingToDump(dump.id);
+                  document.getElementById('photo-pool')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                style={{
+                  flexShrink: 0, width: 175, height: 232,
+                  borderRadius: 10, border: '1.5px dashed var(--border3)',
+                  background: 'rgba(255,255,255,0.02)',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 8,
+                  cursor: 'pointer', color: 'var(--text3)', transition: 'all 0.15s',
+                  backdropFilter: 'blur(4px)',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--gold)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text3)'; }}
+              >
+                <span style={{ fontSize: 22, lineHeight: 1 }}>+</span>
+                <span style={{ fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>Add Photos</span>
+                {(() => {
+                  const nextSlot = getSlotRole(dump.photos.length, Math.max(dump.photos.length + 1, 7));
+                  return nextSlot ? (
+                    <span style={{ fontSize: 6, color: 'rgba(200,169,110,0.45)', letterSpacing: '0.1em', textAlign: 'center', padding: '0 8px' }}>
+                      {SLOT_LABELS[nextSlot]}
+                    </span>
+                  ) : null;
+                })()}
               </div>
-            </SortableContext>
-          </DndContext>
-        );
-      })()}
+            )}
+
+            {/* File upload slot */}
+            <div
+              onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
+              style={{
+                flexShrink: 0, width: 175, height: 232,
+                borderRadius: 10, border: '1.5px dashed var(--border3)',
+                background: 'var(--bg2)', display: 'flex',
+                flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: 8,
+                cursor: 'pointer', color: 'var(--text3)', transition: 'all 0.15s',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--gold)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text3)'; }}
+            >
+              <span style={{ fontSize: 18, lineHeight: 1 }}>↑</span>
+              <span style={{ fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>Upload</span>
+            </div>
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Gold progress bar */}
       <div style={{ height: 2, background: 'var(--border2)', borderRadius: 1, position: 'relative', overflow: 'hidden', marginTop: 4 }}>
@@ -265,21 +245,18 @@ interface SlotProps {
   photo: Photo;
   index: number;
   totalInDump: number;
-  height?: number;
   onRemoveFromDump: () => void;
   onToggleStar: () => void;
   onToggleHuji: () => void;
 }
 
-function SortableSlot({ photo, index, totalInDump, height, onRemoveFromDump, onToggleStar, onToggleHuji }: SlotProps) {
+function SortableSlot({ photo, index, totalInDump, onRemoveFromDump, onToggleStar, onToggleHuji }: SlotProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: photo.id });
   return (
     <PhotoCard
       photo={photo}
       index={index}
       totalInDump={totalInDump}
-      width="100%"
-      height={height}
       dragRef={setNodeRef}
       dragStyle={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : 1 }}
       dragAttributes={attributes as unknown as Record<string, unknown>}

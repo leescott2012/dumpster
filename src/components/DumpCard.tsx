@@ -9,7 +9,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { Dump, Photo } from '../types';
 import { useStore } from '../store';
-import { getSlotRole, SLOT_LABELS } from '../formula';
+import { getSlotRole, SLOT_LABELS, TEMPLATE_7, TEMPLATE_12 } from '../formula';
 import PhotoCard from './PhotoCard';
 
 interface Props {
@@ -86,12 +86,27 @@ export default function DumpCard({ dump, onActivate }: Props) {
 
       <EditableTitle dump={dump} />
 
-      <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 28 }}>
+      <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 10 }}>
         {dump.photos.length === 0 ? 'No photos yet' : `${dump.photos.length}/20 photos`}
         {dump.photos.length >= 10 && dump.photos.length <= 12 && (
           <span style={{ marginLeft: 8, color: 'var(--gold)', fontSize: 10, fontWeight: 700 }}>★ PEAK ZONE</span>
         )}
       </p>
+
+      {/* Slot label description */}
+      {dump.photos.length > 0 && (() => {
+        const template = dump.photos.length >= 10 ? TEMPLATE_12 : TEMPLATE_7;
+        const slots = template.slice(0, dump.photos.length);
+        const desc = slots.map(role => SLOT_LABELS[role]).join(' · ');
+        return (
+          <p style={{
+            fontSize: 10, color: 'var(--text3)', marginBottom: 20,
+            letterSpacing: '0.04em', lineHeight: 1.6,
+          }}>
+            {desc}
+          </p>
+        );
+      })()}
 
       {/* Sortable photo row */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

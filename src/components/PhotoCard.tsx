@@ -21,7 +21,7 @@ interface PhotoCardProps {
   dragAttributes?: Record<string, unknown>;
   dragListeners?: Record<string, unknown>;
   isDragging?: boolean;
-  width?: number;
+  width?: number | string;
   height?: number;
   // pool selection mode
   selected?: boolean;
@@ -94,7 +94,7 @@ export default function PhotoCard({
       onClick={handleClick}
       style={{
         ...dragStyle,
-        flexShrink: 0,
+        flexShrink: typeof width === 'number' ? 0 : undefined,
         width, height,
         borderRadius: 10,
         border: `2px solid ${borderColor}`,

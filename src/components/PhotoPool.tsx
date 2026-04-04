@@ -31,7 +31,7 @@ export default function PhotoPool() {
   const usedIds = new Set(dumps.flatMap((d) => d.photos));
   const colCount = POOL_COLS[poolSize] ?? 6;
   const cardHeight = POOL_HEIGHTS[poolSize] ?? 160;
-  const cardWidth = Math.floor(cardHeight * 0.75);
+
 
   // Reset selection when leaving add-mode
   useEffect(() => {
@@ -337,7 +337,7 @@ export default function PhotoPool() {
                   index={idx}
                   used={used && !addingToDumpId}
                   selected={isSelected}
-                  width={cardWidth}
+                  width="100%"
                   height={cardHeight}
                   onClick={used && !addingToDumpId ? undefined : () => handlePhotoClick(photo.id)}
                   onToggleStar={() => toggleStar(photo.id)}
@@ -351,7 +351,7 @@ export default function PhotoPool() {
             <div
               onClick={() => fileRef.current?.click()}
               style={{
-                width: cardWidth, height: cardHeight, borderRadius: 10,
+                width: '100%', height: cardHeight, borderRadius: 10,
                 border: '1.5px dashed var(--border3)', background: 'var(--bg2)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 6, cursor: 'pointer',

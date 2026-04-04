@@ -1,6 +1,79 @@
 // @catchcanary carousel formula scoring engine
 import type { Photo } from './types';
 
+// Human-readable label for each photo category (used in dump description + titles)
+export const CATEGORY_DISPLAY: Record<string, string> = {
+  PORTRAIT: 'Face',
+  AUTOMOTIVE: 'Car',
+  NIGHTLIFE: 'Night',
+  ART: 'Museum',
+  FITNESS: 'Gym',
+  ABSTRACT: 'Abstract',
+  FASHION: 'Style',
+  ARCHITECTURE: 'Space',
+  TRAVEL: 'Travel',
+  DINING: 'Eats',
+  WATCH: 'Watch',
+  LIFESTYLE: 'Life',
+  SCENE: 'Scene',
+  STUDIO: 'Studio',
+};
+
+// Generate a creative dump title based on the photos' categories
+export function generateDumpTitle(photos: Photo[]): string {
+  if (photos.length === 0) return 'New Dump';
+
+  const counts: Record<string, number> = {};
+  photos.forEach((p) => {
+    const cat = p.category.toUpperCase();
+    counts[cat] = (counts[cat] || 0) + 1;
+  });
+
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const primary = sorted[0]?.[0] ?? 'LIFESTYLE';
+  const secondary = sorted[1]?.[0] ?? null;
+  const secLabel = secondary ? (CATEGORY_DISPLAY[secondary] ?? secondary) : null;
+
+  const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+
+  switch (primary) {
+    case 'NIGHTLIFE':
+      return secLabel
+        ? `The ${secLabel} Night`
+        : pick(['After Hours', 'The Night Edit', 'Nightfall', 'Dark Hours']);
+    case 'AUTOMOTIVE':
+      return secLabel
+        ? `The ${secLabel} Drive`
+        : pick(['The Drive', 'On The Road', 'The Car Edit']);
+    case 'FASHION':
+      return pick(['The Style Edit', 'The Fashion Diary', 'Dressed Up', 'The Look', 'The Fit']);
+    case 'ART':
+      return pick(['The Museum Run', 'Gallery Night', 'Culture Drop', 'The Art Edit']);
+    case 'PORTRAIT':
+      return secLabel
+        ? `The ${secLabel} Portrait`
+        : pick(['The Face Edit', 'Faces', 'Portrait Study']);
+    case 'TRAVEL':
+      return secLabel
+        ? `${secLabel} Trip`
+        : pick(['The Trip', 'On Location', 'Away Edit']);
+    case 'FITNESS':
+      return pick(['Gains Season', 'The Gym Diary', 'Work Mode', 'Session']);
+    case 'ARCHITECTURE':
+      return secLabel
+        ? `The ${secLabel} Space`
+        : pick(['The Space Edit', 'The Build', 'Interiors']);
+    case 'DINING':
+      return pick(['The Table', 'Good Eats', 'The Dinner Edit', 'Last Night']);
+    case 'WATCH':
+      return pick(['On The Wrist', 'The Watch Edit', 'Time Piece']);
+    default:
+      return secLabel
+        ? `The ${CATEGORY_DISPLAY[primary] ?? primary} ${secLabel}`
+        : `The ${CATEGORY_DISPLAY[primary] ?? primary} Edit`;
+  }
+}
+
 export type SlotRole =
   | 'hook' | 'contrast' | 'detail' | 'fashion'
   | 'culture' | 'watch' | 'second-car' | 'insider'

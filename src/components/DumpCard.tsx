@@ -9,7 +9,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { Dump, Photo } from '../types';
 import { useStore } from '../store';
-import { getSlotRole, SLOT_LABELS, TEMPLATE_7, TEMPLATE_12 } from '../formula';
+import { getSlotRole, SLOT_LABELS, CATEGORY_DISPLAY } from '../formula';
 import PhotoCard from './PhotoCard';
 
 interface Props {
@@ -93,17 +93,16 @@ export default function DumpCard({ dump, onActivate }: Props) {
         )}
       </p>
 
-      {/* Slot label description */}
-      {dump.photos.length > 0 && (() => {
-        const template = dump.photos.length >= 10 ? TEMPLATE_12 : TEMPLATE_7;
-        const slots = template.slice(0, dump.photos.length);
-        const desc = slots.map(role => SLOT_LABELS[role]).join(' · ');
+      {/* Category label description */}
+      {dumpPhotos.length > 0 && (() => {
+        const unique = [...new Set(dumpPhotos.map(p => p.category.toUpperCase()))];
+        const desc = unique.map(cat => CATEGORY_DISPLAY[cat] ?? cat).join(' / ');
         return (
           <p style={{
-            fontSize: 10, color: 'var(--text3)', marginBottom: 20,
+            fontSize: 11, color: 'var(--text3)', marginBottom: 20,
             letterSpacing: '0.04em', lineHeight: 1.6,
           }}>
-            {desc}
+            {dump.photos.length}/20 · {desc}
           </p>
         );
       })()}

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>DUMPSTER Icon Generator</title>
+<style>
+  body { background: #111; color: #eee; font-family: system-ui; padding: 2rem; }
+  h1 { color: #C8A96E; }
+  .icon-row { display: flex; align-items: center; gap: 1rem; margin: 1rem 0; padding: 1rem; background: #1a1a1a; border-radius: 8px; }
+  .icon-row canvas { border: 1px solid #333; }
+  .icon-row .info { flex: 1; }
+  .icon-row .name { font-weight: bold; color: #C8A96E; }
+  .icon-row .size { color: #888; font-size: 0.9em; }
+  a.download { color: #C8A96E; text-decoration: none; padding: 0.4rem 0.8rem; border: 1px solid #C8A96E; border-radius: 4px; font-size: 0.85em; }
+  a.download:hover { background: #C8A96E; color: #0a0a0a; }
+  button { background: #C8A96E; color: #0a0a0a; border: none; padding: 0.8rem 2rem; font-size: 1.1em; font-weight: bold; border-radius: 6px; cursor: pointer; margin: 1rem 0; }
+  button:hover { background: #d4b87a; }
+  #status { margin: 1rem 0; padding: 1rem; background: #1a2a1a; border-radius: 6px; display: none; }
+</style>
+</head>
+<body>
+<h1>DUMPSTER Icon Generator</h1>
+<p>Generates PNG icons for the PWA manifest. Click "Generate All" then "Download All".</p>
+<div id="status"></div>
+<button onclick="generateAll()">Generate All Icons</button>
+<button onclick="downloadAll()" id="downloadBtn" style="display:none">Download All PNGs</button>
+<div id="icons"></div>
+
+<script>
+const ICONS = [
+  { name: 'icon-192.png', size: 192, maskable: false },
+  { name: 'icon-512.png', size: 512, maskable: false },
+  { name: 'apple-touch-icon.png', size: 180, maskable: false, noRadius: true },
+  { name: 'icon-maskable-192.png', size: 192, maskable: true },
+  { name: 'icon-maskable-512.png', size: 512, maskable: true },
+];
+
+const blobs = {};
+
+function drawIcon(canvas, size, { maskable = false, noRadius = false } = {}) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = size;
+  canvas.height = size;
+
+  // Background
+  const rx = noRadius ? 0 : (maskable ? 0 : Math.round(size * 0.15));
+  if (rx > 0) {
+    ctx.beginPath();
+    ctx.roundRect(0, 0, size, size, rx);
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fill();
+  } else {
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  // Gold "D"
+  const fontSize = maskable ? size * 0.50 : size * 0.68;
+  ctx.fillStyle = '#C8A96E';
+  ctx.font = `800 ${fontSize}px "SF Pro Display", "Helvetica Neue", "Arial Black", system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // Slight vertical adjustment for optical centering
+  ctx.fillText('D', size / 2, size / 2 + fontSize * 0.02);
+}
+
+function generateAll() {
+  const container = document.getElementById('icons');
+  container.innerHTML = '';
+
+  for (const icon of ICONS) {
+    const row = document.createElement('div');
+    row.className = 'icon-row';
+
+    const canvas = document.createElement('canvas');
+    const displaySize = Math.min(icon.size, 192);
+    canvas.style.width = displaySize + 'px';
+    canvas.style.height = displaySize + 'px';
+    drawIcon(canvas, icon.size, { maskable: icon.maskable, noRadius: icon.noRadius });
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    info.innerHTML = `
+      <div class="name">${icon.name}</div>
+      <div class="size">${icon.size}x${icon.size}${icon.maskable ? ' (maskable)' : ''}</div>
+    `;
+
+    // Convert to blob
+    canvas.toBlob((blob) => {
+      blobs[icon.name] = blob;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.className = 'download';
+      a.href = url;
+      a.download = icon.name;
+      a.textContent = 'Download';
+      row.appendChild(a);
+    }, 'image/png');
+
+    row.appendChild(canvas);
+    row.appendChild(info);
+    container.appendChild(row);
+  }
+
+  document.getElementById('downloadBtn').style.display = 'inline-block';
+  showStatus('All icons generated! Click individual download buttons or "Download All".');
+}
+
+function downloadAll() {
+  for (const [name, blob] of Object.entries(blobs)) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  showStatus('All icons downloaded! Move them to dumpster/public/');
+}
+
+function showStatus(msg) {
+  const el = document.getElementById('status');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+// Auto-generate on load
+window.addEventListener('load', () => setTimeout(generateAll, 100));
+</script>
+</body>
+</html>

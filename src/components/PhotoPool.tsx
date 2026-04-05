@@ -14,8 +14,8 @@ const POOL_COLS: Record<string, number> = { small: 6, medium: 4, large: 2 };
 
 export default function PhotoPool() {
   const {
-    photos, dumps, filter, activeFilters, activeDumpId, poolSize, poolSearchQuery,
-    addPhotos, addPhotoToDump, addPhotosToDump, toggleStar, toggleHuji, removePhoto,
+    photos, dumps, filter, activeFilters, poolSize, poolSearchQuery,
+    addPhotos, addPhotosToDump, toggleStar, toggleHuji, removePhoto,
     setFilter, toggleActiveFilter, setPoolSize, setPoolSearch,
     addingToDumpId, setAddingToDump, rescanPhoto,
   } = useStore();
@@ -92,16 +92,15 @@ export default function PhotoPool() {
 
   const handlePhotoClick = (photoId: string) => {
     if (addingToDumpId) {
-      // Selection mode
+      // Selection mode only — no auto-add on tap
       setSelectedIds(prev => {
         const next = new Set(prev);
         if (next.has(photoId)) next.delete(photoId);
         else next.add(photoId);
         return next;
       });
-    } else if (activeDumpId) {
-      addPhotoToDump(photoId, activeDumpId);
     }
+    // Do nothing on normal tap — user must use Add Photos flow
   };
 
   const confirmAddToDump = () => {

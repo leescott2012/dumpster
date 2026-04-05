@@ -265,7 +265,7 @@ export default function PhotoCard({
 
         {menuOpen && (
           <div className="menu-dropdown" style={{
-            position: 'absolute', top: 30, left: '50%', transform: 'translateX(-50%)',
+            position: 'absolute', top: 30, right: 0,
             background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
             border: '1px solid var(--border2)',
             borderRadius: 10, overflow: 'hidden',

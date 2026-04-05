@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
-  closestCenter, type DragEndEvent, type DragStartEvent, type DragCancelEvent,
+  closestCenter, type DragEndEvent, type DragStartEvent, type DragCancelEvent, type DragOverEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext, horizontalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+
 import type { Dump, Photo } from '../types';
 import { useStore } from '../store';
 import { getSlotRole, SLOT_LABELS, CATEGORY_DISPLAY } from '../formula';
@@ -28,6 +28,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -72,10 +73,16 @@ export default function DumpCard({ dump, onActivate }: Props) {
 
   const handleDragStart = (event: DragStartEvent) => {
     setDraggingId(event.active.id as string);
+    setOverId(null);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    setOverId(event.over?.id as string ?? null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setDraggingId(null);
+    setOverId(null);
     const { active, over } = event;
     if (over && active.id !== over.id)
       reorderDumpPhotos(dump.id, active.id as string, over.id as string);
@@ -83,6 +90,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
 
   const handleDragCancel = (_event: DragCancelEvent) => {
     setDraggingId(null);
+    setOverId(null);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -211,7 +219,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
       </p>
 
       {/* Sortable photo row */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
         <SortableContext items={dump.photos} strategy={horizontalListSortingStrategy}>
           <div
             ref={scrollRowRef}
@@ -228,6 +236,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
                 index={idx}
                 totalInDump={dumpPhotos.length}
                 isDragActive={draggingId !== null}
+                isDropTarget={overId === photo.id && draggingId !== photo.id}
                 onRemoveFromDump={() => removePhotoFromDump(photo.id, dump.id)}
                 onToggleStar={() => toggleStar(photo.id)}
                 onToggleHuji={() => toggleHuji(photo.id)}
@@ -291,12 +300,13 @@ export default function DumpCard({ dump, onActivate }: Props) {
         <DragOverlay dropAnimation={null}>
           {draggingPhoto && (
             <div style={{
-              width: 80, height: 107, borderRadius: 8,
+              width: 110, height: 147, borderRadius: 10,
               border: '2px solid var(--gold)',
               overflow: 'hidden',
-              boxShadow: '0 8px 28px rgba(0,0,0,0.65)',
-              opacity: 0.92,
+              boxShadow: '0 12px 32px rgba(0,0,0,0.7)',
+              opacity: 0.95,
               pointerEvents: 'none',
+              transform: 'rotate(-2deg)',
             }}>
               {/\.(mp4|mov|webm)$/i.test(draggingPhoto.filename) ? (
                 <video src={draggingPhoto.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
@@ -380,15 +390,17 @@ interface SlotProps {
   index: number;
   totalInDump: number;
   isDragActive: boolean;
+  isDropTarget: boolean;
   onRemoveFromDump: () => void;
   onToggleStar: () => void;
   onToggleHuji: () => void;
 }
 
-function SortableSlot({ photo, index, totalInDump, isDragActive, onRemoveFromDump, onToggleStar, onToggleHuji }: SlotProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: photo.id });
+function SortableSlot({ photo, index, totalInDump, isDragActive, isDropTarget, onRemoveFromDump, onToggleStar, onToggleHuji }: SlotProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: photo.id });
 
-  // When dragging: original slot stays full size but grayed out (DragOverlay shows the floating thumbnail)
+  // Freeze all items in place during drag — no real-time shuffling.
+  // Only the drop-target gets a gold border highlight.
   const dimmed = isDragActive && !isDragging;
 
   return (
@@ -398,10 +410,14 @@ function SortableSlot({ photo, index, totalInDump, isDragActive, onRemoveFromDum
       totalInDump={totalInDump}
       dragRef={setNodeRef}
       dragStyle={{
-        transform: CSS.Transform.toString(transform) ?? undefined,
-        transition: transition ?? undefined,
+        // No transform during drag — items stay frozen in their positions
+        transform: undefined,
+        transition: 'none',
         zIndex: isDragging ? 999 : 1,
-        opacity: dimmed ? 0.45 : 1,
+        opacity: isDragging ? 0 : dimmed ? 0.55 : 1,
+        // Gold outline on the item currently under the thumbnail
+        outline: isDropTarget ? '2px solid var(--gold)' : undefined,
+        outlineOffset: isDropTarget ? 3 : undefined,
       }}
       dragAttributes={attributes as unknown as Record<string, unknown>}
       dragListeners={listeners as unknown as Record<string, unknown>}

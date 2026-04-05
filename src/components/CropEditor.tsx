@@ -118,18 +118,20 @@ export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropE
       ];
 
       handles.forEach((handle) => {
-        ctx.fillStyle = 'var(--gold)';
-        ctx.fillRect(handle.x - 5, handle.y - 5, 10, 10);
+        ctx.fillStyle = 'rgba(200,169,110,0.9)';
+        ctx.beginPath();
+        ctx.arc(handle.x, handle.y, 9, 0, Math.PI * 2);
+        ctx.fill();
         ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(handle.x - 5, handle.y - 5, 10, 10);
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       });
     };
     img.src = photoUrl;
   }, [crop, photoUrl, imgDim]);
 
   const getHandleAtPos = (x: number, y: number): string | null => {
-    const threshold = 15;
+    const threshold = 22; // large touch target for mobile
     const handles: Record<string, [number, number]> = {
       nw: [crop.x, crop.y],
       n: [crop.x + crop.width / 2, crop.y],
@@ -155,14 +157,14 @@ export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropE
     return null;
   };
 
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const getCanvasPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const { x, y } = getCanvasPos(e);
     const handle = getHandleAtPos(x, y);
     if (handle) {
       setDragging(handle as 'move' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw');
@@ -170,75 +172,51 @@ export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropE
     }
   }, [crop]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const { x, y } = getCanvasPos(e);
 
     if (!dragging) {
       const handle = getHandleAtPos(x, y);
-      canvas.style.cursor = {
-        nw: 'nw-resize',
-        n: 'n-resize',
-        ne: 'ne-resize',
-        e: 'e-resize',
-        se: 'se-resize',
-        s: 's-resize',
-        sw: 'sw-resize',
-        w: 'w-resize',
-        move: 'grab',
-      }[handle || ''] || 'default';
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = {
+          nw: 'nw-resize', n: 'n-resize', ne: 'ne-resize',
+          e: 'e-resize', se: 'se-resize', s: 's-resize',
+          sw: 'sw-resize', w: 'w-resize', move: 'grab',
+        }[handle || ''] || 'default';
+      }
       return;
     }
 
     const dx = x - dragStart.x;
     const dy = y - dragStart.y;
-
     const newCrop = { ...crop };
     const minSize = 50;
 
     switch (dragging) {
       case 'nw':
-        newCrop.x = Math.max(0, crop.x + dx);
-        newCrop.y = Math.max(0, crop.y + dy);
-        newCrop.width = crop.width - dx;
-        newCrop.height = crop.height - dy;
-        break;
+        newCrop.x = Math.max(0, crop.x + dx); newCrop.y = Math.max(0, crop.y + dy);
+        newCrop.width = crop.width - dx; newCrop.height = crop.height - dy; break;
       case 'n':
-        newCrop.y = Math.max(0, crop.y + dy);
-        newCrop.height = crop.height - dy;
-        break;
+        newCrop.y = Math.max(0, crop.y + dy); newCrop.height = crop.height - dy; break;
       case 'ne':
         newCrop.y = Math.max(0, crop.y + dy);
         newCrop.width = Math.min(imgDim.width - crop.x, crop.width + dx);
-        newCrop.height = crop.height - dy;
-        break;
+        newCrop.height = crop.height - dy; break;
       case 'e':
-        newCrop.width = Math.min(imgDim.width - crop.x, crop.width + dx);
-        break;
+        newCrop.width = Math.min(imgDim.width - crop.x, crop.width + dx); break;
       case 'se':
         newCrop.width = Math.min(imgDim.width - crop.x, crop.width + dx);
-        newCrop.height = Math.min(imgDim.height - crop.y, crop.height + dy);
-        break;
+        newCrop.height = Math.min(imgDim.height - crop.y, crop.height + dy); break;
       case 's':
-        newCrop.height = Math.min(imgDim.height - crop.y, crop.height + dy);
-        break;
+        newCrop.height = Math.min(imgDim.height - crop.y, crop.height + dy); break;
       case 'sw':
-        newCrop.x = Math.max(0, crop.x + dx);
-        newCrop.width = crop.width - dx;
-        newCrop.height = Math.min(imgDim.height - crop.y, crop.height + dy);
-        break;
+        newCrop.x = Math.max(0, crop.x + dx); newCrop.width = crop.width - dx;
+        newCrop.height = Math.min(imgDim.height - crop.y, crop.height + dy); break;
       case 'w':
-        newCrop.x = Math.max(0, crop.x + dx);
-        newCrop.width = crop.width - dx;
-        break;
+        newCrop.x = Math.max(0, crop.x + dx); newCrop.width = crop.width - dx; break;
       case 'move':
         newCrop.x = Math.max(0, Math.min(imgDim.width - crop.width, crop.x + dx));
-        newCrop.y = Math.max(0, Math.min(imgDim.height - crop.height, crop.y + dy));
-        break;
+        newCrop.y = Math.max(0, Math.min(imgDim.height - crop.height, crop.y + dy)); break;
     }
 
     if (newCrop.width >= minSize && newCrop.height >= minSize) {
@@ -247,9 +225,7 @@ export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropE
     }
   }, [dragging, dragStart, crop, imgDim]);
 
-  const handleMouseUp = () => {
-    setDragging(null);
-  };
+  const handlePointerUp = () => setDragging(null);
 
   const handleApplyCrop = async () => {
     const canvas = canvasRef.current;
@@ -320,15 +296,16 @@ export default function CropEditor({ photoUrl, onCropComplete, onCancel }: CropE
 
       <canvas
         ref={canvasRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
         style={{
           maxWidth: '100%',
           maxHeight: 'calc(100% - 120px)',
           cursor: 'default',
           display: 'block',
+          touchAction: 'none',
         }}
       />
 

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
-  closestCenter, type DragEndEvent, type DragStartEvent,
+  closestCenter, type DragEndEvent, type DragStartEvent, type DragCancelEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext, horizontalListSortingStrategy, useSortable,
@@ -63,8 +63,9 @@ export default function DumpCard({ dump, onActivate }: Props) {
     .filter(Boolean) as Photo[];
 
   // PointerSensor with 500ms delay: scroll works normally, drag only activates on hold
+  // tolerance 12 gives more forgiveness for slight finger movement on iPhone
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 500, tolerance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { delay: 500, tolerance: 12 } }),
   );
 
   const scrollRowRef = useRef<HTMLDivElement>(null);
@@ -78,6 +79,10 @@ export default function DumpCard({ dump, onActivate }: Props) {
     const { active, over } = event;
     if (over && active.id !== over.id)
       reorderDumpPhotos(dump.id, active.id as string, over.id as string);
+  };
+
+  const handleDragCancel = (_event: DragCancelEvent) => {
+    setDraggingId(null);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,7 +211,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
       </p>
 
       {/* Sortable photo row */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
         <SortableContext items={dump.photos} strategy={horizontalListSortingStrategy}>
           <div
             ref={scrollRowRef}

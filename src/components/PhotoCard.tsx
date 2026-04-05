@@ -52,14 +52,14 @@ export default function PhotoCard({
 
   const isVideo = /\.(mp4|mov|webm)$/i.test(photo.filename);
 
-  // Close menu on outside click
+  // Close menu on outside tap/click (pointerdown fires on both mouse and touch)
   useEffect(() => {
     if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: PointerEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
   }, [menuOpen]);
 
   // Focus label input when editing

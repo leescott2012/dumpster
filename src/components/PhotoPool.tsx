@@ -38,14 +38,14 @@ export default function PhotoPool() {
     if (!addingToDumpId) setSelectedIds(new Set());
   }, [addingToDumpId]);
 
-  // Close menu on outside click
+  // Close menu on outside tap/click (pointerdown fires on both mouse and touch)
   useEffect(() => {
     if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: PointerEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
   }, [menuOpen]);
 
   const filtered = photos.filter((p) => {
@@ -191,7 +191,6 @@ export default function PhotoPool() {
               borderRadius: 10, padding: '6px 8px',
               boxShadow: menuOpen ? '0 8px 32px rgba(0,0,0,0.25)' : 'none',
               opacity: menuOpen ? 1 : 0,
-              overflow: 'hidden',
               transform: menuOpen ? 'translateX(0) scale(1)' : 'translateX(-12px) scale(0.96)',
               transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
               pointerEvents: menuOpen ? 'auto' : 'none',

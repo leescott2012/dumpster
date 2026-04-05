@@ -32,45 +32,84 @@ export function generateDumpTitle(photos: Photo[]): string {
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   const primary = sorted[0]?.[0] ?? 'LIFESTYLE';
   const secondary = sorted[1]?.[0] ?? null;
-  const secLabel = secondary ? (CATEGORY_DISPLAY[secondary] ?? secondary) : null;
 
   const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 
+  // Multi-category combos
+  if (primary === 'NIGHTLIFE' && secondary === 'AUTOMOTIVE') {
+    return pick(['Night Drives', 'After Midnight', 'The Late Run', 'City After Dark']);
+  }
+  if (primary === 'AUTOMOTIVE' && secondary === 'FASHION') {
+    return pick(['Dressed to Drive', 'The Style Run', 'The Flex', 'Moving in Style']);
+  }
+  if (primary === 'PORTRAIT' && secondary === 'NIGHTLIFE') {
+    return pick(['Night Faces', 'Who Was There', 'The Room', 'Present']);
+  }
+  if (primary === 'FASHION' && secondary === 'ARCHITECTURE') {
+    return pick(['The Location Scout', 'Sharp Angles', 'The Set', 'Built Different']);
+  }
+
   switch (primary) {
     case 'NIGHTLIFE':
-      return secLabel
-        ? `The ${secLabel} Night`
-        : pick(['After Hours', 'The Night Edit', 'Nightfall', 'Dark Hours']);
+      return pick([
+        'After Hours', 'Nightfall', 'Dark Hours', '2am Energy',
+        'The Night', 'Past Midnight', 'Still Up', 'Late',
+      ]);
     case 'AUTOMOTIVE':
-      return secLabel
-        ? `The ${secLabel} Drive`
-        : pick(['The Drive', 'On The Road', 'The Car Edit']);
+      return pick([
+        'The Drive', 'On The Road', 'Moving', 'The Run',
+        'Behind The Wheel', 'Push', 'Keys Out', 'In Motion',
+      ]);
     case 'FASHION':
-      return pick(['The Style Edit', 'The Fashion Diary', 'Dressed Up', 'The Look', 'The Fit']);
+      return pick([
+        'The Fit', 'Dressed', 'The Look', 'Sharp',
+        'On', 'The Outfit', 'Fitted', 'Clean',
+      ]);
     case 'ART':
-      return pick(['The Museum Run', 'Gallery Night', 'Culture Drop', 'The Art Edit']);
+      return pick([
+        'Culture Drop', 'The Gallery', 'Studied', 'Eyes Open',
+        'The Museum Run', 'Seen It', 'The Wall',
+      ]);
     case 'PORTRAIT':
-      return secLabel
-        ? `The ${secLabel} Portrait`
-        : pick(['The Face Edit', 'Faces', 'Portrait Study']);
+      return pick([
+        'Faces', 'Present', 'In Frame', 'The Shot',
+        'Caught Something', 'Who Was There', 'The People',
+      ]);
     case 'TRAVEL':
-      return secLabel
-        ? `${secLabel} Trip`
-        : pick(['The Trip', 'On Location', 'Away Edit']);
+      return pick([
+        'On Location', 'Away', 'Out There', 'The Trip',
+        'Somewhere', 'Different Timezone', 'Moved',
+      ]);
     case 'FITNESS':
-      return pick(['Gains Season', 'The Gym Diary', 'Work Mode', 'Session']);
+      return pick([
+        'Work Mode', 'Locked In', 'Session', 'The Process',
+        'Gains', 'No Days Off', 'The Work',
+      ]);
     case 'ARCHITECTURE':
-      return secLabel
-        ? `The ${secLabel} Space`
-        : pick(['The Space Edit', 'The Build', 'Interiors']);
+      return pick([
+        'The Space', 'Built', 'Interiors', 'The Building',
+        'Good Rooms', 'Structure', 'The Environment',
+      ]);
     case 'DINING':
-      return pick(['The Table', 'Good Eats', 'The Dinner Edit', 'Last Night']);
+      return pick([
+        'The Table', 'Last Night', 'Good Evening', 'What We Ate',
+        'The Dinner', 'Worth It', 'The Reservation',
+      ]);
     case 'WATCH':
-      return pick(['On The Wrist', 'The Watch Edit', 'Time Piece']);
+      return pick([
+        'On The Wrist', 'Time', 'The Piece', 'Worn Well',
+        'The Detail', 'Worth Wearing',
+      ]);
+    case 'STUDIO':
+      return pick([
+        'In The Studio', 'Session', 'The Work', 'Locked In',
+        'Made Something', 'The Process',
+      ]);
     default:
-      return secLabel
-        ? `The ${CATEGORY_DISPLAY[primary] ?? primary} ${secLabel}`
-        : `The ${CATEGORY_DISPLAY[primary] ?? primary} Edit`;
+      return pick([
+        'The Edit', 'Recent', 'What Happened', 'A Few Things',
+        'Filed', 'Documented', 'Worth Saving',
+      ]);
   }
 }
 
@@ -138,15 +177,32 @@ export function scoreForSlot(photo: Photo, slot: SlotRole): number {
   return SLOT_SCORES[slot]?.[cat] ?? 2;
 }
 
+// Shuffle array in place (Fisher-Yates)
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 // Auto-arrange photos into the best template order
+// Hook is always first, closer is always last; middle slots are shuffled for variety
 export function arrangePhotos(photos: Photo[]): Photo[] {
   if (photos.length === 0) return [];
   const template = photos.length >= 10 ? TEMPLATE_12 : TEMPLATE_7;
   const slots = template.slice(0, photos.length);
-  const remaining = [...photos];
-  const result: Photo[] = new Array(slots.length).fill(null);
 
-  slots.forEach((slot, slotIdx) => {
+  // Keep hook (index 0) and closer (last) fixed; shuffle middle
+  const hook = slots[0];
+  const closer = slots[slots.length - 1];
+  const middle = slots.length > 2 ? shuffle([...slots.slice(1, -1)]) : [];
+  const varied: SlotRole[] = slots.length > 1 ? [hook, ...middle, closer] : [hook];
+
+  const remaining = [...photos];
+  const result: Photo[] = new Array(varied.length).fill(null);
+
+  varied.forEach((slot, slotIdx) => {
     if (remaining.length === 0) return;
     let best = -1;
     let bestScore = -1;

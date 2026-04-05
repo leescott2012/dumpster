@@ -67,16 +67,6 @@ export default function Lightbox() {
               {photo.category}
             </p>
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{photo.filename}</p>
-            {photo.labels.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                {photo.labels.map(l => (
-                  <span key={l} style={{
-                    fontSize: 9, background: 'rgba(200,169,110,0.2)', color: 'var(--gold)',
-                    padding: '2px 6px', borderRadius: 3, fontWeight: 600, letterSpacing: '0.08em',
-                  }}>{l}</span>
-                ))}
-              </div>
-            )}
           </div>
           {photo.isHuji && (
             <span style={{

@@ -10,16 +10,17 @@ const FILTER_OPTIONS: { key: Filter; label: string }[] = [
   { key: 'used', label: '✓ Used' },
 ];
 
-const POOL_COLS: Record<string, number> = { small: 8, medium: 6, large: 4 };
-const POOL_HEIGHTS: Record<string, number> = { small: 120, medium: 160, large: 220 };
+const POOL_COLS: Record<string, number> = { small: 6, medium: 4, large: 2 };
 
 export default function PhotoPool() {
   const {
     photos, dumps, filter, activeFilters, activeDumpId, poolSize, poolSearchQuery,
     addPhotos, addPhotoToDump, addPhotosToDump, toggleStar, toggleHuji, removePhoto,
     setFilter, toggleActiveFilter, setPoolSize, setPoolSearch,
-    addingToDumpId, setAddingToDump,
+    addingToDumpId, setAddingToDump, rescanPhoto,
   } = useStore();
+  const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState({ done: 0, total: 0 });
 
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -29,8 +30,7 @@ export default function PhotoPool() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const usedIds = new Set(dumps.flatMap((d) => d.photos));
-  const colCount = POOL_COLS[poolSize] ?? 6;
-  const cardHeight = POOL_HEIGHTS[poolSize] ?? 160;
+  const colCount = POOL_COLS[poolSize] ?? 2;
 
 
   // Reset selection when leaving add-mode
@@ -74,7 +74,6 @@ export default function PhotoPool() {
 
   const poolPhotos = filtered.filter((p) => !usedIds.has(p.id));
   const usedPhotos = filtered.filter((p) => usedIds.has(p.id));
-  const allFiltered = [...poolPhotos, ...usedPhotos];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -112,6 +111,18 @@ export default function PhotoPool() {
     }
   };
 
+  const handleRescanAll = async () => {
+    const toScan = photos.filter(p => !/\.(mp4|mov|webm)$/i.test(p.filename));
+    if (toScan.length === 0) return;
+    setScanning(true);
+    setScanProgress({ done: 0, total: toScan.length });
+    for (let i = 0; i < toScan.length; i++) {
+      await rescanPhoto(toScan[i].id);
+      setScanProgress({ done: i + 1, total: toScan.length });
+    }
+    setScanning(false);
+  };
+
   const sizeLabels = { small: 'S', medium: 'M', large: 'L' };
 
   return (
@@ -125,9 +136,26 @@ export default function PhotoPool() {
       <h2 style={{ fontSize: 36, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 6 }}>
         Available Photos
       </h2>
-      <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20 }}>
-        {poolPhotos.length} available · {usedIds.size} in dumps
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <p style={{ fontSize: 13, color: 'var(--text3)' }}>
+          {poolPhotos.length} available · {usedIds.size} in dumps
+        </p>
+        <button
+          onClick={handleRescanAll}
+          disabled={scanning}
+          style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+            padding: '5px 12px', borderRadius: 6,
+            background: scanning ? 'var(--gold-dim)' : 'var(--bg2)',
+            border: `1px solid ${scanning ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
+            color: scanning ? 'var(--gold)' : 'var(--text3)',
+            cursor: scanning ? 'default' : 'pointer',
+            transition: 'all 0.15s', whiteSpace: 'nowrap',
+          }}
+        >
+          {scanning ? `Scanning ${scanProgress.done}/${scanProgress.total}` : 'Rescan All'}
+        </button>
+      </div>
 
       {/* Filter bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -321,13 +349,13 @@ export default function PhotoPool() {
         )}
 
         {/* Photo grid */}
-        {allFiltered.length > 0 && (
+        {(activeFilters.includes('used') ? usedPhotos : poolPhotos).length > 0 && (
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${colCount}, 1fr)`,
             gap: 8, marginBottom: 16,
           }}>
-            {allFiltered.map((photo, idx) => {
+            {(activeFilters.includes('used') ? usedPhotos : poolPhotos).map((photo, idx) => {
               const used = usedIds.has(photo.id);
               const isSelected = selectedIds.has(photo.id);
               return (
@@ -338,7 +366,7 @@ export default function PhotoPool() {
                   used={used && !addingToDumpId}
                   selected={isSelected}
                   width="100%"
-                  height={cardHeight}
+                  poolSize={poolSize}
                   onClick={used && !addingToDumpId ? undefined : () => handlePhotoClick(photo.id)}
                   onToggleStar={() => toggleStar(photo.id)}
                   onToggleHuji={() => toggleHuji(photo.id)}
@@ -351,7 +379,7 @@ export default function PhotoPool() {
             <div
               onClick={() => fileRef.current?.click()}
               style={{
-                width: '100%', height: cardHeight, borderRadius: 10,
+                width: '100%', aspectRatio: '3/4', borderRadius: 10,
                 border: '1.5px dashed var(--border3)', background: 'var(--bg2)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 6, cursor: 'pointer',

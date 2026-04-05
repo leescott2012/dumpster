@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Photo } from '../types';
 import { useStore } from '../store';
-import { getSlotRole, SLOT_LABELS } from '../formula';
+import { getSlotRole } from '../formula';
 import CropEditor from './CropEditor';
 
 interface PhotoCardProps {
@@ -25,15 +25,19 @@ interface PhotoCardProps {
   height?: number;
   // pool selection mode
   selected?: boolean;
+  // pool grid size (controls visibility of menu + labels)
+  poolSize?: 'small' | 'medium' | 'large';
 }
 
 export default function PhotoCard({
-  photo, index, used, totalInDump,
+  photo, index: _index, used, totalInDump,
   onToggleHuji, onToggleStar, onRemove,
   onClick, dragRef, dragStyle, dragAttributes, dragListeners, isDragging,
   width = 175, height = 232,
   selected = false,
+  poolSize,
 }: PhotoCardProps) {
+  const isSmallPool = poolSize === 'small';
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelInput, setLabelInput] = useState('');
@@ -41,7 +45,8 @@ export default function PhotoCard({
   const menuRef = useRef<HTMLDivElement>(null);
   const labelInputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef(0);
-  const { setLightbox, addLabel, removeLabel, setCategory, cropPhoto } = useStore();
+  const { setLightbox, addLabel, setCategory, cropPhoto, rescanPhoto } = useStore();
+  const [scanning, setScanning] = useState(false);
   const [editingCategory, setEditingCategory] = useState(false);
   const [categoryInput, setCategoryInput] = useState(photo.category);
 
@@ -76,7 +81,8 @@ export default function PhotoCard({
     }
   };
 
-  const slotRole = totalInDump ? getSlotRole(index, totalInDump) : null;
+  // slot role reserved for future use
+  void getSlotRole; void totalInDump;
 
   // Border logic: huji = red, selected = green, dragging = gold, default
   const borderColor = selected
@@ -95,13 +101,19 @@ export default function PhotoCard({
       style={{
         ...dragStyle,
         flexShrink: typeof width === 'number' ? 0 : undefined,
-        width, height,
+        width,
+        height: typeof width === 'number' ? height : undefined,
+        aspectRatio: typeof width === 'string' ? '3/4' : undefined,
         borderRadius: 10,
         border: `2px solid ${borderColor}`,
         overflow: 'visible',
         position: 'relative',
+        zIndex: menuOpen ? 100 : undefined,
         cursor: dragListeners ? (isDragging ? 'grabbing' : 'grab') : (onClick ? 'pointer' : 'default'),
-        touchAction: dragListeners ? 'none' : 'auto',
+        touchAction: 'auto',
+        WebkitTouchCallout: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
         background: 'var(--bg2)',
         opacity: isDragging ? 0.45 : used ? 0.38 : 1,
         transition: 'border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -130,7 +142,7 @@ export default function PhotoCard({
           <img
             src={photo.url}
             alt={photo.filename}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', WebkitTouchCallout: 'none', pointerEvents: 'none' } as React.CSSProperties}
             draggable={false}
           />
         )}
@@ -160,8 +172,8 @@ export default function PhotoCard({
           }}>VIDEO</div>
         )}
 
-        {/* Bottom gradient + category label (editable) */}
-        <div style={{
+        {/* Bottom gradient + category label (editable) — hidden in small pool */}
+        {!isSmallPool && <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
           padding: '24px 8px 7px',
           background: 'linear-gradient(transparent, rgba(0,0,0,0.75))',
@@ -200,34 +212,9 @@ export default function PhotoCard({
               {photo.category}
             </span>
           )}
-        </div>
+        </div>}
 
-        {/* Slot role ghost (shown when in dump and slot is known) */}
-        {slotRole && (
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0,
-            background: 'linear-gradient(rgba(0,0,0,0.5), transparent)',
-            padding: '6px 6px 16px',
-          }}>
-            <span style={{
-              fontSize: 6, fontWeight: 800, letterSpacing: '0.15em',
-              color: 'rgba(200,169,110,0.7)', textTransform: 'uppercase',
-            }}>
-              {SLOT_LABELS[slotRole]}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Number badge */}
-      <div style={{
-        position: 'absolute', top: 6, left: 6,
-        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-        borderRadius: 4, padding: '2px 6px',
-        fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.9)',
-        zIndex: 2, pointerEvents: 'none',
-      }}>
-        {String(index + 1).padStart(2, '0')}
+        {/* Slot role ghost removed — labels were distracting */}
       </div>
 
       {/* Top-right: HUJI badge + star badge (hidden when menu open) */}
@@ -252,27 +239,8 @@ export default function PhotoCard({
         </div>
       )}
 
-      {/* Labels (below card) */}
-      {photo.labels.length > 0 && (
-        <div style={{
-          position: 'absolute', bottom: -20, left: 0, right: 0,
-          display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center',
-        }}>
-          {photo.labels.slice(0, 3).map(l => (
-            <span
-              key={l}
-              onClick={e => { e.stopPropagation(); removeLabel(photo.id, l); }}
-              style={{
-                fontSize: 7, background: 'var(--gold-dim)', color: 'var(--gold)',
-                padding: '1px 4px', borderRadius: 2, fontWeight: 600, cursor: 'pointer',
-              }}
-            >{l}</span>
-          ))}
-        </div>
-      )}
-
-      {/* Three-dot menu */}
-      <div
+      {/* Three-dot menu — hidden in small pool */}
+      {!isSmallPool && <div
         ref={menuRef}
         className="photo-menu-wrap"
         style={{ position: 'absolute', top: 6, right: 6, zIndex: 10 }}
@@ -285,7 +253,7 @@ export default function PhotoCard({
             background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
             border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: menuOpen ? 1 : 0, transition: 'opacity 0.15s', padding: 0,
+            opacity: menuOpen ? 1 : 0.45, transition: 'opacity 0.15s', padding: 0,
           }}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -307,11 +275,11 @@ export default function PhotoCard({
               onClick={() => { onToggleHuji(); setMenuOpen(false); }} />
             <MenuItem label={photo.starred ? '★ Unfavorite' : '☆ Favorite'}
               onClick={() => { onToggleStar(); setMenuOpen(false); }} />
-            <MenuItem label="🔍 Lightbox"
+            <MenuItem label="Lightbox"
               onClick={() => { setLightbox(photo.id); setMenuOpen(false); }} />
-            <MenuItem label="📐 Crop"
+            <MenuItem label="Crop"
               onClick={() => { setCropOpen(true); setMenuOpen(false); }} />
-            <MenuItem label="💾 Save to Photos"
+            <MenuItem label="Save to Photos"
               onClick={() => {
                 const a = document.createElement('a');
                 a.href = photo.url;
@@ -321,6 +289,17 @@ export default function PhotoCard({
                 document.body.removeChild(a);
                 setMenuOpen(false);
               }} />
+            {!isVideo && (
+              <MenuItem
+                label={scanning ? 'Scanning...' : 'Rescan AI Labels'}
+                onClick={async () => {
+                  setMenuOpen(false);
+                  setScanning(true);
+                  await rescanPhoto(photo.id);
+                  setScanning(false);
+                }}
+              />
+            )}
             <div style={{ borderTop: '1px solid var(--border2)', margin: '4px 0' }} />
             {/* Add label */}
             {editingLabel ? (
@@ -354,7 +333,7 @@ export default function PhotoCard({
             <MenuItem label="Remove" danger onClick={() => { onRemove(); setMenuOpen(false); }} />
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Crop Editor */}
       {cropOpen && (

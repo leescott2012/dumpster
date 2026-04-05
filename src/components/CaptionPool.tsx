@@ -12,60 +12,96 @@ const STYLE_LABELS: Record<Caption['style'], string> = {
 };
 
 const STORYTELLING_TEMPLATES = [
-  'There\'s a story behind every photo, but this one speaks for itself.',
-  'Some moments deserve to live forever.',
-  'Caught between the city lights and the night sky.',
-  'The journey is the destination.',
-  'Every detail tells a story.',
+  "Nobody told me the city would feel like this at 2am. Glad I showed up anyway.",
+  "The drive was part of it.",
+  "Some nights you're just there for the energy.",
+  "Didn't plan this one. Best ones never are.",
+  "Not everything needs context. This one does.",
+  "You had to be there. Glad I was.",
+  "The quiet before everything got loud.",
+  "This is what I meant when I said I was busy.",
+  "Some rooms you walk into and already know.",
+  "Shot this on a Tuesday. Tuesday felt like this.",
+  "I keep coming back to this one.",
+  "The in-between is underrated.",
+  "Paid attention. Got rewarded.",
+  "Nothing was planned. Everything was intentional.",
+  "There's a version of this night I'll never fully explain.",
 ];
 
 const EMOJI_TEMPLATES = [
-  '....',
-  '.....',
-  '......',
-  '.....',
-  '......',
+  ".",
+  "..",
+  "...",
+  "....",
+  "…",
 ];
 
 const CLEAN_TEMPLATES = [
-  'Details.',
-  'Perspective.',
-  'Moments.',
-  'Curated.',
-  'Timeless.',
+  "No context.",
+  "24hrs.",
+  "The usual.",
+  "Read the room.",
+  "Still here.",
+  "Running it back.",
+  "Don't overthink it.",
+  "Part of the process.",
+  "Filed under necessary.",
+  "Nothing changes if nothing changes.",
+  "Present.",
+  "Worth it.",
+  "That's it.",
+  "Locked in.",
+  "As expected.",
 ];
 
 const NUMBERED_TEMPLATES = [
-  '1. Show up\n2. Stand out\n3. Repeat',
-  '1. Vision\n2. Execution\n3. Results',
-  '1. Dream it\n2. Build it\n3. Live it',
-  '1. Create\n2. Elevate\n3. Dominate',
+  "01. The look\n02. The vibe\n03. The exit",
+  "01. Showed up\n02. Locked in\n03. Said nothing",
+  "01. The setup\n02. The moment\n03. The after",
+  "01. Early\n02. On time\n03. Never late",
+  "01. The city\n02. The car\n03. The night",
+  "01. Mood\n02. Movement\n03. Memory",
+  "01. Vision\n02. Execute\n03. Move on",
+  "01. Started\n02. Stayed\n03. Left different",
 ];
 
-function generateCaption(style: Caption['style']): string {
+function generateCaption(style: Caption['style'], used: Set<string> = new Set()): string {
   const templates = {
     storytelling: STORYTELLING_TEMPLATES,
     emoji: EMOJI_TEMPLATES,
     clean: CLEAN_TEMPLATES,
     numbered: NUMBERED_TEMPLATES,
   }[style];
-  return templates[Math.floor(Math.random() * templates.length)];
+  const available = templates.filter(t => !used.has(t));
+  const pool = available.length > 0 ? available : templates; // fallback to all if exhausted
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
+type FilterTab = 'all' | 'favorites' | 'banned';
+
 export default function CaptionPool() {
-  const { captions, dumps, activeDumpId, addCaption, rateCaption, favoriteCaption, removeCaption } = useStore();
+  const { captions, dumps, activeDumpId, addCaption, banCaption, favoriteCaption, removeCaption } = useStore();
   const [selectedStyle, setSelectedStyle] = useState<Caption['style']>('storytelling');
   const [customText, setCustomText] = useState('');
-  const [filterFavorites, setFilterFavorites] = useState(false);
+  const [filterTab, setFilterTab] = useState<FilterTab>('all');
 
   const activeDump = dumps.find(d => d.id === activeDumpId);
 
   const filteredCaptions = captions
-    .filter(c => filterFavorites ? c.favorited : true)
+    .filter(c => {
+      if (filterTab === 'favorites') return c.favorited && !c.banned;
+      if (filterTab === 'banned') return c.banned;
+      return !c.banned;
+    })
     .sort((a, b) => b.createdAt - a.createdAt);
 
+  const bannedCount = captions.filter(c => c.banned).length;
+
   const handleAutoGenerate = () => {
-    const text = generateCaption(selectedStyle);
+    const usedTexts = new Set(captions.map(c => c.text));
+    const text = generateCaption(selectedStyle, usedTexts);
+    if (!text) return; // all templates exhausted
     addCaption({
       text,
       style: selectedStyle,
@@ -99,7 +135,7 @@ export default function CaptionPool() {
         Captions
       </h2>
       <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20 }}>
-        {captions.length} captions{activeDump ? ` · Active: ${activeDump.title}` : ''}
+        {captions.filter(c => !c.banned).length} captions{activeDump ? ` · Active: ${activeDump.title}` : ''}
       </p>
 
       {/* Style selector */}
@@ -169,26 +205,23 @@ export default function CaptionPool() {
 
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <button
-          onClick={() => setFilterFavorites(false)}
-          style={{
-            padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-            background: !filterFavorites ? 'var(--gold-dim)' : 'transparent',
-            border: `1px solid ${!filterFavorites ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-            color: !filterFavorites ? 'var(--gold)' : 'var(--text3)',
-            cursor: 'pointer',
-          }}
-        >All</button>
-        <button
-          onClick={() => setFilterFavorites(true)}
-          style={{
-            padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-            background: filterFavorites ? 'var(--gold-dim)' : 'transparent',
-            border: `1px solid ${filterFavorites ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-            color: filterFavorites ? 'var(--gold)' : 'var(--text3)',
-            cursor: 'pointer',
-          }}
-        >Favorites</button>
+        {([
+          { key: 'all' as const, label: 'All' },
+          { key: 'favorites' as const, label: 'Favorites' },
+          { key: 'banned' as const, label: `Never Use${bannedCount > 0 ? ` (${bannedCount})` : ''}` },
+        ]).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setFilterTab(tab.key)}
+            style={{
+              padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+              background: filterTab === tab.key ? (tab.key === 'banned' ? 'rgba(224,92,92,0.12)' : 'var(--gold-dim)') : 'transparent',
+              border: `1px solid ${filterTab === tab.key ? (tab.key === 'banned' ? 'rgba(224,92,92,0.4)' : 'rgba(200,169,110,0.4)') : 'var(--border2)'}`,
+              color: filterTab === tab.key ? (tab.key === 'banned' ? 'var(--red)' : 'var(--gold)') : 'var(--text3)',
+              cursor: 'pointer',
+            }}
+          >{tab.label}</button>
+        ))}
       </div>
 
       {/* Caption list */}
@@ -198,8 +231,17 @@ export default function CaptionPool() {
           border: '1.5px dashed var(--border3)', borderRadius: 12,
           color: 'var(--text3)', fontSize: 13,
         }}>
-          <p style={{ marginBottom: 8 }}>No captions yet</p>
-          <p style={{ fontSize: 11 }}>Generate or write a caption above</p>
+          {filterTab === 'banned'
+            ? <p>No banned captions</p>
+            : filterTab === 'favorites'
+            ? <p>No favorites yet</p>
+            : (
+              <>
+                <p style={{ marginBottom: 8 }}>No captions yet</p>
+                <p style={{ fontSize: 11 }}>Generate or write a caption above</p>
+              </>
+            )
+          }
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -207,7 +249,7 @@ export default function CaptionPool() {
             <CaptionCard
               key={caption.id}
               caption={caption}
-              onRate={(rating) => rateCaption(caption.id, rating)}
+              onBan={() => banCaption(caption.id)}
               onFavorite={() => favoriteCaption(caption.id)}
               onRemove={() => removeCaption(caption.id)}
             />
@@ -220,9 +262,9 @@ export default function CaptionPool() {
 
 // ─── Caption Card ─────────────────────────────────────────────────────────────
 
-function CaptionCard({ caption, onRate, onFavorite, onRemove }: {
+function CaptionCard({ caption, onBan, onFavorite, onRemove }: {
   caption: Caption;
-  onRate: (rating: number) => void;
+  onBan: () => void;
   onFavorite: () => void;
   onRemove: () => void;
 }) {
@@ -235,69 +277,90 @@ function CaptionCard({ caption, onRate, onFavorite, onRemove }: {
   };
 
   return (
-    <div className="menu-dropdown" style={{
+    <div style={{
       padding: '14px 16px', borderRadius: 10,
-      background: 'var(--bg2)', border: '1px solid var(--border2)',
+      background: caption.banned ? 'rgba(224,92,92,0.05)' : 'var(--bg2)',
+      border: `1px solid ${caption.banned ? 'rgba(224,92,92,0.25)' : 'var(--border2)'}`,
       transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+      opacity: caption.banned ? 0.65 : 1,
     }}>
-      {/* Caption text */}
-      <p style={{
-        fontSize: 14, color: 'var(--text)', lineHeight: 1.5,
-        marginBottom: 10, whiteSpace: 'pre-wrap',
-      }}>
-        {caption.text}
-      </p>
+      {/* Caption text + thumbs row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+        <p style={{
+          flex: 1,
+          fontSize: 14, color: caption.banned ? 'var(--text3)' : 'var(--text)', lineHeight: 1.5,
+          whiteSpace: 'pre-wrap',
+          textDecoration: caption.banned ? 'line-through' : 'none',
+        }}>
+          {caption.text}
+        </p>
+        {/* Thumbs — only show on non-banned captions */}
+        {!caption.banned && (
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginTop: 2 }}>
+            <button
+              onClick={onFavorite}
+              title="Good caption"
+              style={{
+                background: caption.favorited ? 'rgba(80,180,80,0.12)' : 'transparent',
+                border: `1px solid ${caption.favorited ? 'rgba(80,180,80,0.4)' : 'var(--border2)'}`,
+                borderRadius: 6, width: 30, height: 30, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.15s',
+              }}
+            >
+              <ThumbSvg up filled={caption.favorited} color={caption.favorited ? '#50b450' : 'var(--text3)'} />
+            </button>
+            <button
+              onClick={onBan}
+              title="Never use"
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border2)',
+                borderRadius: 6, width: 30, height: 30, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(224,92,92,0.5)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border2)'; }}
+            >
+              <ThumbSvg up={false} filled={false} color="var(--text3)" />
+            </button>
+          </div>
+        )}
+        {/* Banned label */}
+        {caption.banned && (
+          <span style={{
+            fontSize: 8, fontWeight: 700, letterSpacing: '0.1em',
+            color: 'var(--red)', background: 'rgba(224,92,92,0.12)',
+            padding: '2px 6px', borderRadius: 4, flexShrink: 0, marginTop: 4,
+            textTransform: 'uppercase',
+          }}>Never Use</span>
+        )}
+      </div>
 
       {/* Meta row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Style badge */}
-          <span style={{
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
-            padding: '2px 8px', borderRadius: 4,
-            background: 'var(--gold-dim)', color: 'var(--gold)',
-            textTransform: 'uppercase',
-          }}>
-            {STYLE_LABELS[caption.style]}
-          </span>
-
-          {/* Rating stars */}
-          <div style={{ display: 'flex', gap: 2 }}>
-            {[1, 2, 3, 4, 5].map(star => (
-              <button
-                key={star}
-                onClick={() => onRate(caption.rating === star ? 0 : star)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: 12, color: star <= caption.rating ? 'var(--gold)' : 'var(--text3)',
-                  padding: '0 1px', lineHeight: 1,
-                }}
-              >
-                {star <= caption.rating ? '★' : '☆'}
-              </button>
-            ))}
-          </div>
-        </div>
+        <span style={{
+          fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+          padding: '2px 8px', borderRadius: 4,
+          background: 'var(--gold-dim)', color: 'var(--gold)',
+          textTransform: 'uppercase',
+        }}>
+          {STYLE_LABELS[caption.style]}
+        </span>
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: 6 }}>
-          <button
-            onClick={handleCopy}
-            style={{
-              fontSize: 9, fontWeight: 600, padding: '3px 8px', borderRadius: 4,
-              background: 'transparent', border: '1px solid var(--border2)',
-              color: copied ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer',
-            }}
-          >{copied ? 'Copied!' : 'Copy'}</button>
-          <button
-            onClick={onFavorite}
-            style={{
-              fontSize: 12, padding: '2px 6px', borderRadius: 4,
-              background: caption.favorited ? 'var(--gold-dim)' : 'transparent',
-              border: `1px solid ${caption.favorited ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-              color: caption.favorited ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer',
-            }}
-          >{caption.favorited ? '★' : '☆'}</button>
+          {!caption.banned && (
+            <button
+              onClick={handleCopy}
+              style={{
+                fontSize: 9, fontWeight: 600, padding: '3px 8px', borderRadius: 4,
+                background: 'transparent', border: '1px solid var(--border2)',
+                color: copied ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer',
+              }}
+            >{copied ? 'Copied!' : 'Copy'}</button>
+          )}
           <button
             onClick={onRemove}
             style={{
@@ -309,5 +372,25 @@ function CaptionCard({ caption, onRate, onFavorite, onRemove }: {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Thumb SVG ────────────────────────────────────────────────────────────────
+
+function ThumbSvg({ up, filled, color }: { up: boolean; filled: boolean; color: string }) {
+  return (
+    <svg
+      width="14" height="14"
+      viewBox="0 0 24 24"
+      fill={filled ? color : 'none'}
+      stroke={color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ transform: up ? 'none' : 'scaleY(-1)', transition: 'fill 0.15s, stroke 0.15s' }}
+    >
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+      <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+    </svg>
   );
 }

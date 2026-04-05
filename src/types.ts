@@ -16,6 +16,7 @@ export interface Caption {
   dumpId?: string;
   createdAt: number;
   favorited: boolean;
+  banned?: boolean; // thumbs-down = never use again
 }
 
 export interface Dump {
@@ -24,6 +25,8 @@ export interface Dump {
   title: string;
   photos: string[]; // ordered photo IDs, max 20
   vibeBadge?: 'mismatch' | null;
+  liked?: boolean;
+  titleApproved?: boolean; // true = user kept it, false = user rejected it
 }
 
 export type Filter = 'all' | 'starred' | 'huji' | 'used' | 'videos';

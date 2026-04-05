@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import {
-  DndContext, PointerSensor, useSensor, useSensors,
-  closestCenter, type DragEndEvent,
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  closestCenter, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext, horizontalListSortingStrategy, useSortable,
@@ -22,17 +22,59 @@ export default function DumpCard({ dump, onActivate }: Props) {
   const {
     photos, removePhotoFromDump, reorderDumpPhotos, addPhotos,
     toggleStar, toggleHuji, deleteDump, checkDumpVibe, setAddingToDump,
+    toggleDumpLike, approveDumpTitle, rejectDumpTitle,
   } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [deleting, setDeleting] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (sharing || dumpPhotos.length === 0) return;
+    setSharing(true);
+    try {
+      const imagePhotos = dumpPhotos.filter(p => !/\.(mp4|mov|webm)$/i.test(p.filename));
+      const files: File[] = [];
+      for (const photo of imagePhotos) {
+        try {
+          const res = await fetch(photo.url);
+          const blob = await res.blob();
+          files.push(new File([blob], photo.filename, { type: blob.type || 'image/jpeg' }));
+        } catch { /* skip failed */ }
+      }
+      if (files.length > 0 && navigator.canShare?.({ files })) {
+        await navigator.share({ files, title: dump.title });
+      } else if (navigator.share) {
+        await navigator.share({ title: dump.title, text: `${dump.title} · ${dumpPhotos.length} photos` });
+      } else {
+        // Desktop fallback: download first image
+        const a = document.createElement('a');
+        a.href = dumpPhotos[0].url;
+        a.download = `${dump.title.replace(/\s+/g, '_')}.jpg`;
+        a.click();
+      }
+    } catch { /* user cancelled or error */ }
+    setSharing(false);
+  };
 
   const dumpPhotos = dump.photos
     .map((id) => photos.find((p) => p.id === id))
     .filter(Boolean) as Photo[];
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  // PointerSensor with 500ms delay: scroll works normally, drag only activates on hold
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 500, tolerance: 5 } }),
+  );
+
+  const scrollRowRef = useRef<HTMLDivElement>(null);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setDraggingId(event.active.id as string);
+  };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    setDraggingId(null);
     const { active, over } = event;
     if (over && active.id !== over.id)
       reorderDumpPhotos(dump.id, active.id as string, over.id as string);
@@ -50,6 +92,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
   };
 
   const fillRatio = dump.photos.length / 20;
+  const draggingPhoto = draggingId ? dumpPhotos.find(p => p.id === draggingId) ?? null : null;
 
   return (
     <div
@@ -60,63 +103,126 @@ export default function DumpCard({ dump, onActivate }: Props) {
         overflow: 'hidden',
         opacity: deleting ? 0 : 1,
         transform: deleting ? 'translateY(-8px) scale(0.98)' : 'none',
-        transition: 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+        transition: 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), outline-color 0.2s',
+        outline: draggingId ? '2px dashed rgba(200,169,110,0.5)' : '2px solid transparent',
+        outlineOffset: 6,
+        borderRadius: 12,
       }}
     >
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
-        <p style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-          color: 'var(--gold)', textTransform: 'uppercase',
-        }}>
-          DUMP {String(dump.num).padStart(2, '0')}
-          {dump.vibeBadge === 'mismatch' && (
-            <span style={{
-              marginLeft: 8, fontSize: 8, background: 'rgba(224,92,92,0.15)',
-              color: 'var(--red)', border: '1px solid rgba(224,92,92,0.3)',
-              borderRadius: 3, padding: '1px 5px', letterSpacing: '0.1em',
-            }}>⚠ VIBE MISMATCH</span>
-          )}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <p style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
+            color: 'var(--gold)', textTransform: 'uppercase',
+          }}>
+            DUMP {String(dump.num).padStart(2, '0')}
+            {dump.vibeBadge === 'mismatch' && (
+              <span style={{
+                marginLeft: 8, fontSize: 8, background: 'rgba(224,92,92,0.15)',
+                color: 'var(--red)', border: '1px solid rgba(224,92,92,0.3)',
+                borderRadius: 3, padding: '1px 5px', letterSpacing: '0.1em',
+              }}>⚠ VIBE MISMATCH</span>
+            )}
+          </p>
+          {/* Heart — like this dump */}
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); toggleDumpLike(dump.id); }}
+            title={dump.liked ? 'Unlike dump' : 'Like dump'}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px',
+              display: 'flex', alignItems: 'center',
+              transition: 'transform 0.15s',
+              transform: dump.liked ? 'scale(1.2)' : 'scale(1)',
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24"
+              fill={dump.liked ? '#e05c5c' : 'none'}
+              stroke={dump.liked ? '#e05c5c' : 'var(--border3)'}
+              strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+              style={{ transition: 'fill 0.2s, stroke 0.2s' }}>
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+          </button>
+        </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <SmallBtn label="Check Vibe" onClick={(e) => { e.stopPropagation(); checkDumpVibe(dump.id); }} />
+          <SmallBtn label={sharing ? '...' : '↑ Share'} onClick={handleShare} disabled={dumpPhotos.length === 0} />
           <SmallBtn label="✕ Delete" onClick={(e) => { e.stopPropagation(); handleDelete(); }} danger />
         </div>
       </div>
 
-      <EditableTitle dump={dump} />
+      {/* Title + thumbs */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 4 }}>
+        <div style={{ flex: 1 }}>
+          <EditableTitle dump={dump} />
+        </div>
+        <div style={{ display: 'flex', gap: 4, paddingTop: 10, flexShrink: 0 }}>
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); approveDumpTitle(dump.id); }}
+            title="Keep this title"
+            style={{
+              background: dump.titleApproved === true ? 'rgba(80,180,80,0.15)' : 'var(--bg2)',
+              border: `1px solid ${dump.titleApproved === true ? 'rgba(80,180,80,0.4)' : 'var(--border2)'}`,
+              borderRadius: 6, padding: '5px 8px', cursor: 'pointer',
+              transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <ThumbIcon up filled={dump.titleApproved === true} color={dump.titleApproved === true ? '#50b450' : 'var(--text3)'} />
+          </button>
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); rejectDumpTitle(dump.id); }}
+            title="Regenerate title"
+            style={{
+              background: dump.titleApproved === false ? 'rgba(224,92,92,0.15)' : 'var(--bg2)',
+              border: `1px solid ${dump.titleApproved === false ? 'rgba(224,92,92,0.4)' : 'var(--border2)'}`,
+              borderRadius: 6, padding: '5px 8px', cursor: 'pointer',
+              transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <ThumbIcon up={false} filled={dump.titleApproved === false} color={dump.titleApproved === false ? '#e05c5c' : 'var(--text3)'} />
+          </button>
+        </div>
+      </div>
 
-      <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 10 }}>
-        {dump.photos.length === 0 ? 'No photos yet' : `${dump.photos.length}/20 photos`}
+      {/* Subtitle: categories / count */}
+      <p style={{
+        fontSize: 13, color: 'var(--text3)', marginBottom: 20,
+        fontStyle: 'italic', letterSpacing: '0.01em', lineHeight: 1.5,
+      }}>
+        {dumpPhotos.length > 0 && (() => {
+          const unique = [...new Set(dumpPhotos.map(p => p.category.toUpperCase()))];
+          return unique.map(cat => CATEGORY_DISPLAY[cat] ?? cat).join(' / ') + '\u2002\u2002';
+        })()}
+        <span style={{ fontStyle: 'normal' }}>
+          {dump.photos.length === 0 ? 'No photos yet' : `${dump.photos.length}/20 photos`}
+        </span>
         {dump.photos.length >= 10 && dump.photos.length <= 12 && (
-          <span style={{ marginLeft: 8, color: 'var(--gold)', fontSize: 10, fontWeight: 700 }}>★ PEAK ZONE</span>
+          <span style={{ marginLeft: 8, color: 'var(--gold)', fontSize: 10, fontWeight: 700, fontStyle: 'normal' }}>★ PEAK ZONE</span>
         )}
       </p>
 
-      {/* Category label description */}
-      {dumpPhotos.length > 0 && (() => {
-        const unique = [...new Set(dumpPhotos.map(p => p.category.toUpperCase()))];
-        const desc = unique.map(cat => CATEGORY_DISPLAY[cat] ?? cat).join(' / ');
-        return (
-          <p style={{
-            fontSize: 11, color: 'var(--text3)', marginBottom: 20,
-            letterSpacing: '0.04em', lineHeight: 1.6,
-          }}>
-            {dump.photos.length}/20 · {desc}
-          </p>
-        );
-      })()}
-
       {/* Sortable photo row */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <SortableContext items={dump.photos} strategy={horizontalListSortingStrategy}>
-          <div className="dump-photos-row" style={{ display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', paddingBottom: 24 }}>
+          <div
+            ref={scrollRowRef}
+            className="dump-photos-row"
+            style={{
+              display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', paddingBottom: 24,
+              WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none',
+            } as React.CSSProperties}
+          >
             {dumpPhotos.map((photo, idx) => (
               <SortableSlot
                 key={photo.id}
                 photo={photo}
                 index={idx}
                 totalInDump={dumpPhotos.length}
+                isDragActive={draggingId !== null}
                 onRemoveFromDump={() => removePhotoFromDump(photo.id, dump.id)}
                 onToggleStar={() => toggleStar(photo.id)}
                 onToggleHuji={() => toggleHuji(photo.id)}
@@ -175,6 +281,26 @@ export default function DumpCard({ dump, onActivate }: Props) {
             </div>
           </div>
         </SortableContext>
+
+        {/* Floating drag thumbnail — follows finger */}
+        <DragOverlay dropAnimation={null}>
+          {draggingPhoto && (
+            <div style={{
+              width: 80, height: 107, borderRadius: 8,
+              border: '2px solid var(--gold)',
+              overflow: 'hidden',
+              boxShadow: '0 8px 28px rgba(0,0,0,0.65)',
+              opacity: 0.92,
+              pointerEvents: 'none',
+            }}>
+              {/\.(mp4|mov|webm)$/i.test(draggingPhoto.filename) ? (
+                <video src={draggingPhoto.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
+              ) : (
+                <img src={draggingPhoto.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />
+              )}
+            </div>
+          )}
+        </DragOverlay>
       </DndContext>
 
       {/* Gold progress bar */}
@@ -205,8 +331,8 @@ function EditableTitle({ dump }: { dump: Dump }) {
       style={{
         display: 'block', width: '100%', background: 'transparent',
         border: 'none', outline: 'none', color: 'var(--text)',
-        fontSize: 36, fontWeight: 700, letterSpacing: '-0.02em',
-        lineHeight: 1.1, marginBottom: 10, padding: '0 0 2px',
+        fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em',
+        lineHeight: 1.2, marginBottom: 6, padding: '0 0 2px',
         cursor: 'text', fontFamily: 'var(--font)',
       }}
     />
@@ -215,23 +341,26 @@ function EditableTitle({ dump }: { dump: Dump }) {
 
 // ─── Small Button ─────────────────────────────────────────────────────────────
 
-function SmallBtn({ label, onClick, danger }: { label: string; onClick: (e: React.MouseEvent) => void; danger?: boolean }) {
+function SmallBtn({ label, onClick, danger, disabled }: { label: string; onClick: (e: React.MouseEvent) => void; danger?: boolean; disabled?: boolean }) {
   return (
     <button
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       style={{
         fontSize: 9, fontWeight: 600, letterSpacing: '0.06em',
         padding: '4px 8px', borderRadius: 4,
         background: 'transparent',
         border: `1px solid ${danger ? 'rgba(224,92,92,0.3)' : 'var(--border2)'}`,
-        color: danger ? 'var(--red)' : 'var(--text3)',
-        cursor: 'pointer', transition: 'all 0.15s',
+        color: disabled ? 'var(--border3)' : danger ? 'var(--red)' : 'var(--text3)',
+        cursor: disabled ? 'default' : 'pointer', transition: 'all 0.15s',
+        opacity: disabled ? 0.4 : 1,
       }}
       onMouseEnter={(e) => {
+        if (disabled) return;
         (e.currentTarget as HTMLButtonElement).style.color = danger ? 'var(--red)' : 'var(--gold)';
         (e.currentTarget as HTMLButtonElement).style.borderColor = danger ? 'var(--red)' : 'var(--gold)';
       }}
       onMouseLeave={(e) => {
+        if (disabled) return;
         (e.currentTarget as HTMLButtonElement).style.color = danger ? 'var(--red)' : 'var(--text3)';
         (e.currentTarget as HTMLButtonElement).style.borderColor = danger ? 'rgba(224,92,92,0.3)' : 'var(--border2)';
       }}
@@ -245,20 +374,30 @@ interface SlotProps {
   photo: Photo;
   index: number;
   totalInDump: number;
+  isDragActive: boolean;
   onRemoveFromDump: () => void;
   onToggleStar: () => void;
   onToggleHuji: () => void;
 }
 
-function SortableSlot({ photo, index, totalInDump, onRemoveFromDump, onToggleStar, onToggleHuji }: SlotProps) {
+function SortableSlot({ photo, index, totalInDump, isDragActive, onRemoveFromDump, onToggleStar, onToggleHuji }: SlotProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: photo.id });
+
+  // When dragging: original slot stays full size but grayed out (DragOverlay shows the floating thumbnail)
+  const dimmed = isDragActive && !isDragging;
+
   return (
     <PhotoCard
       photo={photo}
       index={index}
       totalInDump={totalInDump}
       dragRef={setNodeRef}
-      dragStyle={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : 1 }}
+      dragStyle={{
+        transform: CSS.Transform.toString(transform) ?? undefined,
+        transition: transition ?? undefined,
+        zIndex: isDragging ? 999 : 1,
+        opacity: dimmed ? 0.45 : 1,
+      }}
       dragAttributes={attributes as unknown as Record<string, unknown>}
       dragListeners={listeners as unknown as Record<string, unknown>}
       isDragging={isDragging}
@@ -266,5 +405,15 @@ function SortableSlot({ photo, index, totalInDump, onRemoveFromDump, onToggleSta
       onToggleStar={onToggleStar}
       onRemove={onRemoveFromDump}
     />
+  );
+}
+
+function ThumbIcon({ up, filled, color }: { up: boolean; filled: boolean; color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? color : 'none'} stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+      style={{ transform: up ? 'none' : 'scaleY(-1)', transition: 'fill 0.15s, stroke 0.15s' }}>
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+      <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+    </svg>
   );
 }

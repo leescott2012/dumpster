@@ -26,7 +26,12 @@ function detectHuji(filename: string): boolean {
 
 // ─── localStorage persistence ───────────────────────────────────────────────
 
-const STORAGE_KEY = 'dumpster_state_v2';
+const STORAGE_KEY = 'dumpster_state_v4';
+
+// Clear old storage keys so Safari reloads fresh cloud photos
+['dumpster_state_v3', 'dumpster_state_v2', 'dumpster_state_v1'].forEach(k => {
+  try { localStorage.removeItem(k); } catch {}
+});
 
 function loadPersistedState(): Partial<PersistedState> | null {
   try {
@@ -44,6 +49,14 @@ function saveState(state: PersistedState) {
   } catch { /* quota exceeded */ }
 }
 
+const DEFAULT_RULES = [
+  'Peak dump: 10–12 slides',
+  'Never same category back-to-back',
+  'Hook shot opens, anchor shot closes',
+  'Balance light & dark tones',
+  'Max 2 portraits in a row',
+];
+
 interface PersistedState {
   photos: Photo[];
   dumps: Dump[];
@@ -53,6 +66,7 @@ interface PersistedState {
   poolSize: PoolSize;
   filter: Filter;
   activeFilters: Filter[];
+  customRules: string[];
 }
 
 // ─── undo/redo ───────────────────────────────────────────────────────────────
@@ -112,6 +126,7 @@ interface Store {
   poolSearchQuery: string;
   lightboxPhotoId: string | null;
   addingToDumpId: string | null; // pool selection mode
+  customRules: string[];
 
   // photos
   addPhotos: (files: File[]) => void;
@@ -122,6 +137,7 @@ interface Store {
   addLabel: (photoId: string, label: string) => void;
   removeLabel: (photoId: string, label: string) => void;
   cropPhoto: (photoId: string, croppedBlob: Blob) => void;
+  rescanPhoto: (photoId: string) => Promise<void>;
 
   // dumps
   addPhotoToDump: (photoId: string, dumpId: string) => void;
@@ -134,6 +150,9 @@ interface Store {
   deleteDump: (id: string) => void;
   updateDumpTitle: (dumpId: string, title: string) => void;
   checkDumpVibe: (dumpId: string) => void;
+  toggleDumpLike: (dumpId: string) => void;
+  approveDumpTitle: (dumpId: string) => void;
+  rejectDumpTitle: (dumpId: string) => void;
   resetAll: () => void;
 
   // captions
@@ -141,6 +160,12 @@ interface Store {
   rateCaption: (captionId: string, rating: number) => void;
   favoriteCaption: (captionId: string) => void;
   removeCaption: (captionId: string) => void;
+  banCaption: (captionId: string) => void;
+
+  // rules
+  addRule: (rule: string) => void;
+  removeRule: (index: number) => void;
+  updateRule: (index: number, rule: string) => void;
 
   // ui
   setFilter: (f: Filter) => void;
@@ -156,6 +181,28 @@ interface Store {
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
+}
+
+// ─── AI photo scan ───────────────────────────────────────────────────────────
+
+async function fetchAiLabels(url: string): Promise<{ category: string; labels: string[] } | null> {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const bmp = await createImageBitmap(blob, { resizeWidth: 512, resizeQuality: 'medium' });
+    const canvas = document.createElement('canvas');
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    canvas.getContext('2d')!.drawImage(bmp, 0, 0);
+    const base64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+    const apiRes = await fetch('/api/analyze-photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
+    });
+    if (!apiRes.ok) return null;
+    return await apiRes.json() as { category: string; labels: string[] };
+  } catch { return null; }
 }
 
 // ─── store ───────────────────────────────────────────────────────────────────
@@ -174,6 +221,7 @@ export const useStore = create<Store>((set, get) => {
       poolSize: s.poolSize,
       filter: s.filter,
       activeFilters: s.activeFilters,
+      customRules: s.customRules,
     });
   };
 
@@ -190,7 +238,8 @@ export const useStore = create<Store>((set, get) => {
     activeFilters: persisted?.activeFilters ?? [],
     captions: persisted?.captions ?? [],
     colorMode: persisted?.colorMode ?? 'dark',
-    poolSize: persisted?.poolSize ?? 'medium',
+    poolSize: persisted?.poolSize ?? 'large',
+    customRules: persisted?.customRules ?? DEFAULT_RULES,
     poolSearchQuery: '',
     lightboxPhotoId: null,
     addingToDumpId: null,
@@ -209,6 +258,24 @@ export const useStore = create<Store>((set, get) => {
         isHuji: detectHuji(file.name),
       }));
       set((s) => ({ photos: [...s.photos, ...newPhotos] }));
+      persist();
+
+      // AI label: fire-and-forget for each image (skip videos)
+      newPhotos.forEach(async (photo) => {
+        if (/\.(mp4|mov|webm)$/i.test(photo.filename)) return;
+        const result = await fetchAiLabels(photo.url);
+        if (!result) return;
+        set((s) => ({ photos: s.photos.map((p) => p.id === photo.id ? { ...p, ...result } : p) }));
+        persist();
+      });
+    },
+
+    rescanPhoto: async (photoId) => {
+      const photo = get().photos.find(p => p.id === photoId);
+      if (!photo || /\.(mp4|mov|webm)$/i.test(photo.filename)) return;
+      const result = await fetchAiLabels(photo.url);
+      if (!result) return;
+      set((s) => ({ photos: s.photos.map((p) => p.id === photoId ? { ...p, ...result } : p) }));
       persist();
     },
 
@@ -389,6 +456,73 @@ export const useStore = create<Store>((set, get) => {
       }));
     },
 
+    toggleDumpLike: (dumpId) => {
+      set((s) => ({
+        dumps: s.dumps.map((d) =>
+          d.id === dumpId ? { ...d, liked: !d.liked } : d
+        ),
+      }));
+      persist();
+    },
+
+    approveDumpTitle: (dumpId) => {
+      set((s) => ({
+        dumps: s.dumps.map((d) =>
+          d.id === dumpId ? { ...d, titleApproved: true } : d
+        ),
+      }));
+      persist();
+    },
+
+    rejectDumpTitle: (dumpId) => {
+      // Regenerate title using AI, then mark as not approved
+      const { dumps, photos } = get();
+      const dump = dumps.find(d => d.id === dumpId);
+      if (!dump) return;
+      set((s) => ({
+        dumps: s.dumps.map((d) =>
+          d.id === dumpId ? { ...d, titleApproved: false } : d
+        ),
+      }));
+      // Fire AI title regeneration
+      const dumpPhotos = dump.photos.map(id => photos.find(p => p.id === id)).filter(Boolean) as Photo[];
+      const existingTitles = dumps.map(d => d.title);
+      fetch('/api/generate-dump-title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photos: dumpPhotos.map(p => ({ category: p.category, labels: p.labels })),
+          existingTitles,
+        }),
+      }).then(r => r.json()).then(({ title: newTitle }) => {
+        if (newTitle) {
+          set((s) => ({
+            dumps: s.dumps.map((d) =>
+              d.id === dumpId ? { ...d, title: newTitle, titleApproved: undefined } : d
+            ),
+          }));
+          persist();
+        }
+      }).catch(() => {});
+    },
+
+    addRule: (rule) => {
+      set((s) => ({ customRules: [...s.customRules, rule] }));
+      persist();
+    },
+
+    removeRule: (index) => {
+      set((s) => ({ customRules: s.customRules.filter((_, i) => i !== index) }));
+      persist();
+    },
+
+    updateRule: (index, rule) => {
+      set((s) => ({
+        customRules: s.customRules.map((r, i) => i === index ? rule : r),
+      }));
+      persist();
+    },
+
     resetAll: () => {
       snap();
       get().photos.forEach((p) => { if (p.url.startsWith('blob:')) URL.revokeObjectURL(p.url); });
@@ -434,6 +568,13 @@ export const useStore = create<Store>((set, get) => {
 
     removeCaption: (captionId) => {
       set((s) => ({ captions: s.captions.filter((c) => c.id !== captionId) }));
+      persist();
+    },
+
+    banCaption: (captionId) => {
+      set((s) => ({
+        captions: s.captions.map((c) => c.id === captionId ? { ...c, banned: true, favorited: false } : c),
+      }));
       persist();
     },
 
@@ -518,9 +659,13 @@ export function applyColorMode(mode: ColorMode) {
 
 export async function loadPhotosFromServer() {
   try {
-    // Skip if we already have persisted server photos
+    // Skip if we already have persisted server photos (local or cloud)
     const existing = useStore.getState().photos;
-    if (existing.some(p => p.url.startsWith('/photos/') || p.url.startsWith('/sample-photos/'))) return;
+    if (existing.some(p =>
+      p.url.startsWith('/photos/') ||
+      p.url.startsWith('/sample-photos/') ||
+      p.url.includes('blob.vercel-storage.com')
+    )) return;
 
     // Try loading sample photos first (preloaded examples)
     try {
@@ -542,7 +687,7 @@ export async function loadPhotosFromServer() {
         saveState({
           photos: s.photos, dumps: s.dumps, activeDumpId: s.activeDumpId,
           captions: s.captions, colorMode: s.colorMode, poolSize: s.poolSize,
-          filter: s.filter, activeFilters: s.activeFilters,
+          filter: s.filter, activeFilters: s.activeFilters, customRules: s.customRules,
         });
         return;
       }
@@ -590,7 +735,7 @@ export async function loadPhotosFromServer() {
     saveState({
       photos: s.photos, dumps: s.dumps, activeDumpId: s.activeDumpId,
       captions: s.captions, colorMode: s.colorMode, poolSize: s.poolSize,
-      filter: s.filter, activeFilters: s.activeFilters,
+      filter: s.filter, activeFilters: s.activeFilters, customRules: s.customRules,
     });
   } catch { /* silently fail */ }
 }

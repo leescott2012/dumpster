@@ -21,6 +21,7 @@ interface PhotoCardProps {
   dragAttributes?: Record<string, unknown>;
   dragListeners?: Record<string, unknown>;
   isDragging?: boolean;
+  isDragActive?: boolean; // any drag is happening in the parent
   width?: number | string;
   height?: number;
   // pool selection mode
@@ -32,7 +33,7 @@ interface PhotoCardProps {
 export default function PhotoCard({
   photo, index: _index, used, totalInDump,
   onToggleHuji, onToggleStar, onRemove,
-  onClick, dragRef, dragStyle, dragAttributes, dragListeners, isDragging,
+  onClick, dragRef, dragStyle, dragAttributes, dragListeners, isDragging, isDragActive,
   width = 175, height = 232,
   selected = false,
   poolSize,
@@ -110,7 +111,7 @@ export default function PhotoCard({
         position: 'relative',
         zIndex: menuOpen ? 100 : undefined,
         cursor: dragListeners ? (isDragging ? 'grabbing' : 'grab') : (onClick ? 'pointer' : 'default'),
-        touchAction: 'auto',
+        touchAction: isDragActive ? 'none' : 'auto',
         WebkitTouchCallout: 'none',
         userSelect: 'none',
         WebkitUserSelect: 'none',

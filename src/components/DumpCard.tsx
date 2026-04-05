@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent, type DragStartEvent, type DragCancelEvent, type DragOverEvent,
@@ -103,6 +103,21 @@ export default function DumpCard({ dump, onActivate }: Props) {
     setDeleting(true);
     setTimeout(() => deleteDump(dump.id), 350);
   };
+
+  // Lock ALL scrolling the moment drag activates — body, row, everything
+  useEffect(() => {
+    if (draggingId) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, [draggingId]);
 
   const fillRatio = dump.photos.length / 20;
   const draggingPhoto = draggingId ? dumpPhotos.find(p => p.id === draggingId) ?? null : null;
@@ -225,7 +240,11 @@ export default function DumpCard({ dump, onActivate }: Props) {
             ref={scrollRowRef}
             className="dump-photos-row"
             style={{
-              display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', paddingBottom: 24,
+              display: 'flex', gap: 8,
+              overflowX: draggingId ? 'hidden' : 'auto',
+              overflowY: 'hidden',
+              paddingBottom: 24,
+              touchAction: draggingId ? 'none' : 'pan-x',
               WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none',
             } as React.CSSProperties}
           >
@@ -422,6 +441,7 @@ function SortableSlot({ photo, index, totalInDump, isDragActive, isDropTarget, o
       dragAttributes={attributes as unknown as Record<string, unknown>}
       dragListeners={listeners as unknown as Record<string, unknown>}
       isDragging={isDragging}
+      isDragActive={isDragActive}
       onToggleHuji={onToggleHuji}
       onToggleStar={onToggleStar}
       onRemove={onRemoveFromDump}

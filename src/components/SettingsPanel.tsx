@@ -74,7 +74,10 @@ export function SettingsPanel({ onClose, onOpenTutorial }: Props) {
           onClick={onClose}
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--text3)', fontSize: 22, lineHeight: 1, padding: '4px 0 4px 8px',
+            color: 'var(--text3)', fontSize: 22, lineHeight: 1,
+            width: 44, height: 44,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderRadius: 8, flexShrink: 0,
           }}
         >×</button>
       </div>

@@ -1,7 +1,8 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent, type DragStartEvent, type DragCancelEvent, type DragOverEvent,
+  type Modifier,
 } from '@dnd-kit/core';
 import {
   SortableContext, horizontalListSortingStrategy, useSortable,
@@ -11,6 +12,28 @@ import type { Dump, Photo } from '../types';
 import { useStore } from '../store';
 import { getSlotRole, SLOT_LABELS, CATEGORY_DISPLAY } from '../formula';
 import PhotoCard from './PhotoCard';
+
+// Snap the small drag overlay center directly under the user's finger/cursor
+const OVERLAY_W = 110;
+const OVERLAY_H = 147;
+const snapOverlayToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  if (!draggingNodeRect || !activatorEvent) return transform;
+  let clientX: number, clientY: number;
+  if ('touches' in activatorEvent && (activatorEvent as TouchEvent).touches.length > 0) {
+    clientX = (activatorEvent as TouchEvent).touches[0].clientX;
+    clientY = (activatorEvent as TouchEvent).touches[0].clientY;
+  } else {
+    clientX = (activatorEvent as PointerEvent).clientX;
+    clientY = (activatorEvent as PointerEvent).clientY;
+  }
+  const offsetX = clientX - draggingNodeRect.left;
+  const offsetY = clientY - draggingNodeRect.top;
+  return {
+    ...transform,
+    x: transform.x + offsetX - OVERLAY_W / 2,
+    y: transform.y + offsetY - OVERLAY_H / 2,
+  };
+};
 
 interface Props {
   dump: Dump;
@@ -119,6 +142,48 @@ export default function DumpCard({ dump, onActivate }: Props) {
     };
   }, [draggingId]);
 
+  // Edge-scroll: when dragging near left/right edges of the photo row, auto-scroll it
+  const edgeScrollRaf = useRef<number | null>(null);
+  const pointerXRef = useRef<number>(0);
+
+  const stopEdgeScroll = useCallback(() => {
+    if (edgeScrollRaf.current !== null) {
+      cancelAnimationFrame(edgeScrollRaf.current);
+      edgeScrollRaf.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!draggingId) { stopEdgeScroll(); return; }
+    const row = scrollRowRef.current;
+    if (!row) return;
+
+    const EDGE = 70;       // px zone from each edge
+    const MAX_SPEED = 10;  // max px per frame
+
+    const tick = () => {
+      const rect = row.getBoundingClientRect();
+      const x = pointerXRef.current;
+      if (x < rect.left + EDGE) {
+        const t = 1 - (x - rect.left) / EDGE;
+        row.scrollLeft -= MAX_SPEED * Math.max(0, Math.min(1, t));
+      } else if (x > rect.right - EDGE) {
+        const t = (x - (rect.right - EDGE)) / EDGE;
+        row.scrollLeft += MAX_SPEED * Math.max(0, Math.min(1, t));
+      }
+      edgeScrollRaf.current = requestAnimationFrame(tick);
+    };
+
+    const onPointerMove = (e: PointerEvent) => { pointerXRef.current = e.clientX; };
+    document.addEventListener('pointermove', onPointerMove);
+    edgeScrollRaf.current = requestAnimationFrame(tick);
+
+    return () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      stopEdgeScroll();
+    };
+  }, [draggingId, stopEdgeScroll]);
+
   const fillRatio = dump.photos.length / 20;
   const draggingPhoto = draggingId ? dumpPhotos.find(p => p.id === draggingId) ?? null : null;
 
@@ -128,7 +193,6 @@ export default function DumpCard({ dump, onActivate }: Props) {
       onClick={onActivate}
       style={{
         marginBottom: 56, cursor: 'default',
-        overflow: 'hidden',
         opacity: deleting ? 0 : 1,
         transform: deleting ? 'translateY(-8px) scale(0.98)' : 'none',
         transition: 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), outline-color 0.2s',
@@ -241,7 +305,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
             className="dump-photos-row"
             style={{
               display: 'flex', gap: 8,
-              overflowX: draggingId ? 'hidden' : 'auto',
+              overflowX: 'auto',
               overflowY: 'hidden',
               paddingBottom: 24,
               touchAction: draggingId ? 'none' : 'pan-x',
@@ -315,17 +379,17 @@ export default function DumpCard({ dump, onActivate }: Props) {
           </div>
         </SortableContext>
 
-        {/* Floating drag thumbnail — follows finger */}
-        <DragOverlay dropAnimation={null}>
+        {/* Floating drag thumbnail — centered on finger */}
+        <DragOverlay dropAnimation={null} modifiers={[snapOverlayToCursor]} zIndex={9999}>
           {draggingPhoto && (
             <div style={{
-              width: 110, height: 147, borderRadius: 10,
+              width: OVERLAY_W, height: OVERLAY_H, borderRadius: 10,
               border: '2px solid var(--gold)',
               overflow: 'hidden',
-              boxShadow: '0 12px 32px rgba(0,0,0,0.7)',
-              opacity: 0.95,
+              boxShadow: '0 16px 40px rgba(0,0,0,0.8)',
+              opacity: 1,
               pointerEvents: 'none',
-              transform: 'rotate(-2deg)',
+              transform: 'rotate(-2deg) scale(1.05)',
             }}>
               {/\.(mp4|mov|webm)$/i.test(draggingPhoto.filename) ? (
                 <video src={draggingPhoto.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
@@ -437,6 +501,10 @@ function SortableSlot({ photo, index, totalInDump, isDragActive, isDropTarget, o
         // Gold outline on the item currently under the thumbnail
         outline: isDropTarget ? '2px solid var(--gold)' : undefined,
         outlineOffset: isDropTarget ? 3 : undefined,
+        // Prevent browser from stealing the touch gesture for scroll before
+        // dnd-kit's 500ms hold timer fires — without this, pan-x on the row
+        // cancels the drag activation every time.
+        touchAction: 'none',
       }}
       dragAttributes={attributes as unknown as Record<string, unknown>}
       dragListeners={listeners as unknown as Record<string, unknown>}

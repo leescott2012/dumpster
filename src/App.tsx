@@ -129,7 +129,7 @@ export default function App() {
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 32px' }}>
 
         {/* ── Header ──────────────────────────────────────── */}
-        <header style={{ paddingTop: 52, paddingBottom: 36 }}>
+        <header style={{ paddingTop: 'calc(var(--native-sat, env(safe-area-inset-top)) + 20px)', paddingBottom: 36 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <DumpsterLogo size={22} />
@@ -208,7 +208,7 @@ export default function App() {
           {/* Auto-Generate button + count picker */}
           <div style={{ position: 'relative' }}>
             <ActionButton
-              icon="⚡"
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" fill="currentColor"/></svg>}
               label="Auto-Generate"
               onClick={() => setAutoPickerOpen(o => !o)}
               gold
@@ -352,7 +352,7 @@ function StatPill({ num, label }: { num: number; label: string }) {
   );
 }
 
-function ActionButton({ icon, label, onClick, gold }: { icon: string; label: string; onClick: () => void; gold?: boolean }) {
+function ActionButton({ icon, label, onClick, gold }: { icon: React.ReactNode; label: string; onClick: () => void; gold?: boolean }) {
   return (
     <button
       onClick={onClick}
@@ -363,6 +363,7 @@ function ActionButton({ icon, label, onClick, gold }: { icon: string; label: str
         borderRadius: 8, padding: '10px 18px',
         color: gold ? 'var(--gold)' : 'var(--text2)',
         fontSize: 13, fontWeight: 500, transition: 'all 0.15s',
+        cursor: 'pointer',
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--gold)';
@@ -373,7 +374,7 @@ function ActionButton({ icon, label, onClick, gold }: { icon: string; label: str
         (e.currentTarget as HTMLButtonElement).style.color = gold ? 'var(--gold)' : 'var(--text2)';
       }}
     >
-      <span style={{ fontSize: 15 }}>{icon}</span>
+      {icon}
       {label}
     </button>
   );

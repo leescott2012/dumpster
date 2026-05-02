@@ -1,7 +1,7 @@
 import SwiftUI
 import PhotosUI
 import WebKit
-import ImageIO  // FIX: Explicit import for CGImageSource* functions
+import ImageIO
 
 // MARK: - AI Suggest Button (Floating Overlay)
 
@@ -53,9 +53,9 @@ struct AISuggestView: View {
     @State private var statusMessage: String = ""
     @State private var isCreating = false
 
-    // Haptic Feedback Generator
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
+    private let llmService = LLMService.shared
 
     enum Phase { case picker, results }
 
@@ -70,7 +70,21 @@ struct AISuggestView: View {
                         .font(.system(size: 12, weight: .black))
                         .tracking(3)
                         .foregroundColor(gold)
+
                     Spacer()
+
+                    // Show active provider indicator
+                    if let provider = llmService.preferredProvider() {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 5, height: 5)
+                            Text(provider.displayName)
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(1)
+                                .foregroundColor(gold.opacity(0.5))
+                        }
+                    }
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 60)
@@ -215,7 +229,6 @@ struct AISuggestView: View {
                     }
                 }
 
-                // Bottom padding for the create button
                 Color.clear.frame(height: 100)
             }
         }
@@ -228,7 +241,6 @@ struct AISuggestView: View {
             .appendingPathComponent("dumpster_ai", isDirectory: true)
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
-        // FIX: Use a thread-safe array with a lock instead of mutating from multiple queues.
         let lock = NSLock()
         var loaded: [(UIImage, URL)] = []
         let total = Double(items.count)
@@ -250,7 +262,6 @@ struct AISuggestView: View {
 
                     guard case .success(let data) = result, let data,
                           let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-                        // Still update progress even on failure
                         DispatchQueue.main.async {
                             completed += 1
                             self.progress = completed / total
@@ -280,7 +291,6 @@ struct AISuggestView: View {
                         try? thumbData.write(to: url)
                     }
 
-                    // FIX: Protect the shared array with a lock instead of relying on main queue ordering.
                     lock.lock()
                     loaded.append((thumbnail, url))
                     lock.unlock()
@@ -295,7 +305,6 @@ struct AISuggestView: View {
             group.notify(queue: .main) {
                 self.statusMessage = "Clustering photos..."
 
-                // FIX: Safely copy the loaded array under the lock before passing to analyzer.
                 lock.lock()
                 let safeLoaded = loaded
                 lock.unlock()
@@ -309,20 +318,18 @@ struct AISuggestView: View {
                     self.statusMessage = ""
                     withAnimation { self.phase = .results }
 
-                    // Trigger caption generation in background
+                    // Trigger caption generation using LLMService
                     self.generateCaptionsForClusters(result)
                 }
             }
         }
     }
 
-    // MARK: - Caption Generation
+    // MARK: - Caption Generation (Now uses LLMService)
 
     private func generateCaptionsForClusters(_ clusters: [PhotoCluster]) {
-        let captionService = CaptionService.shared
-
         let requests = clusters.map { cluster in
-            CaptionService.CaptionRequest(
+            LLMService.CaptionRequest(
                 dumpTitle: cluster.title,
                 category: cluster.category,
                 labels: cluster.allLabels,
@@ -330,12 +337,13 @@ struct AISuggestView: View {
             )
         }
 
-        if captionService.hasAPIKey {
-            // Use OpenAI API
-            appState.showStatus("Generating captions...", duration: 30)
+        if llmService.hasAnyAPIKey {
+            // Use the best available LLM provider
+            let providerName = llmService.preferredProvider()?.displayName ?? "AI"
+            appState.showStatus("Generating captions via \(providerName)...", duration: 30)
             Task {
                 do {
-                    let results = try await captionService.generateCaptions(for: requests)
+                    let results = try await llmService.generateCaptions(for: requests)
                     await MainActor.run {
                         appState.captionResults = results
                         appState.showStatus("Captions ready", duration: 3)
@@ -344,9 +352,8 @@ struct AISuggestView: View {
                 } catch {
                     print("[AISuggest] Caption generation failed: \(error)")
                     await MainActor.run {
-                        // Fall back to local captions
                         let fallbacks = requests.map {
-                            CaptionService.fallbackCaptions(for: $0.category, title: $0.dumpTitle)
+                            LLMService.fallbackCaptions(for: $0.category, title: $0.dumpTitle)
                         }
                         appState.captionResults = fallbacks
                         appState.showStatus("Using local captions", duration: 3)
@@ -356,7 +363,7 @@ struct AISuggestView: View {
         } else {
             // No API key — use local fallback captions
             let fallbacks = requests.map {
-                CaptionService.fallbackCaptions(for: $0.category, title: $0.dumpTitle)
+                LLMService.fallbackCaptions(for: $0.category, title: $0.dumpTitle)
             }
             appState.captionResults = fallbacks
         }
@@ -372,7 +379,6 @@ struct AISuggestView: View {
             .filter { selectedClusters.contains($0.offset) }
             .map { $0.element }
 
-        // Build the JSON payload with captions included
         let json = selectedGroups.map { cluster -> [String: Any] in
             let photos = cluster.photos.map { p -> [String: String] in
                 let encodedName = p.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? p.filename
@@ -382,7 +388,6 @@ struct AISuggestView: View {
                 ]
             }
 
-            // Find matching captions for this cluster
             let matchingCaptions = appState.captionResults.first { $0.dumpTitle == cluster.title }
             var payload: [String: Any] = [
                 "title": cluster.title,
@@ -401,8 +406,6 @@ struct AISuggestView: View {
             return
         }
 
-        // FIX: Proper JSON escaping for JavaScript string injection.
-        // Must handle backslashes, single quotes, newlines, carriage returns, and line/paragraph separators.
         let escaped = jsonStr
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
@@ -457,7 +460,6 @@ struct ClusterRow: View {
                         .foregroundColor(selected ? gold : .white.opacity(0.2))
                 }
 
-                // Photo thumbnails
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(Array(cluster.photos.prefix(8).enumerated()), id: \.offset) { _, photo in
@@ -470,7 +472,6 @@ struct ClusterRow: View {
                     }
                 }
 
-                // Show top labels as tags
                 if !cluster.allLabels.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {

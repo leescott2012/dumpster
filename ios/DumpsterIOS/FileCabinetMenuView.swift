@@ -518,50 +518,70 @@ struct AISettingsTabView: View {
     private func apiKeyCard(for provider: LLMService.LLMProvider) -> some View {
         let isExpanded = expandedProvider == provider
         let hasKey = llmService.hasAPIKey(for: provider)
-        let isSaved = savedConfirmation == provider
 
         return VStack(alignment: .leading, spacing: 0) {
-            // Card Header (always visible)
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    expandedProvider = isExpanded ? nil : provider
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: provider.iconName)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(hasKey ? gold : .white.opacity(0.3))
-                        .frame(width: 32)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(provider.displayName)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
-                        Text(hasKey ? "Key configured" : "Not configured")
-                            .font(.system(size: 11))
-                            .foregroundColor(hasKey ? .green.opacity(0.7) : .white.opacity(0.3))
-                    }
-
-                    Spacer()
-
-                    if hasKey {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 6, height: 6)
-                    }
-
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.3))
-                }
-                .padding(16)
-            }
-            .buttonStyle(.plain)
-
-            // Expanded Content
+            apiKeyCardHeader(provider: provider, isExpanded: isExpanded, hasKey: hasKey)
             if isExpanded {
-                VStack(alignment: .leading, spacing: 14) {
+                apiKeyCardExpanded(provider: provider)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(
+                            hasKey ? gold.opacity(0.2) : Color.white.opacity(0.06),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
+    }
+
+    private func apiKeyCardHeader(provider: LLMService.LLMProvider, isExpanded: Bool, hasKey: Bool) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                expandedProvider = isExpanded ? nil : provider
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: provider.iconName)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(hasKey ? gold : .white.opacity(0.3))
+                    .frame(width: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(provider.displayName)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                    Text(hasKey ? "Key configured" : "Not configured")
+                        .font(.system(size: 11))
+                        .foregroundColor(hasKey ? .green.opacity(0.7) : .white.opacity(0.3))
+                }
+
+                Spacer()
+
+                if hasKey {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                }
+
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.3))
+            }
+            .padding(16)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func apiKeyCardExpanded(provider: LLMService.LLMProvider) -> some View {
+        let isSaved = savedConfirmation == provider
+        return VStack(alignment: .leading, spacing: 14) {
                     // API Key Input
                     HStack(spacing: 10) {
                         Group {
@@ -673,25 +693,10 @@ struct AISettingsTabView: View {
                             }
                         }
                     }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(
-                            hasKey ? gold.opacity(0.2) : Color.white.opacity(0.06),
-                            lineWidth: 1
-                        )
-                )
-        )
-        .padding(.horizontal, 24)
-        .padding(.top, 8)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     private func binding(for provider: LLMService.LLMProvider) -> Binding<String> {

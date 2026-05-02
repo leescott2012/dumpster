@@ -1,9 +1,10 @@
 import SwiftUI
 
-// MARK: - Settings View
+// MARK: - Settings View (Legacy — Redirects to File Cabinet)
 
-/// Provides configuration for the Dumpster app, including OpenAI API key management,
-/// cache controls, and app information.
+/// This view is kept for backward compatibility with the existing fullScreenCover presentation.
+/// It now serves as a lightweight redirect that opens the File Cabinet menu.
+/// The actual settings UI lives in FileCabinetMenuView → AISettingsTabView.
 
 struct SettingsView: View {
     @Binding var isPresented: Bool
@@ -11,7 +12,7 @@ struct SettingsView: View {
     @State private var isKeyVisible = false
     @State private var showSavedConfirmation = false
 
-    @ObservedObject private var captionService = CaptionService.shared
+    @ObservedObject private var llmService = LLMService.shared
 
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
 
@@ -34,11 +35,46 @@ struct SettingsView: View {
                     .padding(.top, 60)
                     .padding(.bottom, 28)
 
-                    // API Key Section
-                    sectionHeader("OPENAI API KEY")
+                    // Redirect Banner
+                    VStack(spacing: 16) {
+                        Image(systemName: "archivebox")
+                            .font(.system(size: 36, weight: .light))
+                            .foregroundColor(gold.opacity(0.5))
+
+                        Text("Settings have moved!")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Text("All settings are now in the File Cabinet menu.\nLong-press the Dynamic Island or tap the menu icon to open it.")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.4))
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(5)
+                            .padding(.horizontal, 16)
+
+                        Button {
+                            isPresented = false
+                        } label: {
+                            Text("GOT IT")
+                                .font(.system(size: 13, weight: .bold))
+                                .tracking(3)
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(gold)
+                                .cornerRadius(12)
+                        }
+                        .padding(.horizontal, 32)
+                        .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+
+                    // Quick API Key Section (for convenience)
+                    sectionHeader("QUICK API KEY SETUP")
 
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Required for AI caption generation. Your key is stored locally on this device.")
+                        Text("Quickly add an OpenAI API key. For more providers, use the File Cabinet menu.")
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.4))
                             .lineSpacing(4)
@@ -75,7 +111,8 @@ struct SettingsView: View {
 
                         HStack(spacing: 12) {
                             Button {
-                                captionService.apiKey = apiKeyInput
+                                // Save to LLMService (OpenAI provider)
+                                llmService.setAPIKey(apiKeyInput, for: .openai)
                                 showSavedConfirmation = true
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                                     showSavedConfirmation = false
@@ -91,7 +128,7 @@ struct SettingsView: View {
                                     .cornerRadius(8)
                             }
 
-                            if captionService.hasAPIKey {
+                            if llmService.hasAPIKey(for: .openai) {
                                 HStack(spacing: 6) {
                                     Circle()
                                         .fill(Color.green)
@@ -107,7 +144,7 @@ struct SettingsView: View {
                             if !apiKeyInput.isEmpty {
                                 Button {
                                     apiKeyInput = ""
-                                    captionService.apiKey = ""
+                                    llmService.setAPIKey("", for: .openai)
                                 } label: {
                                     Text("CLEAR")
                                         .font(.system(size: 11, weight: .bold))
@@ -119,6 +156,59 @@ struct SettingsView: View {
                                         .cornerRadius(8)
                                 }
                             }
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 32)
+
+                    // Connected Providers
+                    sectionHeader("CONNECTED PROVIDERS")
+
+                    VStack(spacing: 6) {
+                        ForEach(LLMService.LLMProvider.allCases) { provider in
+                            HStack(spacing: 10) {
+                                Image(systemName: provider.iconName)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(llmService.hasAPIKey(for: provider) ? gold : .white.opacity(0.2))
+                                    .frame(width: 24)
+
+                                Text(provider.displayName)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
+
+                                Spacer()
+
+                                if llmService.hasAPIKey(for: provider) {
+                                    HStack(spacing: 4) {
+                                        Circle()
+                                            .fill(Color.green)
+                                            .frame(width: 5, height: 5)
+                                        Text("Connected")
+                                            .font(.system(size: 10))
+                                            .foregroundColor(.green.opacity(0.7))
+                                    }
+                                } else {
+                                    Text("Not connected")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.white.opacity(0.2))
+                                }
+                            }
+                            .padding(.vertical, 6)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 32)
+
+                    // About Section
+                    sectionHeader("ABOUT")
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        infoRow("Version", value: "1.0.0")
+                        infoRow("Build", value: "2025.05")
+                        infoRow("Vision AI", value: "Apple VNClassifyImageRequest")
+                        infoRow("AI Provider", value: llmService.preferredProvider()?.displayName ?? "Local fallback")
+                        if let provider = llmService.preferredProvider() {
+                            infoRow("Model", value: llmService.selectedModel(for: provider))
                         }
                     }
                     .padding(.horizontal, 24)
@@ -151,44 +241,6 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 32)
-
-                    // About Section
-                    sectionHeader("ABOUT")
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        infoRow("Version", value: "1.0.0")
-                        infoRow("Build", value: "2025.05")
-                        infoRow("Vision AI", value: "Apple VNClassifyImageRequest")
-                        infoRow("Captions", value: captionService.hasAPIKey ? "OpenAI GPT-4.1-nano" : "Local fallback")
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 32)
-
-                    // Production Note
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 12))
-                                .foregroundColor(.yellow.opacity(0.7))
-                            Text("PRODUCTION NOTE")
-                                .font(.system(size: 10, weight: .bold))
-                                .tracking(1)
-                                .foregroundColor(.yellow.opacity(0.7))
-                        }
-                        Text("For production, migrate API key storage to iOS Keychain and consider using a server-side proxy to avoid embedding keys in the app.")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.3))
-                            .lineSpacing(4)
-                    }
-                    .padding(16)
-                    .background(Color.yellow.opacity(0.05))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.yellow.opacity(0.15), lineWidth: 1)
-                    )
-                    .padding(.horizontal, 24)
                     .padding(.bottom, 60)
                 }
             }
@@ -208,7 +260,7 @@ struct SettingsView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            let currentKey = captionService.apiKey
+            let currentKey = llmService.apiKey(for: .openai)
             if !currentKey.isEmpty {
                 apiKeyInput = currentKey
             }

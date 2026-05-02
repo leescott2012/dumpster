@@ -4,15 +4,16 @@ import WebKit
 // MARK: - App State (Observable)
 
 /// Centralized app state shared between native views and the web bridge.
-/// Replaces the fragile @State WKWebView pattern with a proper ObservableObject.
+/// Updated to use LLMService instead of CaptionService for multi-provider support.
 final class AppState: ObservableObject {
     @Published var webView: WKWebView?
     @Published var showAISuggest = false
     @Published var showSettings = false
+    @Published var showFileCabinet = false  // NEW: File Cabinet menu
     @Published var statusText: String = "DUMPSTER"
     @Published var dumpCount: Int = 0
     @Published var isAnalyzing = false
-    @Published var captionResults: [CaptionService.CaptionResult] = []
+    @Published var captionResults: [LLMService.CaptionResult] = []
 
     /// Send a status update that auto-clears after a delay.
     func showStatus(_ text: String, duration: TimeInterval = 3.0) {
@@ -33,7 +34,7 @@ final class AppState: ObservableObject {
     }
 
     /// Send captions to the web app via the bridge.
-    func sendCaptionsToWeb(_ results: [CaptionService.CaptionResult]) {
+    func sendCaptionsToWeb(_ results: [LLMService.CaptionResult]) {
         let payload = results.map { result -> [String: Any] in
             return [
                 "dumpTitle": result.dumpTitle,
@@ -88,8 +89,15 @@ struct ContentView: View {
                         isExpanded.toggle()
                     }
                 }
+                .onLongPressGesture(minimumDuration: 0.5) {
+                    // Long press on Dynamic Island opens File Cabinet
+                    impact.impactOccurred()
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        appState.showFileCabinet = true
+                    }
+                }
 
-            // 3. THE FILE CABINET MENU (AI Suggestions with real data)
+            // 3. AI SUGGESTIONS (Bottom Sheet)
             if appState.showAISuggest {
                 CabinetMenuView(
                     isPresented: $appState.showAISuggest,
@@ -97,6 +105,16 @@ struct ContentView: View {
                 )
                 .zIndex(10)
                 .transition(.move(edge: .bottom))
+            }
+
+            // 4. FILE CABINET MENU (Full Screen Overlay)
+            if appState.showFileCabinet {
+                FileCabinetMenuView(
+                    isPresented: $appState.showFileCabinet,
+                    appState: appState
+                )
+                .zIndex(20)
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
         .background(Color.black)
@@ -146,7 +164,7 @@ struct ContentView: View {
                         .lineLimit(1)
 
                     if appState.dumpCount > 0 && !appState.isAnalyzing {
-                        Text("·")
+                        Text("\u{00B7}")
                             .foregroundColor(Color(hex: "#C8A96E").opacity(0.4))
                         Text("\(appState.dumpCount) dumps")
                             .font(.system(size: 10, weight: .medium))
@@ -157,6 +175,18 @@ struct ContentView: View {
 
                     // Credit badge — tappable, opens paywall
                     CreditBadge()
+
+                    // Menu button
+                    Button {
+                        impact.impactOccurred()
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            appState.showFileCabinet = true
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(Color(hex: "#C8A96E").opacity(0.5))
+                    }
                 }
                 .padding(.horizontal, 14)
                 .transition(.opacity)
@@ -165,14 +195,14 @@ struct ContentView: View {
     }
 }
 
-// MARK: - File Cabinet Menu Component (Connected to Real Data)
+// MARK: - File Cabinet Menu Component (AI Suggestions — Connected to Real Data)
 
 struct CabinetMenuView: View {
     @Binding var isPresented: Bool
     @ObservedObject var appState: AppState
-    @ObservedObject private var captionService = CaptionService.shared
+    @ObservedObject private var llmService = LLMService.shared
     @State private var dragOffset: CGFloat = 0
-    @State private var selectedCaptionIndex: [String: Int] = [:]  // dumpTitle → selected caption index
+    @State private var selectedCaptionIndex: [String: Int] = [:]
     @State private var copiedCaption: String?
 
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
@@ -212,7 +242,20 @@ struct CabinetMenuView: View {
                         .tracking(2)
                         .foregroundColor(gold)
                     Spacer()
-                    if captionService.isGenerating {
+
+                    // Show active provider
+                    if let provider = llmService.activeProvider {
+                        HStack(spacing: 4) {
+                            Image(systemName: provider.iconName)
+                                .font(.system(size: 10))
+                            Text(provider.displayName)
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(1)
+                        }
+                        .foregroundColor(gold.opacity(0.5))
+                    }
+
+                    if llmService.isGenerating {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: gold))
                             .scaleEffect(0.7)
@@ -229,9 +272,9 @@ struct CabinetMenuView: View {
                 // Content
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        if appState.captionResults.isEmpty && !captionService.isGenerating {
+                        if appState.captionResults.isEmpty && !llmService.isGenerating {
                             emptyStateView
-                        } else if captionService.isGenerating {
+                        } else if llmService.isGenerating {
                             generatingView
                         } else {
                             captionResultsView
@@ -281,24 +324,37 @@ struct CabinetMenuView: View {
                 .font(.system(size: 17, weight: .bold))
                 .foregroundColor(.white.opacity(0.6))
 
-            Text("Use the AI Dump Builder to analyze photos — captions will be generated automatically for each dump.")
+            Text("Use the AI Builder to select photos.\nVision AI will group them and generate captions.")
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(.white.opacity(0.3))
                 .multilineTextAlignment(.center)
                 .lineSpacing(5)
                 .padding(.horizontal, 16)
 
-            if !CaptionService.shared.hasAPIKey {
+            if !llmService.hasAnyAPIKey {
                 HStack(spacing: 8) {
                     Image(systemName: "key")
                         .font(.system(size: 12))
                         .foregroundColor(.yellow.opacity(0.7))
-                    Text("Add an OpenAI API key in Settings for AI captions")
+                    Text("Add an API key in the File Cabinet menu for AI captions")
                         .font(.system(size: 12))
                         .foregroundColor(.yellow.opacity(0.6))
                 }
                 .padding(12)
                 .background(Color.yellow.opacity(0.06))
+                .cornerRadius(10)
+                .padding(.top, 8)
+            } else if let provider = llmService.preferredProvider() {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                    Text("\(provider.displayName) ready")
+                        .font(.system(size: 12))
+                        .foregroundColor(.green.opacity(0.6))
+                }
+                .padding(12)
+                .background(Color.green.opacity(0.06))
                 .cornerRadius(10)
                 .padding(.top, 8)
             }
@@ -319,9 +375,11 @@ struct CabinetMenuView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white.opacity(0.6))
 
-            Text("AI is crafting the perfect captions for your dumps")
-                .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.3))
+            if let provider = llmService.activeProvider {
+                Text("Using \(provider.displayName) to craft the perfect captions")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.3))
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -336,7 +394,7 @@ struct CabinetMenuView: View {
         }
     }
 
-    private func captionCard(for result: CaptionService.CaptionResult) -> some View {
+    private func captionCard(for result: LLMService.CaptionResult) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             captionCardHeader(result: result)
             captionCardOptions(result: result)
@@ -352,9 +410,7 @@ struct CabinetMenuView: View {
         )
     }
 
-    // MARK: - Caption Card Header
-
-    private func captionCardHeader(result: CaptionService.CaptionResult) -> some View {
+    private func captionCardHeader(result: LLMService.CaptionResult) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(result.dumpTitle)
@@ -372,9 +428,7 @@ struct CabinetMenuView: View {
         }
     }
 
-    // MARK: - Caption Card Options
-
-    private func captionCardOptions(result: CaptionService.CaptionResult) -> some View {
+    private func captionCardOptions(result: LLMService.CaptionResult) -> some View {
         ForEach(Array(result.captions.enumerated()), id: \.offset) { index, caption in
             CaptionOptionButton(
                 caption: caption,
@@ -459,23 +513,13 @@ struct DumpsterWebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
-
-        // FIX: Use the configuration's own userContentController instead of creating a new one.
-        // This was a critical bug — scripts and message handlers were being added to a detached controller.
         let userContentController = configuration.userContentController
-
-        // FIX: Enable persistent localStorage by using the default data store.
-        // Without this, WKWebView with custom schemes uses ephemeral storage.
         configuration.websiteDataStore = WKWebsiteDataStore.default()
-
-        // Register the custom URL scheme handler
         configuration.setURLSchemeHandler(DumpsterSchemeHandler(), forURLScheme: "dumpster")
 
-        // Inject CSS/JS fixes and the native→web bridge receiver
         let webFixScript = WKUserScript(
             source: """
             (function() {
-                // CSS fixes
                 const style = document.createElement('style');
                 style.innerHTML = `
                     .stray-question-mark, #stray-q, [class*="question-mark"] {
@@ -487,7 +531,6 @@ struct DumpsterWebView: UIViewRepresentable {
                 `;
                 document.head.appendChild(style);
 
-                // Touch interaction fix for caption pills
                 setTimeout(() => {
                     const pill = document.querySelector('.photo-caption-pill') || document.querySelector('[class*="pill-container"]');
                     if (pill) {
@@ -500,14 +543,12 @@ struct DumpsterWebView: UIViewRepresentable {
                     }
                 }, 1000);
 
-                // Native → Web bridge receiver
                 window.__dumpsterBridge = window.__dumpsterBridge || {};
 
                 window.__dumpsterBridge.receiveCaptions = function(jsonStr) {
                     try {
                         const captions = JSON.parse(jsonStr);
                         console.log('[Dumpster] Received captions from native:', captions);
-                        // Dispatch custom event for the React app to consume
                         window.dispatchEvent(new CustomEvent('dumpster-captions', { detail: captions }));
                     } catch(e) {
                         console.error('[Dumpster] Failed to parse captions:', e);
@@ -519,7 +560,6 @@ struct DumpsterWebView: UIViewRepresentable {
                     window.dispatchEvent(new CustomEvent('dumpster-status', { detail: status }));
                 };
 
-                // Notify native that the bridge is ready
                 setTimeout(() => {
                     if (window.webkit && window.webkit.messageHandlers.dumpsterBridge) {
                         window.webkit.messageHandlers.dumpsterBridge.postMessage({ type: 'bridgeReady' });
@@ -531,12 +571,8 @@ struct DumpsterWebView: UIViewRepresentable {
             forMainFrameOnly: true
         )
         userContentController.addUserScript(webFixScript)
-
-        // Register message handlers for web→native communication
         userContentController.add(context.coordinator, name: "dumpsterBridge")
         userContentController.add(context.coordinator, name: "openSettings")
-
-        // FIX: Assign the configured userContentController back
         configuration.userContentController = userContentController
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
@@ -544,24 +580,19 @@ struct DumpsterWebView: UIViewRepresentable {
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.backgroundColor = .clear
         webView.isOpaque = false
-
-        // Allow back/forward navigation for SPA
         webView.allowsBackForwardNavigationGestures = false
 
         if let url = URL(string: "dumpster://app/index.html") {
             webView.load(URLRequest(url: url))
         }
 
-        // Store webView reference in AppState
         DispatchQueue.main.async {
             self.appState.webView = webView
         }
         return webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {
-        // No dynamic updates needed — the web view manages its own state
-    }
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
 
     // MARK: - Coordinator
 
@@ -578,7 +609,10 @@ struct DumpsterWebView: UIViewRepresentable {
         ) {
             switch message.name {
             case "openSettings":
-                DispatchQueue.main.async { self.appState.showSettings = true }
+                // Open the File Cabinet instead of the old settings
+                DispatchQueue.main.async {
+                    self.appState.showFileCabinet = true
+                }
 
             case "dumpsterBridge":
                 handleBridgeMessage(message.body)
@@ -588,16 +622,17 @@ struct DumpsterWebView: UIViewRepresentable {
             }
         }
 
-        /// Parse structured messages from the web app.
         private func handleBridgeMessage(_ body: Any) {
             if let dict = body as? [String: Any], let type = dict["type"] as? String {
                 switch type {
                 case "openAISuggest":
                     DispatchQueue.main.async { self.appState.showAISuggest = true }
 
+                case "openFileCabinet":
+                    DispatchQueue.main.async { self.appState.showFileCabinet = true }
+
                 case "bridgeReady":
                     print("[Dumpster] Web bridge is ready")
-                    // Send any pending captions
                     if !appState.captionResults.isEmpty {
                         appState.sendCaptionsToWeb(appState.captionResults)
                     }
@@ -614,7 +649,6 @@ struct DumpsterWebView: UIViewRepresentable {
                     print("[Dumpster] Unknown bridge message type: \(type)")
                 }
             } else {
-                // Legacy: plain message with no type → open AI suggest
                 DispatchQueue.main.async { self.appState.showAISuggest = true }
             }
         }
@@ -622,7 +656,6 @@ struct DumpsterWebView: UIViewRepresentable {
         // MARK: - Navigation Delegate
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            // Query dump count from web app after load
             webView.evaluateJavaScript("""
                 (function() {
                     try {
@@ -648,7 +681,6 @@ struct DumpsterWebView: UIViewRepresentable {
             decidePolicyFor navigationAction: WKNavigationAction,
             decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
         ) {
-            // Allow all dumpster:// scheme navigations; open external URLs in Safari
             if let url = navigationAction.request.url {
                 if url.scheme == "dumpster" {
                     decisionHandler(.allow)

@@ -323,6 +323,11 @@ final class LLMService: ObservableObject {
 
     /// Generate captions for a single dump cluster using the best available provider.
     func generateCaptions(for request: CaptionRequest) async throws -> CaptionResult {
+        // ── Credit gate ──
+        guard await CreditManager.shared.canAfford(.generateCaptions) else {
+            throw LLMError.insufficientCredits
+        }
+
         let styleModifier = captionStyle.promptModifier
 
         let systemPrompt = """
@@ -354,7 +359,10 @@ final class LLMService: ObservableObject {
         )
 
         let content = try await generate(request: llmRequest)
-        return parseCaptionResponse(content, dumpTitle: request.dumpTitle)
+        let result = parseCaptionResponse(content, dumpTitle: request.dumpTitle)
+        // ── Deduct credit on success ──
+        await CreditManager.shared.spend(.generateCaptions)
+        return result
     }
 
     /// Generate captions for multiple dump clusters in parallel.
@@ -758,6 +766,7 @@ final class LLMService: ObservableObject {
 
     enum LLMError: LocalizedError {
         case noAPIKey
+        case insufficientCredits
         case encodingFailed
         case invalidResponse
         case parseFailed
@@ -768,6 +777,8 @@ final class LLMService: ObservableObject {
             switch self {
             case .noAPIKey:
                 return "No API key configured. Add one in the AI Settings tab."
+            case .insufficientCredits:
+                return "Not enough credits. Purchase more to continue."
             case .encodingFailed:
                 return "Failed to encode the request."
             case .invalidResponse:

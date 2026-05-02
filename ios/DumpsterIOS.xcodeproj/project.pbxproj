@@ -12,6 +12,8 @@
 		3AD0047A7E444A7382782F0E /* dist in Resources */ = {isa = PBXBuildFile; fileRef = AD9AEE17CF4678F0F13F35B9 /* dist */; };
 		508ABFF3F315D702FD01405A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 135D9890D321175612158EE2 /* WebKit.framework */; };
 		5CB7C4506AB1D38D2A5C978B /* DumpsterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2EF2DF6E4FCD33732C83403 /* DumpsterApp.swift */; };
+		614D3E65DB0447D958D096A5 /* FileCabinetMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976F59813A22C1FE20995D5D /* FileCabinetMenuView.swift */; };
+		770E6DAF6E7FCAB3899F51E1 /* LLMService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A40D3A91D3B735CC9E9F37D /* LLMService.swift */; };
 		7CDB3DEB1C05C8ED453FF3FE /* Vision.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FAFA509DCC5B38F16559E5E /* Vision.framework */; };
 		871377AF5DCD1946EDC2938F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BC4F2FFEDD818FDDC691CB4 /* ContentView.swift */; };
 		A5AAFB876367D4D2A11DE74A /* DumpsterSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9637EDB09413525FBDE8681C /* DumpsterSchemeHandler.swift */; };
@@ -28,9 +30,11 @@
 		4B4FBAB204DBA8CB45149F47 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4BEB2D6552AFB6AB0311814B /* CreditManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CreditManager.swift; sourceTree = "<group>"; };
 		6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8A40D3A91D3B735CC9E9F37D /* LLMService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LLMService.swift; sourceTree = "<group>"; };
 		8BC4F2FFEDD818FDDC691CB4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		942EA7AB9A670BD8CC090DEF /* PaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		9637EDB09413525FBDE8681C /* DumpsterSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DumpsterSchemeHandler.swift; sourceTree = "<group>"; };
+		976F59813A22C1FE20995D5D /* FileCabinetMenuView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileCabinetMenuView.swift; sourceTree = "<group>"; };
 		9FAFA509DCC5B38F16559E5E /* Vision.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Vision.framework; path = System/Library/Frameworks/Vision.framework; sourceTree = SDKROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AISuggestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISuggestView.swift; sourceTree = "<group>"; };
 		AD9AEE17CF4678F0F13F35B9 /* dist */ = {isa = PBXFileReference; lastKnownFileType = folder; path = dist; sourceTree = "<group>"; };
@@ -68,6 +72,8 @@
 				AD9AEE17CF4678F0F13F35B9 /* dist */,
 				4BEB2D6552AFB6AB0311814B /* CreditManager.swift */,
 				942EA7AB9A670BD8CC090DEF /* PaywallView.swift */,
+				8A40D3A91D3B735CC9E9F37D /* LLMService.swift */,
+				976F59813A22C1FE20995D5D /* FileCabinetMenuView.swift */,
 			);
 			path = DumpsterIOS;
 			sourceTree = "<group>";
@@ -185,6 +191,8 @@
 				F2690B2D2FA5BC44000AA4F6 /* CaptionService.swift in Sources */,
 				0EFF5AE87F175E278D167941 /* CreditManager.swift in Sources */,
 				1E84D1DFE6FF62704A4DA1A7 /* PaywallView.swift in Sources */,
+				770E6DAF6E7FCAB3899F51E1 /* LLMService.swift in Sources */,
+				614D3E65DB0447D958D096A5 /* FileCabinetMenuView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

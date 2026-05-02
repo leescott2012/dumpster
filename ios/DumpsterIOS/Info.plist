@@ -22,27 +22,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>DUMPSTER needs camera access to capture photos for your dumps.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>DUMPSTER needs access to your photo library to build AI-powered dumps.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>DUMPSTER saves analyzed photos to build your dumps.</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<false/>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>api.openai.com</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<false/>
-				<key>NSExceptionRequiresForwardSecrecy</key>
-				<true/>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-			</dict>
-		</dict>
-	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

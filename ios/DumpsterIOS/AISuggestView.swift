@@ -1,0 +1,506 @@
+import SwiftUI
+import PhotosUI
+import WebKit
+import ImageIO  // FIX: Explicit import for CGImageSource* functions
+
+// MARK: - AI Suggest Button (Floating Overlay)
+
+struct AIButton: View {
+    @Binding var isPresented: Bool
+    private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
+
+    var body: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Button {
+                    isPresented = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("AI SUGGEST")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(2)
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 13)
+                    .background(gold)
+                    .clipShape(Capsule())
+                    .shadow(color: gold.opacity(0.4), radius: 12, x: 0, y: 4)
+                }
+                .padding(.trailing, 24)
+                .padding(.bottom, 48)
+            }
+        }
+    }
+}
+
+// MARK: - Main AI Suggest Flow
+
+struct AISuggestView: View {
+    @Binding var isPresented: Bool
+    @ObservedObject var appState: AppState
+
+    @State private var phase: Phase = .picker
+    @State private var selectedItems: [PhotosPickerItem] = []
+    @State private var isAnalyzing = false
+    @State private var clusters: [PhotoCluster] = []
+    @State private var selectedClusters: Set<Int> = []
+    @State private var progress: Double = 0.0
+    @State private var statusMessage: String = ""
+    @State private var isCreating = false
+
+    // Haptic Feedback Generator
+    private let haptic = UIImpactFeedbackGenerator(style: .medium)
+    private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
+
+    enum Phase { case picker, results }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Text(phase == .picker ? "AI BUILDER" : "SUGGESTED DUMPS")
+                        .font(.system(size: 12, weight: .black))
+                        .tracking(3)
+                        .foregroundColor(gold)
+                    Spacer()
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 60)
+                .padding(.bottom, 20)
+
+                switch phase {
+                case .picker:
+                    pickerPhase
+                case .results:
+                    resultsPhase
+                }
+            }
+
+            // Close button
+            Button {
+                haptic.impactOccurred()
+                isPresented = false
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white.opacity(0.6))
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.white.opacity(0.1)))
+            }
+            .padding(.trailing, 24)
+            .padding(.top, 50)
+
+            // Create button (results phase)
+            if phase == .results && !clusters.isEmpty {
+                VStack {
+                    Spacer()
+                    Button {
+                        haptic.impactOccurred()
+                        createDumps()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isCreating {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                    .scaleEffect(0.7)
+                            }
+                            Text(isCreating
+                                 ? "CREATING..."
+                                 : "CREATE \(selectedClusters.count) DUMP\(selectedClusters.count == 1 ? "" : "S")")
+                                .font(.system(size: 13, weight: .bold))
+                                .tracking(3)
+                                .foregroundColor(.black)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(selectedClusters.isEmpty || isCreating ? Color.gray : gold)
+                        .cornerRadius(14)
+                    }
+                    .disabled(selectedClusters.isEmpty || isCreating)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 40)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    // MARK: - Picker Phase
+
+    private var pickerPhase: some View {
+        VStack(spacing: 32) {
+            Spacer()
+
+            VStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 48, weight: .light))
+                    .foregroundColor(gold)
+                Text("AI DUMP BUILDER")
+                    .font(.system(size: 18, weight: .black))
+                    .tracking(4)
+                    .foregroundColor(.white)
+                Text("Pick your photos and Vision AI will\ngroup them into perfect dumps.")
+                    .font(.system(size: 15))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.white.opacity(0.4))
+                    .lineSpacing(5)
+            }
+
+            if !isAnalyzing {
+                PhotosPicker(
+                    selection: $selectedItems,
+                    maxSelectionCount: 100,
+                    matching: .images
+                ) {
+                    Text("SELECT PHOTOS")
+                        .font(.system(size: 13, weight: .bold))
+                        .tracking(3)
+                        .foregroundColor(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(gold)
+                        .cornerRadius(14)
+                }
+                .padding(.horizontal, 32)
+                .onChange(of: selectedItems) { oldItems, newItems in
+                    guard !newItems.isEmpty else { return }
+                    haptic.impactOccurred()
+                    isAnalyzing = true
+                    appState.isAnalyzing = true
+                    appState.showStatus("Analyzing photos...", duration: 60)
+                    loadAndAnalyze(items: newItems)
+                }
+            } else {
+                VStack(spacing: 16) {
+                    ProgressView(value: progress)
+                        .tint(gold)
+                        .frame(width: 200)
+                    Text(statusMessage.isEmpty ? "Analyzing \(Int(progress * 100))%..." : statusMessage)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Results Phase
+
+    private var resultsPhase: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Tap to select which dumps to create")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.35))
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
+
+                ForEach(Array(clusters.enumerated()), id: \.offset) { i, cluster in
+                    ClusterRow(cluster: cluster, selected: selectedClusters.contains(i)) {
+                        haptic.impactOccurred(intensity: 0.6)
+                        if selectedClusters.contains(i) {
+                            selectedClusters.remove(i)
+                        } else {
+                            selectedClusters.insert(i)
+                        }
+                    }
+                }
+
+                // Bottom padding for the create button
+                Color.clear.frame(height: 100)
+            }
+        }
+    }
+
+    // MARK: - Load & Analyze
+
+    private func loadAndAnalyze(items: [PhotosPickerItem]) {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dumpster_ai", isDirectory: true)
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        // FIX: Use a thread-safe array with a lock instead of mutating from multiple queues.
+        let lock = NSLock()
+        var loaded: [(UIImage, URL)] = []
+        let total = Double(items.count)
+        var completed = 0.0
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let group = DispatchGroup()
+            let semaphore = DispatchSemaphore(value: 3)
+
+            for item in items {
+                semaphore.wait()
+                group.enter()
+
+                item.loadTransferable(type: Data.self) { result in
+                    defer {
+                        group.leave()
+                        semaphore.signal()
+                    }
+
+                    guard case .success(let data) = result, let data,
+                          let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+                        // Still update progress even on failure
+                        DispatchQueue.main.async {
+                            completed += 1
+                            self.progress = completed / total
+                        }
+                        return
+                    }
+
+                    let options: [CFString: Any] = [
+                        kCGImageSourceCreateThumbnailFromImageAlways: true,
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                        kCGImageSourceThumbnailMaxPixelSize: 512
+                    ]
+
+                    guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+                        DispatchQueue.main.async {
+                            completed += 1
+                            self.progress = completed / total
+                        }
+                        return
+                    }
+
+                    let thumbnail = UIImage(cgImage: cgImage)
+                    let filename = "\(UUID().uuidString).jpg"
+                    let url = tempDir.appendingPathComponent(filename)
+
+                    if let thumbData = thumbnail.jpegData(compressionQuality: 0.7) {
+                        try? thumbData.write(to: url)
+                    }
+
+                    // FIX: Protect the shared array with a lock instead of relying on main queue ordering.
+                    lock.lock()
+                    loaded.append((thumbnail, url))
+                    lock.unlock()
+
+                    DispatchQueue.main.async {
+                        completed += 1
+                        self.progress = completed / total
+                    }
+                }
+            }
+
+            group.notify(queue: .main) {
+                self.statusMessage = "Clustering photos..."
+
+                // FIX: Safely copy the loaded array under the lock before passing to analyzer.
+                lock.lock()
+                let safeLoaded = loaded
+                lock.unlock()
+
+                PhotoAnalyzer.analyze(images: safeLoaded) { result in
+                    self.clusters = result
+                    self.selectedClusters = Set(result.indices)
+                    self.isAnalyzing = false
+                    self.appState.isAnalyzing = false
+                    self.appState.showStatus("Found \(result.count) dumps", duration: 3)
+                    self.statusMessage = ""
+                    withAnimation { self.phase = .results }
+
+                    // Trigger caption generation in background
+                    self.generateCaptionsForClusters(result)
+                }
+            }
+        }
+    }
+
+    // MARK: - Caption Generation
+
+    private func generateCaptionsForClusters(_ clusters: [PhotoCluster]) {
+        let captionService = CaptionService.shared
+
+        let requests = clusters.map { cluster in
+            CaptionService.CaptionRequest(
+                dumpTitle: cluster.title,
+                category: cluster.category,
+                labels: cluster.allLabels,
+                photoCount: cluster.photos.count
+            )
+        }
+
+        if captionService.hasAPIKey {
+            // Use OpenAI API
+            appState.showStatus("Generating captions...", duration: 30)
+            Task {
+                do {
+                    let results = try await captionService.generateCaptions(for: requests)
+                    await MainActor.run {
+                        appState.captionResults = results
+                        appState.showStatus("Captions ready", duration: 3)
+                        appState.sendCaptionsToWeb(results)
+                    }
+                } catch {
+                    print("[AISuggest] Caption generation failed: \(error)")
+                    await MainActor.run {
+                        // Fall back to local captions
+                        let fallbacks = requests.map {
+                            CaptionService.fallbackCaptions(for: $0.category, title: $0.dumpTitle)
+                        }
+                        appState.captionResults = fallbacks
+                        appState.showStatus("Using local captions", duration: 3)
+                    }
+                }
+            }
+        } else {
+            // No API key — use local fallback captions
+            let fallbacks = requests.map {
+                CaptionService.fallbackCaptions(for: $0.category, title: $0.dumpTitle)
+            }
+            appState.captionResults = fallbacks
+        }
+    }
+
+    // MARK: - Create Dumps
+
+    private func createDumps() {
+        isCreating = true
+        appState.showStatus("Creating dumps...", duration: 10)
+
+        let selectedGroups = clusters.enumerated()
+            .filter { selectedClusters.contains($0.offset) }
+            .map { $0.element }
+
+        // Build the JSON payload with captions included
+        let json = selectedGroups.map { cluster -> [String: Any] in
+            let photos = cluster.photos.map { p -> [String: String] in
+                let encodedName = p.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? p.filename
+                return [
+                    "url": "dumpster://app/ai/\(encodedName)",
+                    "category": p.category
+                ]
+            }
+
+            // Find matching captions for this cluster
+            let matchingCaptions = appState.captionResults.first { $0.dumpTitle == cluster.title }
+            var payload: [String: Any] = [
+                "title": cluster.title,
+                "photos": photos
+            ]
+            if let captions = matchingCaptions {
+                payload["captions"] = captions.captions
+                payload["vibe"] = captions.vibe
+            }
+            return payload
+        }
+
+        guard let data = try? JSONSerialization.data(withJSONObject: json),
+              let jsonStr = String(data: data, encoding: .utf8) else {
+            isCreating = false
+            return
+        }
+
+        // FIX: Proper JSON escaping for JavaScript string injection.
+        // Must handle backslashes, single quotes, newlines, carriage returns, and line/paragraph separators.
+        let escaped = jsonStr
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+
+        let script = "window.__dumpsterAI && window.__dumpsterAI.createDumps('\(escaped)')"
+
+        appState.evaluateJS(script) { result, error in
+            DispatchQueue.main.async {
+                self.isCreating = false
+                if let error {
+                    print("[AISuggest] JS bridge error: \(error)")
+                    self.appState.showStatus("Error creating dumps", duration: 3)
+                } else {
+                    self.appState.showStatus("Dumps created!", duration: 3)
+                    self.appState.dumpCount += self.selectedClusters.count
+                    self.isPresented = false
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Cluster Row
+
+struct ClusterRow: View {
+    let cluster: PhotoCluster
+    let selected: Bool
+    let onTap: () -> Void
+
+    private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(cluster.title)
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("\(cluster.photos.count) photos \u{00B7} \(cluster.category)")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.4))
+                            .tracking(1)
+                    }
+                    Spacer()
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundColor(selected ? gold : .white.opacity(0.2))
+                }
+
+                // Photo thumbnails
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(cluster.photos.prefix(8).enumerated()), id: \.offset) { _, photo in
+                            Image(uiImage: photo.image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 72, height: 96)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+
+                // Show top labels as tags
+                if !cluster.allLabels.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(cluster.allLabels.prefix(5).enumerated()), id: \.offset) { _, label in
+                                Text(label)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.06))
+                                    .cornerRadius(6)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(selected
+                          ? Color(red: 200/255, green: 169/255, blue: 110/255).opacity(0.08)
+                          : Color.white.opacity(0.04))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .strokeBorder(selected ? gold.opacity(0.4) : Color.clear, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 4)
+    }
+}

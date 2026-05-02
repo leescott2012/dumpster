@@ -3,10 +3,13 @@ dist/
 .DS_Store
 .env
 .env.local
+.env.vercel.local
+.vercel/
+.vite/
 
 # Xcode
-ios/**/xcuserdata/
-ios/**/*.xcuserstate
-ios/**/build/
-ios/**/DerivedData/
-ios/**/.build/
+**/xcuserdata/
+**/*.xcuserstate
+**/build/
+**/DerivedData/
+**/.build/

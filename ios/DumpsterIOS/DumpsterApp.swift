@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct DumpsterApp: App {
@@ -7,5 +8,6 @@ struct DumpsterApp: App {
             ContentView()
                 .ignoresSafeArea()
         }
+        .modelContainer(for: [DumpPhoto.self, PhotoDump.self, DumpCaption.self])
     }
 }

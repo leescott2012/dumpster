@@ -77,10 +77,10 @@ struct ContentView: View {
             DumpsterWebView(appState: appState)
                 .ignoresSafeArea(.all)
 
-            // 2. THE DYNAMIC ISLAND (Top)
+            // 2. THE DYNAMIC ISLAND (Top) — sits over the hardware notch/DI cutout
             dynamicIslandView
                 .frame(maxWidth: .infinity)
-                .padding(.top, 13)
+                .padding(.top, 11)
                 .ignoresSafeArea(.all)
                 .animation(.easeInOut(duration: 2.5), value: isExpanded)
                 .onTapGesture {
@@ -122,11 +122,8 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $appState.showSettings) {
             SettingsView(isPresented: $appState.showSettings)
         }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                isExpanded = true
-            }
-        }
+        // Default state: collapsed black pill that blends with the hardware Dynamic Island.
+        // Tap to expand with status + credit badge + menu.
     }
 
     // MARK: - Dynamic Island
@@ -134,19 +131,8 @@ struct ContentView: View {
     private var dynamicIslandView: some View {
         ZStack {
             Capsule()
-                .fill(Color(white: 0.07))
+                .fill(Color.black)
                 .frame(width: isExpanded ? 340 : 126, height: 37)
-                .shadow(
-                    color: Color(hex: "#C8A96E").opacity(isExpanded ? 0.5 : 0.0),
-                    radius: 20, y: 6
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(
-                            Color(hex: "#C8A96E").opacity(isExpanded ? 0.8 : 0.12),
-                            lineWidth: isExpanded ? 1.0 : 0.5
-                        )
-                )
 
             // Status content inside the expanded capsule
             if isExpanded {

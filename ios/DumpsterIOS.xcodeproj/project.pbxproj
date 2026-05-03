@@ -13,23 +13,32 @@
 		508ABFF3F315D702FD01405A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 135D9890D321175612158EE2 /* WebKit.framework */; };
 		5CB7C4506AB1D38D2A5C978B /* DumpsterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2EF2DF6E4FCD33732C83403 /* DumpsterApp.swift */; };
 		614D3E65DB0447D958D096A5 /* FileCabinetMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976F59813A22C1FE20995D5D /* FileCabinetMenuView.swift */; };
+		744D41C3B53C0DD9B32BA428 /* DumpCaption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F80D6842A3F2E2562A0926D /* DumpCaption.swift */; };
 		770E6DAF6E7FCAB3899F51E1 /* LLMService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A40D3A91D3B735CC9E9F37D /* LLMService.swift */; };
 		7CDB3DEB1C05C8ED453FF3FE /* Vision.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FAFA509DCC5B38F16559E5E /* Vision.framework */; };
+		827CDB8546B0D69337FC904C /* DumpPhoto.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18FB4008CEC5180C6AC6B7EE /* DumpPhoto.swift */; };
 		871377AF5DCD1946EDC2938F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BC4F2FFEDD818FDDC691CB4 /* ContentView.swift */; };
 		A5AAFB876367D4D2A11DE74A /* DumpsterSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9637EDB09413525FBDE8681C /* DumpsterSchemeHandler.swift */; };
 		B1C2D3E4F5A6B7C8D9E0F1A2 /* AISuggestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* AISuggestView.swift */; };
 		C2D3E4F5A6B7C8D9E0F1A2B3 /* PhotoAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* PhotoAnalyzer.swift */; };
+		D687086BE070123EAB8776E3 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */; };
+		EC83CE521C6FFA186F28F215 /* AppEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1EFF72D39C18BA5DBDEF2 /* AppEnums.swift */; };
 		F2690B2C2FA5BC44000AA4F6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2690B2B2FA5BC44000AA4F6 /* SettingsView.swift */; };
 		F2690B2D2FA5BC44000AA4F6 /* CaptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2690B2A2FA5BC44000AA4F6 /* CaptionService.swift */; };
+		FD212AA6B74AAD58FC19138E /* PhotoDump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36E61C275F679BEBC565B6B8 /* PhotoDump.swift */; };
 		FF82148B05EDB0CEFD9202E3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		135D9890D321175612158EE2 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		18FB4008CEC5180C6AC6B7EE /* DumpPhoto.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpPhoto.swift; sourceTree = "<group>"; };
+		36E61C275F679BEBC565B6B8 /* PhotoDump.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoDump.swift; sourceTree = "<group>"; };
 		437842ABD9E9037213FD18FC /* DumpsterIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DumpsterIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4B4FBAB204DBA8CB45149F47 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4BEB2D6552AFB6AB0311814B /* CreditManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CreditManager.swift; sourceTree = "<group>"; };
 		6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		6F80D6842A3F2E2562A0926D /* DumpCaption.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCaption.swift; sourceTree = "<group>"; };
+		7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8A40D3A91D3B735CC9E9F37D /* LLMService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LLMService.swift; sourceTree = "<group>"; };
 		8BC4F2FFEDD818FDDC691CB4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		942EA7AB9A670BD8CC090DEF /* PaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
@@ -39,6 +48,7 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AISuggestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISuggestView.swift; sourceTree = "<group>"; };
 		AD9AEE17CF4678F0F13F35B9 /* dist */ = {isa = PBXFileReference; lastKnownFileType = folder; path = dist; sourceTree = "<group>"; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* PhotoAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoAnalyzer.swift; sourceTree = "<group>"; };
+		D4E1EFF72D39C18BA5DBDEF2 /* AppEnums.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppEnums.swift; sourceTree = "<group>"; };
 		E2EF2DF6E4FCD33732C83403 /* DumpsterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DumpsterApp.swift; sourceTree = "<group>"; };
 		F2690B2A2FA5BC44000AA4F6 /* CaptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionService.swift; sourceTree = "<group>"; };
 		F2690B2B2FA5BC44000AA4F6 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -57,6 +67,27 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3BEC8A6E8CED6C5D71D1B72C /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				D4E1EFF72D39C18BA5DBDEF2 /* AppEnums.swift */,
+				18FB4008CEC5180C6AC6B7EE /* DumpPhoto.swift */,
+				36E61C275F679BEBC565B6B8 /* PhotoDump.swift */,
+				6F80D6842A3F2E2562A0926D /* DumpCaption.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		B7092703833006DB08AE3502 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */,
+			);
+			name = Utilities;
+			path = Utilities;
+			sourceTree = "<group>";
+		};
 		C35D572E8A165E0230C5D305 /* DumpsterIOS */ = {
 			isa = PBXGroup;
 			children = (
@@ -74,6 +105,8 @@
 				942EA7AB9A670BD8CC090DEF /* PaywallView.swift */,
 				8A40D3A91D3B735CC9E9F37D /* LLMService.swift */,
 				976F59813A22C1FE20995D5D /* FileCabinetMenuView.swift */,
+				3BEC8A6E8CED6C5D71D1B72C /* Models */,
+				B7092703833006DB08AE3502 /* Utilities */,
 			);
 			path = DumpsterIOS;
 			sourceTree = "<group>";
@@ -193,6 +226,11 @@
 				1E84D1DFE6FF62704A4DA1A7 /* PaywallView.swift in Sources */,
 				770E6DAF6E7FCAB3899F51E1 /* LLMService.swift in Sources */,
 				614D3E65DB0447D958D096A5 /* FileCabinetMenuView.swift in Sources */,
+				EC83CE521C6FFA186F28F215 /* AppEnums.swift in Sources */,
+				827CDB8546B0D69337FC904C /* DumpPhoto.swift in Sources */,
+				FD212AA6B74AAD58FC19138E /* PhotoDump.swift in Sources */,
+				744D41C3B53C0DD9B32BA428 /* DumpCaption.swift in Sources */,
+				D687086BE070123EAB8776E3 /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

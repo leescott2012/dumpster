@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0026E79D334EDE569AAA154D /* UndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A26BB7172434E549C9A9D /* UndoManager.swift */; };
 		0EFF5AE87F175E278D167941 /* CreditManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BEB2D6552AFB6AB0311814B /* CreditManager.swift */; };
 		1E84D1DFE6FF62704A4DA1A7 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 942EA7AB9A670BD8CC090DEF /* PaywallView.swift */; };
 		3AD0047A7E444A7382782F0E /* dist in Resources */ = {isa = PBXBuildFile; fileRef = AD9AEE17CF4678F0F13F35B9 /* dist */; };
@@ -20,6 +21,7 @@
 		871377AF5DCD1946EDC2938F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BC4F2FFEDD818FDDC691CB4 /* ContentView.swift */; };
 		A5AAFB876367D4D2A11DE74A /* DumpsterSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9637EDB09413525FBDE8681C /* DumpsterSchemeHandler.swift */; };
 		B1C2D3E4F5A6B7C8D9E0F1A2 /* AISuggestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* AISuggestView.swift */; };
+		C126023D169A8F06E722B4C4 /* FormulaEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FAFC6DDDE09CA03CD99446E /* FormulaEngine.swift */; };
 		C2D3E4F5A6B7C8D9E0F1A2B3 /* PhotoAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* PhotoAnalyzer.swift */; };
 		D687086BE070123EAB8776E3 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */; };
 		EB0D5748896835B99BE96D18 /* PhotoStorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F40CA50033B8B07FFAC959 /* PhotoStorageManager.swift */; };
@@ -33,10 +35,12 @@
 /* Begin PBXFileReference section */
 		135D9890D321175612158EE2 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		18FB4008CEC5180C6AC6B7EE /* DumpPhoto.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpPhoto.swift; sourceTree = "<group>"; };
+		230A26BB7172434E549C9A9D /* UndoManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UndoManager.swift; sourceTree = "<group>"; };
 		36E61C275F679BEBC565B6B8 /* PhotoDump.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoDump.swift; sourceTree = "<group>"; };
 		437842ABD9E9037213FD18FC /* DumpsterIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DumpsterIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4B4FBAB204DBA8CB45149F47 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4BEB2D6552AFB6AB0311814B /* CreditManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CreditManager.swift; sourceTree = "<group>"; };
+		5FAFC6DDDE09CA03CD99446E /* FormulaEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FormulaEngine.swift; sourceTree = "<group>"; };
 		6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6F80D6842A3F2E2562A0926D /* DumpCaption.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCaption.swift; sourceTree = "<group>"; };
 		7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -86,6 +90,8 @@
 			children = (
 				7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */,
 				C0F40CA50033B8B07FFAC959 /* PhotoStorageManager.swift */,
+				5FAFC6DDDE09CA03CD99446E /* FormulaEngine.swift */,
+				230A26BB7172434E549C9A9D /* UndoManager.swift */,
 			);
 			name = Utilities;
 			path = Utilities;
@@ -235,6 +241,8 @@
 				744D41C3B53C0DD9B32BA428 /* DumpCaption.swift in Sources */,
 				D687086BE070123EAB8776E3 /* Theme.swift in Sources */,
 				EB0D5748896835B99BE96D18 /* PhotoStorageManager.swift in Sources */,
+				C126023D169A8F06E722B4C4 /* FormulaEngine.swift in Sources */,
+				0026E79D334EDE569AAA154D /* UndoManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -3,23 +3,65 @@ import WebKit
 
 // MARK: - App State (Observable)
 
-/// Centralized app state shared between native views and the web bridge.
-/// Updated to use LLMService instead of CaptionService for multi-provider support.
+/// Centralized app state shared between native views and (during transition) the web bridge.
+/// Phase 2 extends this with native-UI fields. The WKWebView path is still wired up
+/// for now — Phase 6 will demolish it.
+@MainActor
 final class AppState: ObservableObject {
+
+    // ── Web bridge (TRANSITIONAL — removed in Phase 6) ──
     @Published var webView: WKWebView?
+
+    // ── Overlay toggles ──
     @Published var showAISuggest = false
     @Published var showSettings = false
-    @Published var showFileCabinet = false  // NEW: File Cabinet menu
+    @Published var showFileCabinet = false
+
+    // ── Dynamic Island ──
     @Published var statusText: String = "DUMPSTER"
     @Published var dumpCount: Int = 0
     @Published var isAnalyzing = false
+
+    // ── AI results ──
     @Published var captionResults: [LLMService.CaptionResult] = []
 
-    /// Send a status update that auto-clears after a delay.
+    // ── Native UI state (used by views built in Phases 4–6) ──
+    @Published var activeDumpId: String?
+    @Published var colorMode: ColorMode = .dark {
+        didSet { UserDefaults.standard.set(colorMode.rawValue, forKey: "dumpster_colorMode") }
+    }
+    @Published var poolSize: PoolSize = .large {
+        didSet { UserDefaults.standard.set(poolSize.rawValue, forKey: "dumpster_poolSize") }
+    }
+    @Published var activeFilters: Set<FilterType> = []
+    @Published var poolSearchQuery: String = ""
+    @Published var lightboxPhotoId: String?
+    @Published var addingToDumpId: String?
+    @Published var activePoolTab: PoolTab = .photos
+
+    // MARK: - Init
+
+    init() {
+        if let cm = UserDefaults.standard.string(forKey: "dumpster_colorMode"),
+           let mode = ColorMode(rawValue: cm) {
+            colorMode = mode
+        }
+        if let ps = UserDefaults.standard.string(forKey: "dumpster_poolSize"),
+           let size = PoolSize(rawValue: ps) {
+            poolSize = size
+        }
+    }
+
+    // MARK: - Status helper
+
+    /// Show a transient status in the Dynamic Island, then revert to "DUMPSTER".
+    /// If a newer status comes in before the timer fires, the older revert is skipped.
     func showStatus(_ text: String, duration: TimeInterval = 3.0) {
         statusText = text
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
-            self?.statusText = "DUMPSTER"
+        let captured = text
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(duration))
+            if self.statusText == captured { self.statusText = "DUMPSTER" }
         }
     }
 

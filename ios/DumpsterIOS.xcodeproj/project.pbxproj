@@ -11,8 +11,6 @@
 		0EFF5AE87F175E278D167941 /* CreditManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BEB2D6552AFB6AB0311814B /* CreditManager.swift */; };
 		1E84D1DFE6FF62704A4DA1A7 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 942EA7AB9A670BD8CC090DEF /* PaywallView.swift */; };
 		2E360841D8A252DFB82BE410 /* PoolFilterMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A5101A689318A2375DE509 /* PoolFilterMenu.swift */; };
-		3AD0047A7E444A7382782F0E /* dist in Resources */ = {isa = PBXBuildFile; fileRef = AD9AEE17CF4678F0F13F35B9 /* dist */; };
-		508ABFF3F315D702FD01405A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 135D9890D321175612158EE2 /* WebKit.framework */; };
 		588620A22292D4023E98DC50 /* PhotoCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBEC3288F059A41256981069 /* PhotoCardView.swift */; };
 		5CB7C4506AB1D38D2A5C978B /* DumpsterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2EF2DF6E4FCD33732C83403 /* DumpsterApp.swift */; };
 		614D3E65DB0447D958D096A5 /* FileCabinetMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976F59813A22C1FE20995D5D /* FileCabinetMenuView.swift */; };
@@ -24,7 +22,6 @@
 		871377AF5DCD1946EDC2938F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BC4F2FFEDD818FDDC691CB4 /* ContentView.swift */; };
 		8D6DA427EE2682893A8F3B19 /* PhotoPoolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08A4384BC616EBDE1702D74 /* PhotoPoolView.swift */; };
 		9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */; };
-		A5AAFB876367D4D2A11DE74A /* DumpsterSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9637EDB09413525FBDE8681C /* DumpsterSchemeHandler.swift */; };
 		B1C2D3E4F5A6B7C8D9E0F1A2 /* AISuggestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* AISuggestView.swift */; };
 		C126023D169A8F06E722B4C4 /* FormulaEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FAFC6DDDE09CA03CD99446E /* FormulaEngine.swift */; };
 		C2D3E4F5A6B7C8D9E0F1A2B3 /* PhotoAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* PhotoAnalyzer.swift */; };
@@ -41,7 +38,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		135D9890D321175612158EE2 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		18FB4008CEC5180C6AC6B7EE /* DumpPhoto.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpPhoto.swift; sourceTree = "<group>"; };
 		202A316C5E1892E09EBE6F49 /* LightboxView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LightboxView.swift; sourceTree = "<group>"; };
 		223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCaptionBubble.swift; sourceTree = "<group>"; };
@@ -60,12 +56,10 @@
 		8A40D3A91D3B735CC9E9F37D /* LLMService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LLMService.swift; sourceTree = "<group>"; };
 		8BC4F2FFEDD818FDDC691CB4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		942EA7AB9A670BD8CC090DEF /* PaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
-		9637EDB09413525FBDE8681C /* DumpsterSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DumpsterSchemeHandler.swift; sourceTree = "<group>"; };
 		976F59813A22C1FE20995D5D /* FileCabinetMenuView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileCabinetMenuView.swift; sourceTree = "<group>"; };
 		9FAFA509DCC5B38F16559E5E /* Vision.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Vision.framework; path = System/Library/Frameworks/Vision.framework; sourceTree = SDKROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AISuggestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISuggestView.swift; sourceTree = "<group>"; };
 		A61564A55124AA0946A46F09 /* CaptionPoolView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptionPoolView.swift; sourceTree = "<group>"; };
-		AD9AEE17CF4678F0F13F35B9 /* dist */ = {isa = PBXFileReference; lastKnownFileType = folder; path = dist; sourceTree = "<group>"; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* PhotoAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoAnalyzer.swift; sourceTree = "<group>"; };
 		C08A4384BC616EBDE1702D74 /* PhotoPoolView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoPoolView.swift; sourceTree = "<group>"; };
 		C0F40CA50033B8B07FFAC959 /* PhotoStorageManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoStorageManager.swift; sourceTree = "<group>"; };
@@ -81,7 +75,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				508ABFF3F315D702FD01405A /* WebKit.framework in Frameworks */,
 				7CDB3DEB1C05C8ED453FF3FE /* Vision.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -136,12 +129,10 @@
 				F2690B2B2FA5BC44000AA4F6 /* SettingsView.swift */,
 				E2EF2DF6E4FCD33732C83403 /* DumpsterApp.swift */,
 				8BC4F2FFEDD818FDDC691CB4 /* ContentView.swift */,
-				9637EDB09413525FBDE8681C /* DumpsterSchemeHandler.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* AISuggestView.swift */,
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* PhotoAnalyzer.swift */,
 				4B4FBAB204DBA8CB45149F47 /* Info.plist */,
 				6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */,
-				AD9AEE17CF4678F0F13F35B9 /* dist */,
 				4BEB2D6552AFB6AB0311814B /* CreditManager.swift */,
 				942EA7AB9A670BD8CC090DEF /* PaywallView.swift */,
 				8A40D3A91D3B735CC9E9F37D /* LLMService.swift */,
@@ -156,7 +147,6 @@
 		CBD258B4A8E7AF4F00B11D4B /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				135D9890D321175612158EE2 /* WebKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -246,7 +236,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				FF82148B05EDB0CEFD9202E3 /* Assets.xcassets in Resources */,
-				3AD0047A7E444A7382782F0E /* dist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -259,7 +248,6 @@
 			files = (
 				5CB7C4506AB1D38D2A5C978B /* DumpsterApp.swift in Sources */,
 				871377AF5DCD1946EDC2938F /* ContentView.swift in Sources */,
-				A5AAFB876367D4D2A11DE74A /* DumpsterSchemeHandler.swift in Sources */,
 				B1C2D3E4F5A6B7C8D9E0F1A2 /* AISuggestView.swift in Sources */,
 				C2D3E4F5A6B7C8D9E0F1A2B3 /* PhotoAnalyzer.swift in Sources */,
 				F2690B2C2FA5BC44000AA4F6 /* SettingsView.swift in Sources */,

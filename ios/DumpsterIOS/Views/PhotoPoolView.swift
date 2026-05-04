@@ -363,24 +363,27 @@ struct PhotoPoolView: View {
     // MARK: - Upload card
 
     private var uploadCard: some View {
-        PhotosPicker(selection: $pickerItems, maxSelectionCount: 50, matching: .images) {
-            VStack(spacing: 6) {
-                Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .semibold))
-                Text("Add Photos")
-                    .font(.system(size: 10, weight: .medium))
+        // Use GeometryReader so the card matches photo tile dimensions exactly
+        GeometryReader { geo in
+            PhotosPicker(selection: $pickerItems, maxSelectionCount: 50, matching: .images) {
+                VStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .semibold))
+                    Text("Add Photos")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundColor(Theme.text2(appState.colorMode, cs))
+                .frame(width: geo.size.width, height: geo.size.width * 1.25)
+                .background(Theme.bg2(appState.colorMode, cs))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Theme.border(appState.colorMode, cs),
+                                      style: StrokeStyle(lineWidth: 1, dash: [4]))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .foregroundColor(Theme.text2(appState.colorMode, cs))
-            .frame(maxWidth: .infinity)
-            .aspectRatio(0.8, contentMode: .fit)
-            .background(Theme.bg2(appState.colorMode, cs))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Theme.border(appState.colorMode, cs),
-                                  style: StrokeStyle(lineWidth: 1, dash: [4]))
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
+        .aspectRatio(0.8, contentMode: .fit)
     }
 
     private func importPickedPhotos(_ items: [PhotosPickerItem]) async {

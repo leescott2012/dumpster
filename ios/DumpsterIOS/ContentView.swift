@@ -68,8 +68,8 @@ struct ContentView: View {
     @StateObject private var appState = AppState()
     @StateObject private var undoManager = DumpsterUndoManager()
 
-    // Dynamic Island animation state
-    @State private var isExpanded = true
+    // Dynamic Island state — collapsed by default, auto-expands at launch
+    @State private var isExpanded = false
 
     // Haptic Feedback
     private let impact = UIImpactFeedbackGenerator(style: .medium)
@@ -81,19 +81,22 @@ struct ContentView: View {
                 .environmentObject(appState)
                 .environmentObject(undoManager)
 
-            // 2. THE DYNAMIC ISLAND (Top) — sits over the hardware notch/DI cutout
+            // 2. THE DYNAMIC ISLAND
+            // — Sits OVER the app but UNDER the iOS system status bar (time/battery)
+            // — Blank black capsule when collapsed (blends with hardware DI cutout)
+            // — Expands to full status-bar width 5s after launch for 3s,
+            //   acting as a separator so system fonts don't clash with app content
             dynamicIslandView
                 .padding(.top, 11)
                 .ignoresSafeArea(.all)
-                .animation(.easeInOut(duration: 2.5), value: isExpanded)
+                .animation(.spring(response: 0.55, dampingFraction: 0.82), value: isExpanded)
                 .onTapGesture {
                     impact.impactOccurred()
-                    withAnimation(.interpolatingSpring(stiffness: 120, damping: 12)) {
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
                         isExpanded.toggle()
                     }
                 }
                 .onLongPressGesture(minimumDuration: 0.5) {
-                    // Long press on Dynamic Island opens File Cabinet
                     impact.impactOccurred()
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         appState.showFileCabinet = true
@@ -123,6 +126,20 @@ struct ContentView: View {
             }
         }
         .background(Color.black)
+        .onAppear {
+            // Auto-expand DI 5 seconds after launch to separate status bar fonts,
+            // then collapse after 3 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
+                    isExpanded = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
+                        isExpanded = false
+                    }
+                }
+            }
+        }
         .fullScreenCover(isPresented: $appState.showSettings) {
             SettingsView(isPresented: $appState.showSettings)
         }
@@ -134,55 +151,21 @@ struct ContentView: View {
     }
 
     // MARK: - Dynamic Island
+    //
+    // Blank black capsule. Collapsed = 126×37 (matches hardware DI cutout).
+    // Expanded = full screen width × 54pt — spans from the time label to the
+    // battery icon, providing a clean black backdrop behind the system status
+    // bar so the white system fonts don't clash with app content underneath.
+    // No text or interactive content inside — the system UI renders on top.
 
     private var dynamicIslandView: some View {
-        let pillW: CGFloat = isExpanded ? 230 : 126
-        let pillH: CGFloat = 37
+        let screenW = UIScreen.main.bounds.width
+        let pillW: CGFloat = isExpanded ? screenW : 126
+        let pillH: CGFloat = isExpanded ? 54 : 37
 
-        return ZStack {
-            // Background capsule
-            Capsule()
-                .fill(Color.black)
-
-            // Content — only shown when expanded
-            if isExpanded {
-                HStack(spacing: 8) {
-                    if appState.isAnalyzing {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#C8A96E")))
-                            .scaleEffect(0.55)
-                            .frame(width: 14, height: 14)
-                    }
-
-                    Text(appState.statusText)
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(0.6)
-                        .foregroundColor(Color(hex: "#C8A96E"))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Spacer(minLength: 0)
-
-                    Button {
-                        impact.impactOccurred()
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            appState.showFileCabinet = true
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(Color(hex: "#C8A96E").opacity(0.7))
-                    }
-                }
-                .padding(.horizontal, 14)
-                // Constrained to pill width so nothing escapes the capsule
-                .frame(width: pillW, height: pillH)
-                .transition(.opacity)
-            }
-        }
-        // Single source of truth for pill size — applies to both capsule and content
-        .frame(width: pillW, height: pillH)
-        .clipShape(Capsule())
+        return Capsule()
+            .fill(Color.black)
+            .frame(width: pillW, height: pillH)
     }
 }
 

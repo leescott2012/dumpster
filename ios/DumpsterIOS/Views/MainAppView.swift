@@ -87,8 +87,13 @@ struct MainAppView: View {
                 }
                 .tracking(-0.6)
                 Spacer(minLength: 8)
-                iconButton("gearshape") {
-                    appState.showSettings = true
+                HStack(spacing: 6) {
+                    iconButton("line.3.horizontal") {
+                        appState.showFileCabinet = true
+                    }
+                    iconButton("gearshape") {
+                        appState.showSettings = true
+                    }
                 }
                 .padding(.top, 6)
             }
@@ -235,41 +240,40 @@ struct MainAppView: View {
     }
 
     private var newDumpButton: some View {
-        HStack(spacing: 10) {
-            // Primary: Auto-generate (sparkles)
+        // Both pills equal width, centered
+        HStack(spacing: 12) {
+            Spacer(minLength: 0)
+
             Button {
                 appState.showAISuggest = true
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                     Text("AUTO-GENERATE")
                         .font(.system(size: 11, weight: .heavy))
-                        .tracking(2.0)
+                        .tracking(1.6)
                 }
                 .foregroundColor(.black)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
                 .background(Theme.gold)
                 .clipShape(Capsule())
-                .shadow(color: Theme.gold.opacity(0.35), radius: 10, x: 0, y: 3)
+                .shadow(color: Theme.gold.opacity(0.3), radius: 8, x: 0, y: 3)
             }
 
-            // Secondary: New empty dump
             Button(action: createNewDump) {
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .bold))
                     Text("NEW DUMP")
                         .font(.system(size: 11, weight: .heavy))
-                        .tracking(2.0)
+                        .tracking(1.6)
                 }
                 .foregroundColor(Theme.gold)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 11)
-                .overlay(
-                    Capsule().strokeBorder(Theme.gold, lineWidth: 1.2)
-                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .overlay(Capsule().strokeBorder(Theme.gold, lineWidth: 1.2))
             }
 
             Spacer(minLength: 0)

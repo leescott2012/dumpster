@@ -240,10 +240,8 @@ struct MainAppView: View {
     }
 
     private var newDumpButton: some View {
-        // Both pills equal width, centered
+        // Equal-width pills, centered — no outer Spacers (they steal space)
         HStack(spacing: 12) {
-            Spacer(minLength: 0)
-
             Button {
                 appState.showAISuggest = true
             } label: {
@@ -252,7 +250,7 @@ struct MainAppView: View {
                         .font(.system(size: 12, weight: .bold))
                     Text("AUTO-GENERATE")
                         .font(.system(size: 11, weight: .heavy))
-                        .tracking(1.6)
+                        .tracking(1.4)
                 }
                 .foregroundColor(.black)
                 .frame(maxWidth: .infinity)
@@ -268,17 +266,15 @@ struct MainAppView: View {
                         .font(.system(size: 12, weight: .bold))
                     Text("NEW DUMP")
                         .font(.system(size: 11, weight: .heavy))
-                        .tracking(1.6)
+                        .tracking(1.4)
                 }
                 .foregroundColor(Theme.gold)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .overlay(Capsule().strokeBorder(Theme.gold, lineWidth: 1.2))
             }
-
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 20)
     }
 
     private func createNewDump() {

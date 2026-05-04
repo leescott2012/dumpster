@@ -366,11 +366,11 @@ struct PhotoPoolView: View {
         // Use GeometryReader so the card matches photo tile dimensions exactly
         GeometryReader { geo in
             PhotosPicker(selection: $pickerItems, maxSelectionCount: 50, matching: .images) {
-                VStack(spacing: 6) {
+                VStack(spacing: 4) {
                     Image(systemName: "plus")
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                     Text("Add Photos")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 8, weight: .medium))
                 }
                 .foregroundColor(Theme.text2(appState.colorMode, cs))
                 .frame(width: geo.size.width, height: geo.size.width * 1.25)

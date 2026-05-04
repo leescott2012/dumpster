@@ -87,7 +87,11 @@ struct ContentView: View {
             // — Expands to full status-bar width 5s after launch for 3s,
             //   acting as a separator so system fonts don't clash with app content
             dynamicIslandView
-                .padding(.top, 11)
+                // When collapsed: nudge down 11pt to sit on the hardware DI cutout.
+                // When expanded: start at y=0 so the black bar covers the full status
+                // bar area (time sits on the left, battery on the right, both render
+                // above this layer — system UI is always on top of SwiftUI views).
+                .padding(.top, isExpanded ? 0 : 11)
                 .ignoresSafeArea(.all)
                 .animation(.spring(response: 0.55, dampingFraction: 0.82), value: isExpanded)
                 .onTapGesture {
@@ -127,17 +131,12 @@ struct ContentView: View {
         }
         .background(Color.black)
         .onAppear {
-            // Auto-expand DI 5 seconds after launch to separate status bar fonts,
-            // then collapse after 3 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
-                    isExpanded = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
-                        isExpanded = false
-                    }
-                }
+            // Expand DI 2s after launch across the full status bar for 5s, then collapse
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) { isExpanded = true }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 7) {
+                withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) { isExpanded = false }
             }
         }
         .fullScreenCover(isPresented: $appState.showSettings) {
@@ -159,6 +158,7 @@ struct ContentView: View {
     // No text or interactive content inside — the system UI renders on top.
 
     private var dynamicIslandView: some View {
+        // Use explicit numeric values so SwiftUI can animate between them
         let screenW = UIScreen.main.bounds.width
         let pillW: CGFloat = isExpanded ? screenW : 126
         let pillH: CGFloat = isExpanded ? 54 : 37

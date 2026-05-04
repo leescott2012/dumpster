@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0026E79D334EDE569AAA154D /* UndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A26BB7172434E549C9A9D /* UndoManager.swift */; };
+		0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81E7E5BB2905556C06187290 /* DebugSeeder.swift */; };
 		0EFF5AE87F175E278D167941 /* CreditManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BEB2D6552AFB6AB0311814B /* CreditManager.swift */; };
 		1E84D1DFE6FF62704A4DA1A7 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 942EA7AB9A670BD8CC090DEF /* PaywallView.swift */; };
 		2E360841D8A252DFB82BE410 /* PoolFilterMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A5101A689318A2375DE509 /* PoolFilterMenu.swift */; };
@@ -53,6 +54,7 @@
 		6F80D6842A3F2E2562A0926D /* DumpCaption.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCaption.swift; sourceTree = "<group>"; };
 		702838F65FF68DD79CFE568A /* MainAppView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainAppView.swift; sourceTree = "<group>"; };
 		7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		81E7E5BB2905556C06187290 /* DebugSeeder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugSeeder.swift; sourceTree = "<group>"; };
 		8A40D3A91D3B735CC9E9F37D /* LLMService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LLMService.swift; sourceTree = "<group>"; };
 		8BC4F2FFEDD818FDDC691CB4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		942EA7AB9A670BD8CC090DEF /* PaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
@@ -117,6 +119,7 @@
 				C0F40CA50033B8B07FFAC959 /* PhotoStorageManager.swift */,
 				5FAFC6DDDE09CA03CD99446E /* FormulaEngine.swift */,
 				230A26BB7172434E549C9A9D /* UndoManager.swift */,
+				81E7E5BB2905556C06187290 /* DebugSeeder.swift */,
 			);
 			name = Utilities;
 			path = Utilities;
@@ -272,6 +275,7 @@
 				E0A7AAA1E3B6AAA770B95DF1 /* LightboxView.swift in Sources */,
 				9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */,
 				710B8108FF1ED0318E925C2D /* MainAppView.swift in Sources */,
+				0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

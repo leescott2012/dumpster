@@ -30,6 +30,7 @@ struct DumpCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            tagBreadcrumb
             carousel
             progressBar
             actionRow
@@ -69,40 +70,43 @@ struct DumpCardView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 10) {
-            Text(String(format: "%02d", dump.num))
-                .font(.system(size: 12, weight: .heavy, design: .monospaced))
-                .foregroundColor(Theme.gold)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Theme.goldDim)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+        VStack(alignment: .leading, spacing: 8) {
+            // Row 1: small "DUMP 01" tracked label  |  action icons
+            HStack(spacing: 8) {
+                Text("DUMP \(String(format: "%02d", dump.num))")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(2.0)
+                    .foregroundColor(Theme.gold)
 
-            titleView
+                if dump.vibeBadge == "mismatch" {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.yellow)
+                }
 
-            if dump.titleApproved == nil {
-                approveButtons
+                Spacer()
+
+                iconButton(symbol: dump.liked ? "heart.fill" : "heart",
+                           tint: dump.liked ? .red : nil) {
+                    dump.liked.toggle()
+                    try? modelContext.save()
+                }
+                iconButton(symbol: "sparkles", tint: isGenerating ? Theme.text3(appState.colorMode, cs) : Theme.gold) {
+                    Task { await generateCaptions() }
+                }
+                .disabled(isGenerating || photos.isEmpty)
+                iconButton(symbol: "square.and.arrow.up") { shareDump() }
+                iconButton(symbol: "trash", tint: Theme.removeText) { showDeleteConfirm = true }
             }
 
-            if dump.vibeBadge == "mismatch" {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 13))
-                    .foregroundColor(.yellow)
+            // Row 2: BIG title on its own line, with optional approve buttons inline.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                titleView
+                if dump.titleApproved == nil {
+                    approveButtons
+                }
+                Spacer(minLength: 0)
             }
-
-            Spacer()
-
-            iconButton(symbol: dump.liked ? "heart.fill" : "heart",
-                       tint: dump.liked ? .red : nil) {
-                dump.liked.toggle()
-                try? modelContext.save()
-            }
-            iconButton(symbol: "sparkles", tint: isGenerating ? Theme.text3(appState.colorMode, cs) : Theme.gold) {
-                Task { await generateCaptions() }
-            }
-            .disabled(isGenerating || photos.isEmpty)
-            iconButton(symbol: "square.and.arrow.up") { shareDump() }
-            iconButton(symbol: "trash", tint: Theme.removeText) { showDeleteConfirm = true }
         }
         .padding(.horizontal, 14)
     }
@@ -112,15 +116,18 @@ struct DumpCardView: View {
         if editingTitle {
             TextField("Dump title", text: $titleDraft)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 22, weight: .bold))
                 .foregroundColor(Theme.text(appState.colorMode, cs))
+                .tracking(-0.3)
                 .submitLabel(.done)
                 .onSubmit { commitTitle() }
         } else {
             Text(dump.title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 22, weight: .bold))
                 .foregroundColor(Theme.text(appState.colorMode, cs))
-                .lineLimit(1)
+                .tracking(-0.3)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .onTapGesture {
                     titleDraft = dump.title
                     editingTitle = true
@@ -177,6 +184,35 @@ struct DumpCardView: View {
         editingTitle = false
     }
 
+    // MARK: - Tag breadcrumb
+
+    private var tagBreadcrumb: some View {
+        HStack(spacing: 6) {
+            Text(uniqueCategories.joined(separator: " / "))
+                .font(.system(size: 11))
+                .foregroundColor(Theme.text2(appState.colorMode, cs))
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text("\(photos.count)/20 photos")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(Theme.text3(appState.colorMode, cs))
+        }
+        .padding(.horizontal, 14)
+    }
+
+    private var uniqueCategories: [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for p in photos {
+            let cap = p.category.capitalized
+            if !cap.isEmpty && !seen.contains(cap) {
+                seen.insert(cap)
+                ordered.append(cap)
+            }
+        }
+        return Array(ordered.prefix(5))
+    }
+
     // MARK: - Carousel
 
     private var carousel: some View {
@@ -188,7 +224,7 @@ struct DumpCardView: View {
                         context: .dump(dumpId: dump.id),
                         slotIndex: index,
                         totalInDump: photos.count,
-                        size: CGSize(width: 120, height: 160),
+                        size: CGSize(width: 145, height: 195),
                         onRemoveFromDump: { removePhoto(photo) },
                         onToggleStar: { photo.starred.toggle(); try? modelContext.save() },
                         onToggleHuji: { photo.isHuji.toggle(); try? modelContext.save() }
@@ -214,7 +250,7 @@ struct DumpCardView: View {
                     .font(.system(size: 10, weight: .medium))
             }
             .foregroundColor(Theme.text2(appState.colorMode, cs))
-            .frame(width: 120, height: 160)
+            .frame(width: 145, height: 195)
             .background(Theme.bg2(appState.colorMode, cs))
             .overlay(
                 RoundedRectangle(cornerRadius: 10)

@@ -25,7 +25,7 @@ final class AppState: ObservableObject {
     @Published var colorMode: ColorMode = .dark {
         didSet { UserDefaults.standard.set(colorMode.rawValue, forKey: "dumpster_colorMode") }
     }
-    @Published var poolSize: PoolSize = .large {
+    @Published var poolSize: PoolSize = .medium {
         didSet { UserDefaults.standard.set(poolSize.rawValue, forKey: "dumpster_poolSize") }
     }
     @Published var activeFilters: Set<FilterType> = []
@@ -69,7 +69,7 @@ struct ContentView: View {
     @StateObject private var undoManager = DumpsterUndoManager()
 
     // Dynamic Island animation state
-    @State private var isExpanded = false
+    @State private var isExpanded = true
 
     // Haptic Feedback
     private let impact = UIImpactFeedbackGenerator(style: .medium)
@@ -83,7 +83,6 @@ struct ContentView: View {
 
             // 2. THE DYNAMIC ISLAND (Top) — sits over the hardware notch/DI cutout
             dynamicIslandView
-                .frame(maxWidth: .infinity)
                 .padding(.top, 11)
                 .ignoresSafeArea(.all)
                 .animation(.easeInOut(duration: 2.5), value: isExpanded)
@@ -139,40 +138,33 @@ struct ContentView: View {
     // MARK: - Dynamic Island
 
     private var dynamicIslandView: some View {
-        ZStack {
+        let pillW: CGFloat = isExpanded ? 230 : 126
+        let pillH: CGFloat = 37
+
+        return ZStack {
+            // Background capsule
             Capsule()
                 .fill(Color.black)
-                .frame(width: isExpanded ? 340 : 126, height: 37)
 
-            // Status content inside the expanded capsule
+            // Content — only shown when expanded
             if isExpanded {
                 HStack(spacing: 8) {
                     if appState.isAnalyzing {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#C8A96E")))
-                            .scaleEffect(0.6)
+                            .scaleEffect(0.55)
+                            .frame(width: 14, height: 14)
                     }
 
                     Text(appState.statusText)
                         .font(.system(size: 11, weight: .bold))
-                        .tracking(2)
+                        .tracking(0.6)
                         .foregroundColor(Color(hex: "#C8A96E"))
                         .lineLimit(1)
+                        .truncationMode(.tail)
 
-                    if appState.dumpCount > 0 && !appState.isAnalyzing {
-                        Text("\u{00B7}")
-                            .foregroundColor(Color(hex: "#C8A96E").opacity(0.4))
-                        Text("\(appState.dumpCount) dumps")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Color(hex: "#C8A96E").opacity(0.6))
-                    }
+                    Spacer(minLength: 0)
 
-                    Spacer()
-
-                    // Credit badge — tappable, opens paywall
-                    CreditBadge()
-
-                    // Menu button
                     Button {
                         impact.impactOccurred()
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -181,13 +173,18 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "line.3.horizontal")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(Color(hex: "#C8A96E").opacity(0.5))
+                            .foregroundColor(Color(hex: "#C8A96E").opacity(0.7))
                     }
                 }
                 .padding(.horizontal, 14)
+                // Constrained to pill width so nothing escapes the capsule
+                .frame(width: pillW, height: pillH)
                 .transition(.opacity)
             }
         }
+        // Single source of truth for pill size — applies to both capsule and content
+        .frame(width: pillW, height: pillH)
+        .clipShape(Capsule())
     }
 }
 

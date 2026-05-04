@@ -59,9 +59,10 @@ struct PhotoPoolView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            header
-            if !appState.activeFilters.isEmpty { activeFilterChips }
+        VStack(alignment: .leading, spacing: 12) {
+            heroHeader
+            filterPills
+            actionRow
             if showSearchField { searchField }
             if appState.addingToDumpId != nil { selectionBanner }
             grid
@@ -72,29 +73,101 @@ struct PhotoPoolView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Hero header
 
-    private var header: some View {
+    private var heroHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Available Photos")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(Theme.text(appState.colorMode, cs))
+                .tracking(-0.4)
+            Text("\(allPhotos.count) photo\(allPhotos.count == 1 ? "" : "s") available")
+                .font(.system(size: 13))
+                .foregroundColor(Theme.text2(appState.colorMode, cs))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.top, 4)
+    }
+
+    // MARK: - Filter pills (All / Starred / Huji Only)
+
+    private var filterPills: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                pillButton(
+                    label: "All",
+                    icon: nil,
+                    isSelected: appState.activeFilters.isEmpty
+                ) {
+                    appState.activeFilters.removeAll()
+                }
+                pillButton(
+                    label: "Starred",
+                    icon: "star.fill",
+                    isSelected: appState.activeFilters.contains(.starred)
+                ) {
+                    toggleFilter(.starred)
+                }
+                pillButton(
+                    label: "Huji Only",
+                    icon: nil,
+                    isSelected: appState.activeFilters.contains(.huji)
+                ) {
+                    toggleFilter(.huji)
+                }
+                pillButton(
+                    label: "Used",
+                    icon: nil,
+                    isSelected: appState.activeFilters.contains(.used)
+                ) {
+                    toggleFilter(.used)
+                }
+            }
+            .padding(.horizontal, 14)
+        }
+    }
+
+    private func pillButton(label: String, icon: String?, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if let icon { Image(systemName: icon).font(.system(size: 10, weight: .semibold)) }
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundColor(isSelected ? .black : Theme.text(appState.colorMode, cs))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(isSelected ? Theme.gold : Theme.bg2(appState.colorMode, cs))
+            .clipShape(Capsule())
+        }
+    }
+
+    private func toggleFilter(_ filter: FilterType) {
+        if appState.activeFilters.contains(filter) {
+            appState.activeFilters.remove(filter)
+        } else {
+            appState.activeFilters.insert(filter)
+        }
+    }
+
+    // MARK: - Action row (search + size buttons)
+
+    private var actionRow: some View {
         HStack(spacing: 8) {
-            Text("PHOTO POOL")
-                .font(.system(size: 11, weight: .heavy))
-                .tracking(2.0)
-                .foregroundColor(Theme.gold)
             Spacer()
-            PoolFilterMenu()
             Button { showSearchField.toggle() } label: {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Theme.text(appState.colorMode, cs))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 30, height: 30)
                     .background(Theme.bg2(appState.colorMode, cs))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
             }
             sizeButton(symbol: "plus", action: incrementSize)
             sizeButton(symbol: "minus", action: decrementSize)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 12)
+        .padding(.horizontal, 14)
     }
 
     private func sizeButton(symbol: String, action: @escaping () -> Void) -> some View {
@@ -213,14 +286,15 @@ struct PhotoPoolView: View {
             count: appState.poolSize.columnCount
         )
         return ScrollView {
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(filteredPhotos) { photo in
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(Array(filteredPhotos.enumerated()), id: \.element.id) { index, photo in
                     GeometryReader { geo in
                         PhotoCardView(
                             photo: photo,
                             context: .pool,
                             isSelected: selectedPhotoIDs.contains(photo.id),
                             isUsed: usedPhotoIDs.contains(photo.id) && !appState.activeFilters.contains(.used),
+                            slotIndex: index,
                             size: CGSize(width: geo.size.width, height: geo.size.width * 1.25),
                             onTap: { tapPoolPhoto(photo) },
                             onToggleStar: { photo.starred.toggle(); try? modelContext.save() },
@@ -231,7 +305,7 @@ struct PhotoPoolView: View {
                 }
                 uploadCard
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .padding(.bottom, 40)
         }
         .gesture(magnificationGesture)

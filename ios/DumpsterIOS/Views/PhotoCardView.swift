@@ -154,7 +154,18 @@ struct PhotoCardView: View {
     @ViewBuilder
     private var badgeLayer: some View {
         VStack {
-            HStack {
+            HStack(alignment: .top, spacing: 4) {
+                // Slot number pill (e.g. "01") — shown whenever a slotIndex is provided
+                if let idx = slotIndex {
+                    Text(String(format: "%02d", idx + 1))
+                        .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Color.black.opacity(0.72))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .padding(7)
+                }
                 if photo.starred {
                     Image(systemName: "star.fill")
                         .foregroundColor(Theme.starBadge)

@@ -1,6 +1,6 @@
 import SwiftUI
+import SwiftData
 import PhotosUI
-import WebKit
 import ImageIO
 
 // MARK: - AI Suggest Button (Floating Overlay)
@@ -43,6 +43,8 @@ struct AIButton: View {
 struct AISuggestView: View {
     @Binding var isPresented: Bool
     @ObservedObject var appState: AppState
+    @Environment(\.modelContext) private var modelContext
+    @Query private var existingDumps: [PhotoDump]
 
     @State private var phase: Phase = .picker
     @State private var selectedItems: [PhotosPickerItem] = []
@@ -347,7 +349,6 @@ struct AISuggestView: View {
                     await MainActor.run {
                         appState.captionResults = results
                         appState.showStatus("Captions ready", duration: 3)
-                        appState.sendCaptionsToWeb(results)
                     }
                 } catch {
                     print("[AISuggest] Caption generation failed: \(error)")
@@ -369,7 +370,7 @@ struct AISuggestView: View {
         }
     }
 
-    // MARK: - Create Dumps
+    // MARK: - Create Dumps (Native SwiftData — Phase 6)
 
     private func createDumps() {
         isCreating = true
@@ -379,55 +380,68 @@ struct AISuggestView: View {
             .filter { selectedClusters.contains($0.offset) }
             .map { $0.element }
 
-        let json = selectedGroups.map { cluster -> [String: Any] in
-            let photos = cluster.photos.map { p -> [String: String] in
-                let encodedName = p.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? p.filename
-                return [
-                    "url": "dumpster://app/ai/\(encodedName)",
-                    "category": p.category
-                ]
+        var nextNum = (existingDumps.map { $0.num }.max() ?? 0) + 1
+
+        for cluster in selectedGroups {
+            // 1. Save each AnalyzedPhoto's UIImage to disk + insert DumpPhoto.
+            var photoIDs: [String] = []
+            for p in cluster.photos {
+                let relPath = PhotoStorageManager.shared.saveImage(
+                    p.image,
+                    filename: p.filename
+                )
+                let dp = DumpPhoto(
+                    localPath: relPath,
+                    filename: p.filename,
+                    category: p.category,
+                    labels: p.labels,
+                    starred: false,
+                    isHuji: FormulaEngine.detectHuji(filename: p.filename)
+                )
+                modelContext.insert(dp)
+                photoIDs.append(dp.id)
+                if photoIDs.count >= 20 { break }
             }
 
-            let matchingCaptions = appState.captionResults.first { $0.dumpTitle == cluster.title }
-            var payload: [String: Any] = [
-                "title": cluster.title,
-                "photos": photos
-            ]
-            if let captions = matchingCaptions {
-                payload["captions"] = captions.captions
-                payload["vibe"] = captions.vibe
+            // 2. Create the PhotoDump record.
+            let vibe: String?
+            // Resolve the photos we just created back into DumpPhoto for vibe check.
+            // (The AnalyzedPhoto.category is sufficient for the warm/cool ratio.)
+            let stub = cluster.photos.map { p -> DumpPhoto in
+                DumpPhoto(localPath: "", filename: p.filename, category: p.category, labels: p.labels)
             }
-            return payload
-        }
+            vibe = FormulaEngine.checkColorTemp(stub) ? nil : "mismatch"
 
-        guard let data = try? JSONSerialization.data(withJSONObject: json),
-              let jsonStr = String(data: data, encoding: .utf8) else {
-            isCreating = false
-            return
-        }
+            let dump = PhotoDump(
+                num: nextNum,
+                title: cluster.title,
+                photoIDs: photoIDs,
+                vibeBadge: vibe,
+                liked: false,
+                titleApproved: nil
+            )
+            modelContext.insert(dump)
+            nextNum += 1
 
-        let escaped = jsonStr
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\r", with: "\\r")
-            .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
-            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
-
-        let script = "window.__dumpsterAI && window.__dumpsterAI.createDumps('\(escaped)')"
-
-        appState.evaluateJS(script) { result, error in
-            DispatchQueue.main.async {
-                self.isCreating = false
-                if let error {
-                    print("[AISuggest] JS bridge error: \(error)")
-                    self.appState.showStatus("Error creating dumps", duration: 3)
-                } else {
-                    self.appState.showStatus("Dumps created!", duration: 3)
-                    self.appState.dumpCount += self.selectedClusters.count
-                    self.isPresented = false
+            // 3. Save associated captions if we generated any.
+            if let cr = appState.captionResults.first(where: { $0.dumpTitle == cluster.title }) {
+                for line in cr.captions {
+                    let cap = DumpCaption(text: line, style: "ai", dumpId: dump.id)
+                    modelContext.insert(cap)
                 }
             }
+        }
+
+        do {
+            try modelContext.save()
+            isCreating = false
+            appState.showStatus("Dumps created!", duration: 3)
+            appState.dumpCount = existingDumps.count
+            isPresented = false
+        } catch {
+            print("[AISuggest] SwiftData save error: \(error)")
+            isCreating = false
+            appState.showStatus("Error creating dumps", duration: 3)
         }
     }
 }

@@ -1,16 +1,11 @@
 import SwiftUI
-import WebKit
 
 // MARK: - App State (Observable)
 
-/// Centralized app state shared between native views and (during transition) the web bridge.
-/// Phase 2 extends this with native-UI fields. The WKWebView path is still wired up
-/// for now — Phase 6 will demolish it.
+/// Centralized app state shared across native views.
+/// Phase 6: removed all WKWebView / JS-bridge fields.
 @MainActor
 final class AppState: ObservableObject {
-
-    // ── Web bridge (TRANSITIONAL — removed in Phase 6) ──
-    @Published var webView: WKWebView?
 
     // ── Overlay toggles ──
     @Published var showAISuggest = false
@@ -65,47 +60,13 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Inject JavaScript into the web view with error handling.
-    func evaluateJS(_ script: String, completion: ((Any?, Error?) -> Void)? = nil) {
-        guard let webView else {
-            completion?(nil, NSError(domain: "AppState", code: -1,
-                                     userInfo: [NSLocalizedDescriptionKey: "WebView not available"]))
-            return
-        }
-        webView.evaluateJavaScript(script, completionHandler: completion)
-    }
-
-    /// Send captions to the web app via the bridge.
-    func sendCaptionsToWeb(_ results: [LLMService.CaptionResult]) {
-        let payload = results.map { result -> [String: Any] in
-            return [
-                "dumpTitle": result.dumpTitle,
-                "captions": result.captions,
-                "vibe": result.vibe
-            ]
-        }
-        guard let data = try? JSONSerialization.data(withJSONObject: payload),
-              let jsonStr = String(data: data, encoding: .utf8) else { return }
-
-        let escaped = jsonStr
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\r", with: "\\r")
-
-        let script = """
-        if (window.__dumpsterBridge) {
-            window.__dumpsterBridge.receiveCaptions('\(escaped)');
-        }
-        """
-        evaluateJS(script)
-    }
 }
 
 // MARK: - Root View
 
 struct ContentView: View {
     @StateObject private var appState = AppState()
+    @StateObject private var undoManager = DumpsterUndoManager()
 
     // Dynamic Island animation state
     @State private var isExpanded = false
@@ -115,9 +76,10 @@ struct ContentView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // 1. THE WEB CONTENT (Base Layer)
-            DumpsterWebView(appState: appState)
-                .ignoresSafeArea(.all)
+            // 1. NATIVE CONTENT (replaces DumpsterWebView)
+            MainAppView()
+                .environmentObject(appState)
+                .environmentObject(undoManager)
 
             // 2. THE DYNAMIC ISLAND (Top) — sits over the hardware notch/DI cutout
             dynamicIslandView
@@ -158,9 +120,15 @@ struct ContentView: View {
                 .zIndex(20)
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
+
+            // 5. LIGHTBOX (full-screen photo overlay — Phase 5)
+            if appState.lightboxPhotoId != nil {
+                LightboxView()
+                    .environmentObject(appState)
+                    .zIndex(30)
+            }
         }
         .background(Color.black)
-        .preferredColorScheme(.dark)
         .fullScreenCover(isPresented: $appState.showSettings) {
             SettingsView(isPresented: $appState.showSettings)
         }
@@ -529,199 +497,6 @@ struct CaptionOptionButton: View {
     private var borderShape: some View {
         RoundedRectangle(cornerRadius: 12)
             .stroke(isSelected ? gold.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
-    }
-}
-
-// MARK: - WebView Wrapper
-
-struct DumpsterWebView: UIViewRepresentable {
-    @ObservedObject var appState: AppState
-
-    func makeCoordinator() -> Coordinator { Coordinator(appState: appState) }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        let userContentController = configuration.userContentController
-        configuration.websiteDataStore = WKWebsiteDataStore.default()
-        configuration.setURLSchemeHandler(DumpsterSchemeHandler(), forURLScheme: "dumpster")
-
-        let webFixScript = WKUserScript(
-            source: """
-            (function() {
-                const style = document.createElement('style');
-                style.innerHTML = `
-                    .stray-question-mark, #stray-q, [class*="question-mark"] {
-                        display: none !important;
-                    }
-                    .photo-caption-pill, [class*="pill-container"] {
-                        transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-                    }
-                `;
-                document.head.appendChild(style);
-
-                setTimeout(() => {
-                    const pill = document.querySelector('.photo-caption-pill') || document.querySelector('[class*="pill-container"]');
-                    if (pill) {
-                        let startX = 0;
-                        pill.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
-                        pill.addEventListener('touchend', (e) => {
-                            const endX = e.changedTouches[0].clientX;
-                            if (Math.abs(startX - endX) > 40) { pill.click(); }
-                        });
-                    }
-                }, 1000);
-
-                window.__dumpsterBridge = window.__dumpsterBridge || {};
-
-                window.__dumpsterBridge.receiveCaptions = function(jsonStr) {
-                    try {
-                        const captions = JSON.parse(jsonStr);
-                        console.log('[Dumpster] Received captions from native:', captions);
-                        window.dispatchEvent(new CustomEvent('dumpster-captions', { detail: captions }));
-                    } catch(e) {
-                        console.error('[Dumpster] Failed to parse captions:', e);
-                    }
-                };
-
-                window.__dumpsterBridge.receiveStatus = function(status) {
-                    console.log('[Dumpster] Status:', status);
-                    window.dispatchEvent(new CustomEvent('dumpster-status', { detail: status }));
-                };
-
-                setTimeout(() => {
-                    if (window.webkit && window.webkit.messageHandlers.dumpsterBridge) {
-                        window.webkit.messageHandlers.dumpsterBridge.postMessage({ type: 'bridgeReady' });
-                    }
-                }, 500);
-            })();
-            """,
-            injectionTime: .atDocumentEnd,
-            forMainFrameOnly: true
-        )
-        userContentController.addUserScript(webFixScript)
-        userContentController.add(context.coordinator, name: "dumpsterBridge")
-        userContentController.add(context.coordinator, name: "openSettings")
-        configuration.userContentController = userContentController
-
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.navigationDelegate = context.coordinator
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.backgroundColor = .clear
-        webView.isOpaque = false
-        webView.allowsBackForwardNavigationGestures = false
-
-        if let url = URL(string: "dumpster://app/index.html") {
-            webView.load(URLRequest(url: url))
-        }
-
-        DispatchQueue.main.async {
-            self.appState.webView = webView
-        }
-        return webView
-    }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-
-    // MARK: - Coordinator
-
-    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-        let appState: AppState
-
-        init(appState: AppState) {
-            self.appState = appState
-        }
-
-        func userContentController(
-            _ userContentController: WKUserContentController,
-            didReceive message: WKScriptMessage
-        ) {
-            switch message.name {
-            case "openSettings":
-                // Open the File Cabinet instead of the old settings
-                DispatchQueue.main.async {
-                    self.appState.showFileCabinet = true
-                }
-
-            case "dumpsterBridge":
-                handleBridgeMessage(message.body)
-
-            default:
-                break
-            }
-        }
-
-        private func handleBridgeMessage(_ body: Any) {
-            if let dict = body as? [String: Any], let type = dict["type"] as? String {
-                switch type {
-                case "openAISuggest":
-                    DispatchQueue.main.async { self.appState.showAISuggest = true }
-
-                case "openFileCabinet":
-                    DispatchQueue.main.async { self.appState.showFileCabinet = true }
-
-                case "bridgeReady":
-                    print("[Dumpster] Web bridge is ready")
-                    if !appState.captionResults.isEmpty {
-                        appState.sendCaptionsToWeb(appState.captionResults)
-                    }
-
-                case "dumpCount":
-                    if let count = dict["count"] as? Int {
-                        DispatchQueue.main.async { self.appState.dumpCount = count }
-                    }
-
-                case "requestCaptions":
-                    DispatchQueue.main.async { self.appState.showAISuggest = true }
-
-                default:
-                    print("[Dumpster] Unknown bridge message type: \(type)")
-                }
-            } else {
-                DispatchQueue.main.async { self.appState.showAISuggest = true }
-            }
-        }
-
-        // MARK: - Navigation Delegate
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            webView.evaluateJavaScript("""
-                (function() {
-                    try {
-                        const data = localStorage.getItem('dumpster-dumps');
-                        if (data) {
-                            const dumps = JSON.parse(data);
-                            return Array.isArray(dumps) ? dumps.length : 0;
-                        }
-                    } catch(e) {}
-                    return 0;
-                })();
-            """) { [weak self] result, _ in
-                if let count = result as? Int {
-                    DispatchQueue.main.async {
-                        self?.appState.dumpCount = count
-                    }
-                }
-            }
-        }
-
-        func webView(
-            _ webView: WKWebView,
-            decidePolicyFor navigationAction: WKNavigationAction,
-            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
-        ) {
-            if let url = navigationAction.request.url {
-                if url.scheme == "dumpster" {
-                    decisionHandler(.allow)
-                } else if url.scheme == "https" || url.scheme == "http" {
-                    UIApplication.shared.open(url)
-                    decisionHandler(.cancel)
-                } else {
-                    decisionHandler(.allow)
-                }
-            } else {
-                decisionHandler(.allow)
-            }
-        }
     }
 }
 

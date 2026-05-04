@@ -5,16 +5,14 @@ import SwiftData
 ///
 /// Visual states (mutually compatible):
 ///   • default      — image fills, rounded corners
-///   • huji         — thin red border + "HUJI" badge top-right
-///   • starred      — gold star badge top-left
+///   • starred      — gold star badge top-left (both contexts)
 ///   • selected     — green border + green tint (add-to-dump mode)
 ///   • used (pool)  — 40% black overlay + checkmark badge
 ///   • dragging     — gold border + 1.05 scale (dump context only)
 ///
-/// Gestures:
-///   • single tap   → "..." menu (or toggles selection in add-to-dump mode)
-///   • double tap   → opens lightbox (added BEFORE single tap so SwiftUI disambiguates)
-///   • long press   → start drag (dump context only)
+/// Context rules:
+///   • pool context  — no slot number, no category label, shows "Delete Photo" in menu
+///   • dump context  — slot number pill, category gradient, shows "Remove from Dump" in menu
 struct PhotoCardView: View {
 
     enum CardContext {
@@ -34,7 +32,7 @@ struct PhotoCardView: View {
     var onDoubleTap: (() -> Void)? = nil
     var onRemoveFromDump: (() -> Void)? = nil
     var onToggleStar: (() -> Void)? = nil
-    var onToggleHuji: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
     var onOpenLightbox: (() -> Void)? = nil
 
     @EnvironmentObject var appState: AppState
@@ -51,7 +49,7 @@ struct PhotoCardView: View {
             imageLayer
             if isUsed { usedOverlay }
             if isSelected { selectedOverlay }
-            categoryGradient
+            if isDumpContext { categoryGradient }
             badgeLayer
         }
         .frame(width: size.width, height: size.height)
@@ -61,11 +59,8 @@ struct PhotoCardView: View {
         .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isDragging)
         // Order matters: double-tap first so SwiftUI can disambiguate.
         .onTapGesture(count: 2) {
-            if let onDoubleTap = onDoubleTap {
-                onDoubleTap()
-            } else {
-                appState.lightboxPhotoId = photo.id
-            }
+            if let onDoubleTap { onDoubleTap() }
+            else { appState.lightboxPhotoId = photo.id }
         }
         .onTapGesture(count: 1) {
             if appState.addingToDumpId != nil && !isDumpContext {
@@ -75,17 +70,15 @@ struct PhotoCardView: View {
             }
         }
         .confirmationDialog(photo.filename, isPresented: $showMenu, titleVisibility: .hidden) {
-            Button(photo.isHuji ? "Unmark Huji" : "Mark as Huji") { onToggleHuji?() }
             Button(photo.starred ? "Unfavorite" : "Favorite") { onToggleStar?() }
             Button("Open Lightbox") {
-                if let onOpenLightbox = onOpenLightbox {
-                    onOpenLightbox()
-                } else {
-                    appState.lightboxPhotoId = photo.id
-                }
+                if let onOpenLightbox { onOpenLightbox() }
+                else { appState.lightboxPhotoId = photo.id }
             }
             if isDumpContext {
                 Button("Remove from Dump", role: .destructive) { onRemoveFromDump?() }
+            } else {
+                Button("Delete Photo", role: .destructive) { onDelete?() }
             }
             Button("Cancel", role: .cancel) {}
         }
@@ -131,6 +124,7 @@ struct PhotoCardView: View {
         }
     }
 
+    /// Category label gradient — only shown in dump context.
     private var categoryGradient: some View {
         VStack {
             Spacer()
@@ -155,8 +149,8 @@ struct PhotoCardView: View {
     private var badgeLayer: some View {
         VStack {
             HStack(alignment: .top, spacing: 4) {
-                // Slot number pill (e.g. "01") — shown whenever a slotIndex is provided
-                if let idx = slotIndex {
+                // Slot number pill — dump context only
+                if isDumpContext, let idx = slotIndex {
                     Text(String(format: "%02d", idx + 1))
                         .font(.system(size: 11, weight: .heavy, design: .monospaced))
                         .foregroundColor(.white)
@@ -176,16 +170,6 @@ struct PhotoCardView: View {
                         .padding(6)
                 }
                 Spacer()
-                if photo.isHuji {
-                    Text("HUJI")
-                        .font(.system(size: 9, weight: .heavy))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Theme.hujiOutline)
-                        .cornerRadius(3)
-                        .padding(6)
-                }
             }
             Spacer()
         }
@@ -200,9 +184,6 @@ struct PhotoCardView: View {
         } else if isSelected {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .strokeBorder(Color.green, lineWidth: 2)
-        } else if photo.isHuji {
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .strokeBorder(Theme.hujiOutline, lineWidth: 2)
         } else {
             EmptyView()
         }

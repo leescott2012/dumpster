@@ -1,5 +1,40 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
+
+// MARK: - Drop delegate for reordering photos within a dump
+
+struct DumpPhotoDropDelegate: DropDelegate {
+    let targetId: String
+    let dump: PhotoDump
+    @Binding var draggingId: String?
+    let modelContext: ModelContext
+
+    func dropEntered(info: DropInfo) {
+        guard let from = draggingId,
+              from != targetId,
+              let fromIdx = dump.photoIDs.firstIndex(of: from),
+              let toIdx   = dump.photoIDs.firstIndex(of: targetId) else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+            dump.photoIDs.move(
+                fromOffsets: IndexSet(integer: fromIdx),
+                toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx
+            )
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingId = nil
+        try? modelContext.save()
+        return true
+    }
+}
+
+// MARK: - DumpCardView
 
 /// A single PhotoDump rendered as a card with header, horizontal photo carousel,
 /// progress bar footer, and action buttons (like, share, delete, generate captions).
@@ -20,6 +55,9 @@ struct DumpCardView: View {
     @State private var captionResult: LLMService.CaptionResult?
     @State private var isGenerating = false
     @State private var captionError: String?
+
+    /// For drag-to-reorder within the carousel
+    @State private var draggingPhotoId: String? = nil
 
     /// Resolve the dump's photo IDs in order.
     private var photos: [DumpPhoto] {
@@ -99,7 +137,7 @@ struct DumpCardView: View {
                 iconButton(symbol: "trash", tint: Theme.removeText) { showDeleteConfirm = true }
             }
 
-            // Row 2: BIG title on its own line, with optional approve buttons inline.
+            // Row 2: BIG title on its own line
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 titleView
                 if dump.titleApproved == nil {
@@ -213,7 +251,7 @@ struct DumpCardView: View {
         return Array(ordered.prefix(5))
     }
 
-    // MARK: - Carousel
+    // MARK: - Carousel (with drag-to-reorder)
 
     private var carousel: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -226,9 +264,23 @@ struct DumpCardView: View {
                         totalInDump: photos.count,
                         size: CGSize(width: 145, height: 195),
                         onRemoveFromDump: { removePhoto(photo) },
-                        onToggleStar: { photo.starred.toggle(); try? modelContext.save() },
-                        onToggleHuji: { photo.isHuji.toggle(); try? modelContext.save() }
+                        onToggleStar: { photo.starred.toggle(); try? modelContext.save() }
                     )
+                    // Drag to reorder
+                    .onDrag {
+                        draggingPhotoId = photo.id
+                        return NSItemProvider(object: photo.id as NSString)
+                    }
+                    .onDrop(
+                        of: [UTType.plainText],
+                        delegate: DumpPhotoDropDelegate(
+                            targetId: photo.id,
+                            dump: dump,
+                            draggingId: $draggingPhotoId,
+                            modelContext: modelContext
+                        )
+                    )
+                    .opacity(draggingPhotoId == photo.id ? 0.5 : 1.0)
                 }
                 if photos.count < 20 {
                     addPhotosCard
@@ -236,6 +288,7 @@ struct DumpCardView: View {
             }
             .padding(.horizontal, 14)
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: dump.photoIDs)
     }
 
     private var addPhotosCard: some View {

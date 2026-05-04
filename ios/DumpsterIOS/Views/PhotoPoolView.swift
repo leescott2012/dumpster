@@ -30,12 +30,20 @@ struct PhotoPoolView: View {
     private var filteredPhotos: [DumpPhoto] {
         var result = allPhotos
 
+        // Default: hide photos already used in a dump.
+        // Only show used photos when the "Used" filter is explicitly active.
+        if appState.activeFilters.contains(.used) {
+            result = result.filter { usedPhotoIDs.contains($0.id) }
+        } else {
+            result = result.filter { !usedPhotoIDs.contains($0.id) }
+        }
+
         for filter in appState.activeFilters {
             switch filter {
             case .all:     break
             case .starred: result = result.filter { $0.starred }
             case .huji:    result = result.filter { $0.isHuji }
-            case .used:    result = result.filter { usedPhotoIDs.contains($0.id) }
+            case .used:    break // already handled above
             case .videos:  result = result.filter { isVideo($0.filename) }
             }
         }
@@ -75,15 +83,38 @@ struct PhotoPoolView: View {
 
     // MARK: - Hero header
 
+    @State private var showPoolMenu = false
+
+    private var unusedCount: Int { allPhotos.count - usedPhotoIDs.count }
+
     private var heroHeader: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Available Photos")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundColor(Theme.text(appState.colorMode, cs))
-                .tracking(-0.4)
-            Text("\(allPhotos.count) photo\(allPhotos.count == 1 ? "" : "s") available")
-                .font(.system(size: 13))
-                .foregroundColor(Theme.text2(appState.colorMode, cs))
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Photo Pool")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(Theme.text(appState.colorMode, cs))
+                    .tracking(-0.4)
+                Text("\(unusedCount) available · \(usedPhotoIDs.count) in dumps")
+                    .font(.system(size: 13))
+                    .foregroundColor(Theme.text2(appState.colorMode, cs))
+            }
+            Spacer()
+            // Pool menu
+            Button { showPoolMenu = true } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Theme.text(appState.colorMode, cs))
+                    .frame(width: 32, height: 32)
+                    .background(Theme.bg2(appState.colorMode, cs))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .confirmationDialog("Photo Pool", isPresented: $showPoolMenu) {
+                Button("Sort by Newest") { /* default sort */ }
+                Button("Show Used Photos") { appState.activeFilters = [.used] }
+                Button("Show Starred") { appState.activeFilters = [.starred] }
+                Button("Show All") { appState.activeFilters.removeAll() }
+                Button("Cancel", role: .cancel) {}
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
@@ -108,13 +139,6 @@ struct PhotoPoolView: View {
                     isSelected: appState.activeFilters.contains(.starred)
                 ) {
                     toggleFilter(.starred)
-                }
-                pillButton(
-                    label: "Huji Only",
-                    icon: nil,
-                    isSelected: appState.activeFilters.contains(.huji)
-                ) {
-                    toggleFilter(.huji)
                 }
                 pillButton(
                     label: "Used",
@@ -287,26 +311,27 @@ struct PhotoPoolView: View {
         )
         return ScrollView {
             LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(Array(filteredPhotos.enumerated()), id: \.element.id) { index, photo in
+                ForEach(filteredPhotos, id: \.id) { photo in
                     GeometryReader { geo in
                         PhotoCardView(
                             photo: photo,
                             context: .pool,
                             isSelected: selectedPhotoIDs.contains(photo.id),
                             isUsed: usedPhotoIDs.contains(photo.id) && !appState.activeFilters.contains(.used),
-                            slotIndex: index,
                             size: CGSize(width: geo.size.width, height: geo.size.width * 1.25),
                             onTap: { tapPoolPhoto(photo) },
                             onToggleStar: { photo.starred.toggle(); try? modelContext.save() },
-                            onToggleHuji: { photo.isHuji.toggle(); try? modelContext.save() }
+                            onDelete: { deleteFromPool(photo) }
                         )
                     }
                     .aspectRatio(0.8, contentMode: .fit)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
                 }
                 uploadCard
             }
             .padding(.horizontal, 14)
             .padding(.bottom, 40)
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: filteredPhotos.map { $0.id })
         }
         .gesture(magnificationGesture)
     }
@@ -317,6 +342,21 @@ struct PhotoPoolView: View {
             selectedPhotoIDs.remove(photo.id)
         } else {
             selectedPhotoIDs.insert(photo.id)
+        }
+    }
+
+    /// Permanently delete a photo: remove from all dumps, delete file, delete record.
+    private func deleteFromPool(_ photo: DumpPhoto) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            // Remove from any dump that references it
+            for dump in allDumps {
+                dump.photoIDs.removeAll { $0 == photo.id }
+            }
+            // Delete the image file from disk
+            PhotoStorageManager.shared.deleteImage(relativePath: photo.localPath)
+            // Delete the SwiftData record
+            modelContext.delete(photo)
+            try? modelContext.save()
         }
     }
 

@@ -100,15 +100,10 @@ struct ContentView: View {
                     }
                 }
 
-            // 3. AI SUGGESTIONS (Bottom Sheet)
-            if appState.showAISuggest {
-                CabinetMenuView(
-                    isPresented: $appState.showAISuggest,
-                    appState: appState
-                )
-                .zIndex(10)
-                .transition(.move(edge: .bottom))
-            }
+            // 3. AI DUMP BUILDER — full-screen photo picker + clustering
+            // showAISuggest is toggled by the AUTO-GENERATE button in MainAppView.
+            // AISuggestView handles its own PhotosPicker; API key is optional
+            // (falls back to local caption generation automatically).
 
             // 4. FILE CABINET MENU (Full Screen Overlay)
             if appState.showFileCabinet {
@@ -130,6 +125,9 @@ struct ContentView: View {
         .background(Color.black)
         .fullScreenCover(isPresented: $appState.showSettings) {
             SettingsView(isPresented: $appState.showSettings)
+        }
+        .fullScreenCover(isPresented: $appState.showAISuggest) {
+            AISuggestView(isPresented: $appState.showAISuggest, appState: appState)
         }
         // Default state: collapsed black pill that blends with the hardware Dynamic Island.
         // Tap to expand with status + credit badge + menu.

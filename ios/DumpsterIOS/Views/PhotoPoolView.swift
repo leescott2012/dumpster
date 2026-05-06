@@ -350,11 +350,6 @@ struct PhotoPoolView: View {
                     slotIndex: 0,
                     totalInDump: 0,
                     size: ResponsiveGrid.photoSize(for: appState.poolSize, screenWidth: UIScreen.main.bounds.width),
-                    onRemoveFromDump: nil,
-                    onDelete: {
-                        modelContext.delete(photo)
-                        try? modelContext.save()
-                    },
                     onTap: {
                         // Selection mode: toggle; otherwise PhotoCardView opens lightbox itself
                         if appState.addingToDumpId != nil {
@@ -364,6 +359,11 @@ struct PhotoPoolView: View {
                                 selectedPhotoIDs.insert(photo.id)
                             }
                         }
+                    },
+                    onRemoveFromDump: nil,
+                    onDelete: {
+                        modelContext.delete(photo)
+                        try? modelContext.save()
                     }
                 )
                 .overlay(

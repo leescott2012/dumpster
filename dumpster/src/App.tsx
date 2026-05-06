@@ -3,6 +3,7 @@ import './index.css';
 import { useStore, applyColorMode, loadPhotosFromServer } from './store';
 import DumpCard from './components/DumpCard';
 import PhotoPool from './components/PhotoPool';
+import CaptionsView from './components/CaptionsView';
 import Lightbox from './components/Lightbox';
 import { InstallPrompt } from './components/InstallPrompt';
 import { Onboarding } from './components/Onboarding';
@@ -42,6 +43,7 @@ export default function App() {
 
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [mainTab, setMainTab] = useState<'photos' | 'captions'>('photos');
   const [accentHex, setAccentHex] = useState(() => localStorage.getItem('dumpster_accent') ?? '#C8A96E');
   const mainMenuRef = useRef<HTMLDivElement>(null);
   const usedIds = new Set(dumps.flatMap((d) => d.photos));
@@ -249,52 +251,84 @@ export default function App() {
           </div>
         </header>
 
-        <div style={{ borderTop: '1px solid var(--border2)', marginBottom: 48 }} />
+        <div style={{ borderTop: '1px solid var(--border2)', marginBottom: 32 }} />
 
-        {/* ── Dump Cards ───────────────────────────────────── */}
-        {dumps.map((dump) => (
-          <DumpCard
-            key={dump.id}
-            dump={dump}
-            active={dump.id === activeDumpId}
-            onActivate={() => setActiveDump(dump.id)}
-          />
-        ))}
-
-        {/* ── New Dump ─────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 72, marginTop: 8 }}>
-          <button
-            onClick={newDump}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              background: 'transparent',
-              border: '1.5px solid var(--accent)',
-              borderRadius: 999, padding: '10px 22px',
-              color: 'var(--accent)',
-              fontSize: 11, fontWeight: 800, letterSpacing: '0.12em',
-              textTransform: 'uppercase', cursor: 'pointer',
-              transition: 'all 0.18s', fontFamily: 'var(--font)',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent)';
-              (e.currentTarget as HTMLButtonElement).style.color = '#000';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)';
-            }}
-          >
-            <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
-            New Dump
-          </button>
+        {/* ── Photos / Captions segmented pill ─────────────── */}
+        <div style={{
+          display: 'flex', justifyContent: 'center', marginBottom: 40,
+        }}>
+          <div style={{
+            display: 'flex', padding: 4, gap: 0,
+            background: 'var(--bg2)', border: '1px solid var(--border2)',
+            borderRadius: 999,
+          }}>
+            {(['photos', 'captions'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setMainTab(tab)}
+                style={{
+                  padding: '8px 24px', borderRadius: 999, border: 'none',
+                  fontSize: 11, fontWeight: 800, letterSpacing: '0.1em',
+                  textTransform: 'uppercase', cursor: 'pointer',
+                  background: mainTab === tab ? 'var(--accent)' : 'transparent',
+                  color: mainTab === tab ? '#000' : 'var(--text3)',
+                  transition: 'all 0.2s', fontFamily: 'var(--font)',
+                }}
+              >{tab}</button>
+            ))}
+          </div>
         </div>
 
-        <div style={{ borderTop: '1px solid var(--border2)', marginBottom: 48 }} />
+        {/* ── PHOTOS TAB ───────────────────────────────────── */}
+        {mainTab === 'photos' && (
+          <>
+            {dumps.map((dump) => (
+              <DumpCard
+                key={dump.id}
+                dump={dump}
+                active={dump.id === activeDumpId}
+                onActivate={() => setActiveDump(dump.id)}
+              />
+            ))}
 
-        {/* ── Photo Pool ───────────────────────────────────── */}
-        <PhotoPool />
+            {/* New Dump */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 72, marginTop: 8 }}>
+              <button
+                onClick={newDump}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  background: 'transparent', border: '1.5px solid var(--accent)',
+                  borderRadius: 999, padding: '10px 22px',
+                  color: 'var(--accent)', fontSize: 11, fontWeight: 800,
+                  letterSpacing: '0.12em', textTransform: 'uppercase',
+                  cursor: 'pointer', transition: 'all 0.18s', fontFamily: 'var(--font)',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent)';
+                  (e.currentTarget as HTMLButtonElement).style.color = '#000';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)';
+                }}
+              >
+                <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
+                New Dump
+              </button>
+            </div>
 
-        <div style={{ height: 80 }} />
+            <div style={{ borderTop: '1px solid var(--border2)', marginBottom: 48 }} />
+            <PhotoPool />
+          </>
+        )}
+
+        {/* ── CAPTIONS TAB ─────────────────────────────────── */}
+        {mainTab === 'captions' && <CaptionsView />}
+
+        {/* ── Footer ───────────────────────────────────────── */}
+        <AppFooter />
+
+        <div style={{ height: 48 }} />
       </div>
     </div>
   );
@@ -313,6 +347,170 @@ function undoRedoStyle(disabled: boolean): React.CSSProperties {
     opacity: disabled ? 0.4 : 1,
   };
 }
+
+// ─── Footer ───────────────────────────────────────────────────────────────────
+
+function AppFooter() {
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+
+  return (
+    <>
+      {/* Privacy modal */}
+      {showPrivacy && <LegalModal title="Privacy Policy" onClose={() => setShowPrivacy(false)}>
+        <p>DUMPSTER ("we", "us") is committed to protecting your privacy.</p>
+        <h3>Information We Collect</h3>
+        <p>Photos and content you add are stored locally in your browser (localStorage). We do not upload your photos to any server. No personal data is collected, sold, or shared with third parties.</p>
+        <h3>Local Storage</h3>
+        <p>We use localStorage to save your dumps, captions, and preferences between sessions. You can clear this at any time via your browser settings.</p>
+        <h3>Analytics</h3>
+        <p>We may use anonymised analytics to understand how the app is used. No personally identifiable information is collected.</p>
+        <h3>Contact</h3>
+        <p>Questions? Email us at support@dumpster.app</p>
+        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 16 }}>Last updated: May 2026</p>
+      </LegalModal>}
+
+      {/* Terms modal */}
+      {showTerms && <LegalModal title="Terms of Service" onClose={() => setShowTerms(false)}>
+        <p>By using DUMPSTER you agree to the following terms.</p>
+        <h3>Use of Service</h3>
+        <p>DUMPSTER is provided for personal use to organise and sequence photos for social media carousels. You retain full ownership of any content you add.</p>
+        <h3>Prohibited Use</h3>
+        <p>You may not use DUMPSTER to store, distribute, or display illegal, harmful, or infringing content.</p>
+        <h3>Disclaimer</h3>
+        <p>DUMPSTER is provided "as is" without warranty of any kind. We are not liable for any loss of data or content.</p>
+        <h3>Changes</h3>
+        <p>We may update these terms at any time. Continued use after changes constitutes acceptance.</p>
+        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 16 }}>Last updated: May 2026</p>
+      </LegalModal>}
+
+      {/* App Store landing strip */}
+      <div style={{
+        borderTop: '1px solid var(--border2)', marginTop: 64, marginBottom: 0,
+        padding: '56px 0', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        gap: 20, textAlign: 'center',
+      }}>
+        {/* Icon */}
+        <div style={{
+          width: 72, height: 72, borderRadius: 18,
+          background: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
+          border: '1px solid var(--border2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        }}>
+          <span style={{ fontSize: 32, lineHeight: 1 }}>🗑️</span>
+        </div>
+        <div>
+          <p style={{
+            fontSize: 10, fontWeight: 800, letterSpacing: '0.2em',
+            color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 8,
+          }}>NATIVE IOS APP</p>
+          <p style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em', marginBottom: 6 }}>
+            Get DUMPSTER on iPhone
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--text3)', maxWidth: 380, margin: '0 auto' }}>
+            Full AI caption generation, StoreKit subscriptions, offline-first, and native photo picker — coming to the App Store.
+          </p>
+        </div>
+
+        {/* App Store badge */}
+        <a
+          href="https://apps.apple.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'inline-block' }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: '#000', borderRadius: 12, padding: '11px 22px',
+            border: '1px solid #333',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 814 1000" fill="white">
+              <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-38.8-155.5-127.4C46 790.7 0 663 0 541.8c0-207.5 135.4-317.3 268.5-317.3 99.8 0 165 52.5 221 52.5 53.7 0 128.1-55.5 239.7-55.5zM572.3 116.7c49.2-58.5 84.8-140.1 84.8-221.6 0-11.3-.9-22.6-2.7-33.9-80.2 3.1-176.5 53.5-233.8 123.3-43.5 50.8-85.5 132.9-85.5 215.3 0 12.6 2.2 25.2 3.1 29.5 5 .9 13.2 2.2 21.4 2.2 71.7 0 159.3-48.1 212.7-114.8z"/>
+            </svg>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', lineHeight: 1, marginBottom: 2 }}>Download on the</p>
+              <p style={{ fontSize: 16, fontWeight: 700, color: '#fff', lineHeight: 1 }}>App Store</p>
+            </div>
+          </div>
+        </a>
+
+        {/* Legal links */}
+        <div style={{ display: 'flex', gap: 20, marginTop: 8 }}>
+          <button
+            onClick={() => setShowPrivacy(true)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font)',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text3)')}
+          >Privacy Policy</button>
+          <button
+            onClick={() => setShowTerms(true)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font)',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text3)')}
+          >Terms of Service</button>
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 0 }}>
+          © {new Date().getFullYear()} DUMPSTER. All rights reserved.
+        </p>
+      </div>
+    </>
+  );
+}
+
+// ─── Legal modal ──────────────────────────────────────────────────────────────
+
+function LegalModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24, animation: 'fadeIn 0.18s ease',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#1a1a1a', border: '1px solid var(--border2)',
+          borderRadius: 20, padding: 32, maxWidth: 560, width: '100%',
+          maxHeight: '80vh', overflowY: 'auto',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.8)',
+          animation: 'slideDown 0.2s ease',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{title}</h2>
+          <button
+            onClick={onClose}
+            style={{
+              width: 32, height: 32, borderRadius: '50%', border: 'none',
+              background: 'var(--bg3)', color: 'var(--text3)', cursor: 'pointer', fontSize: 16,
+            }}
+          >✕</button>
+        </div>
+        <div style={{
+          fontSize: 13, color: 'var(--text2)', lineHeight: 1.8,
+          display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── StatPill ─────────────────────────────────────────────────────────────────
 
 function StatPill({ num, label }: { num: number; label: string }) {
   return (

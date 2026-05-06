@@ -36,7 +36,7 @@ function loadSavedAccent() {
 
 export default function App() {
   const {
-    dumps, photos, activeDumpId, colorMode,
+    dumps, photos, captions, activeDumpId, colorMode,
     newDump, setActiveDump, undo, redo, canUndo, canRedo,
     setColorMode,
   } = useStore();
@@ -106,17 +106,23 @@ export default function App() {
       <Lightbox />
       <InstallPrompt />
       {showOnboarding && <Onboarding onComplete={() => setShowOnboarding(false)} />}
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 32px' }}>
+      <div style={{ maxWidth: 1040, margin: '0 auto', padding: '0 28px' }}>
 
         {/* ── Header ──────────────────────────────────────── */}
         <header style={{ paddingTop: 48, paddingBottom: 32 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
 
             {/* Brand wordmark */}
-            <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 7,
+                background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span style={{ fontSize: 14, lineHeight: 1, fontWeight: 900, color: '#000', fontFamily: 'var(--font)' }}>D</span>
+              </div>
               <p style={{
-                fontSize: 10, letterSpacing: '0.22em', color: 'var(--accent)',
-                textTransform: 'uppercase', fontWeight: 800, marginBottom: 0,
+                fontSize: 11, letterSpacing: '0.2em', color: 'var(--text)',
+                textTransform: 'uppercase', fontWeight: 800,
               }}>DUMPSTER</p>
             </div>
 
@@ -235,13 +241,14 @@ export default function App() {
           </div>
 
           <h1 style={{
-            fontSize: 50, fontWeight: 800, color: 'var(--text)', lineHeight: 1.05,
-            marginBottom: 12, letterSpacing: '-0.02em', marginTop: 16,
+            fontSize: 54, fontWeight: 400, color: 'var(--text)', lineHeight: 1.05,
+            marginBottom: 14, letterSpacing: '-0.01em', marginTop: 18,
+            fontFamily: 'var(--font-display)',
           }}>
             Build Your{' '}
-            <span style={{ color: 'var(--accent)' }}>Dumps</span>
+            <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>Dumps</span>
           </h1>
-          <p style={{ fontSize: 14, color: 'var(--text3)', lineHeight: 1.6, marginBottom: 24, maxWidth: 540 }}>
+          <p style={{ fontSize: 14, color: 'var(--text3)', lineHeight: 1.65, marginBottom: 24, maxWidth: 480 }}>
             Drag to reorder · double-click to enlarge · tap + to add from pool
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -254,27 +261,39 @@ export default function App() {
         <div style={{ borderTop: '1px solid var(--border2)', marginBottom: 32 }} />
 
         {/* ── Photos / Captions segmented pill ─────────────── */}
-        <div style={{
-          display: 'flex', justifyContent: 'center', marginBottom: 40,
-        }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 44 }}>
           <div style={{
-            display: 'flex', padding: 4, gap: 0,
+            display: 'flex', padding: 4,
             background: 'var(--bg2)', border: '1px solid var(--border2)',
-            borderRadius: 999,
+            borderRadius: 999, boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
           }}>
-            {(['photos', 'captions'] as const).map(tab => (
+            {([
+              { key: 'photos',   label: 'Photos',   badge: null },
+              { key: 'captions', label: 'Captions', badge: captions.length > 0 ? captions.length : null },
+            ] as const).map(({ key, label, badge }) => (
               <button
-                key={tab}
-                onClick={() => setMainTab(tab)}
+                key={key}
+                onClick={() => setMainTab(key)}
                 style={{
-                  padding: '8px 24px', borderRadius: 999, border: 'none',
-                  fontSize: 11, fontWeight: 800, letterSpacing: '0.1em',
+                  padding: '9px 26px', borderRadius: 999, border: 'none',
+                  fontSize: 11, fontWeight: 800, letterSpacing: '0.12em',
                   textTransform: 'uppercase', cursor: 'pointer',
-                  background: mainTab === tab ? 'var(--accent)' : 'transparent',
-                  color: mainTab === tab ? '#000' : 'var(--text3)',
+                  background: mainTab === key ? 'var(--accent)' : 'transparent',
+                  color: mainTab === key ? '#000' : 'var(--text3)',
                   transition: 'all 0.2s', fontFamily: 'var(--font)',
+                  display: 'flex', alignItems: 'center', gap: 7,
                 }}
-              >{tab}</button>
+              >
+                {label}
+                {badge !== null && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 800, lineHeight: 1,
+                    background: mainTab === key ? 'rgba(0,0,0,0.2)' : 'var(--accent-dim)',
+                    color: mainTab === key ? '#000' : 'var(--accent)',
+                    padding: '2px 6px', borderRadius: 999, minWidth: 18, textAlign: 'center',
+                  }}>{badge}</span>
+                )}
+              </button>
             ))}
           </div>
         </div>
@@ -318,7 +337,7 @@ export default function App() {
             </div>
 
             <div style={{ borderTop: '1px solid var(--border2)', marginBottom: 48 }} />
-            <PhotoPool />
+            <PhotoPool onShowCaptions={() => setMainTab('captions')} />
           </>
         )}
 
@@ -515,12 +534,13 @@ function LegalModal({ title, onClose, children }: { title: string; onClose: () =
 function StatPill({ num, label }: { num: number; label: string }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 6,
+      display: 'flex', alignItems: 'center', gap: 7,
       background: 'var(--bg2)', border: '1px solid var(--border2)',
-      borderRadius: 999, padding: '6px 14px',
+      borderRadius: 999, padding: '7px 16px',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
     }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{num}</span>
-      <span style={{ fontSize: 12, color: 'var(--text3)' }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{num}</span>
+      <span style={{ fontSize: 11, color: 'var(--text3)', letterSpacing: '0.03em' }}>{label}</span>
     </div>
   );
 }

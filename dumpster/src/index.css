@@ -1,33 +1,41 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Serif+Display:ital@0;1&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  /* Prevent double-tap zoom on all elements */
+  touch-action: manipulation;
 }
 
 :root {
-  --bg: #0a0a0a;
-  --bg1: #111;
-  --bg2: #181818;
-  --bg3: #222;
-  --border: #1e1e1e;
-  --border2: #2a2a2a;
-  --border3: #333;
+  --bg: #080808;
+  --bg1: #0e0e0e;
+  --bg2: #141414;
+  --bg3: #1c1c1c;
+  --bg4: #222222;
+  --border: #1a1a1a;
+  --border2: #242424;
+  --border3: #303030;
   /* accent = user-customisable brand colour (defaults to gold) */
   --accent: #C8A96E;
-  --accent-dim: rgba(200, 169, 110, 0.15);
-  --accent-dim2: rgba(200, 169, 110, 0.08);
+  --accent-dim: rgba(200, 169, 110, 0.12);
+  --accent-dim2: rgba(200, 169, 110, 0.06);
   /* keep --gold aliases so old references still compile */
   --gold: var(--accent);
   --gold-dim: var(--accent-dim);
   --gold-dim2: var(--accent-dim2);
-  --text: #e8e8e8;
-  --text2: #999;
-  --text3: #555;
+  --text: #f0f0f0;
+  --text2: #888;
+  --text3: #444;
   --red: #E05C5C;
   --green: #4CAF50;
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
 }
 
 @keyframes fadeIn {
@@ -36,18 +44,17 @@
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-12px); }
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-/* Pool-size=small: never show the three-dot menu button */
-.pool-size-small .photo-menu-btn,
-.pool-size-small .photo-menu-wrap {
-  display: none !important;
 }
 
 html, body {
@@ -56,6 +63,22 @@ html, body {
   font-family: var(--font);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent iOS bounce / zoom */
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Subtle noise texture overlay */
+html::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.018;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
 }
 
 #root {
@@ -70,19 +93,15 @@ button {
 
 input, textarea {
   font-family: var(--font);
+  /* iOS: prevent zoom-on-focus for small inputs */
+  font-size: 16px;
 }
 
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border3);
-  border-radius: 2px;
-}
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border3); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* Photo slot hover → show remove button */
 .photo-slot:hover .slot-remove {
@@ -104,5 +123,22 @@ input, textarea {
 
 /* Drag over highlight for drop zones */
 .drag-over {
-  background: var(--gold-dim2) !important;
+  background: var(--accent-dim2) !important;
+  border-color: var(--accent) !important;
 }
+
+/* Pool-size=small: never show the three-dot menu button */
+.pool-size-small .photo-menu-btn,
+.pool-size-small .photo-menu-wrap {
+  display: none !important;
+}
+
+/* Premium card base */
+.premium-card {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Day mode overrides (set via JS) */

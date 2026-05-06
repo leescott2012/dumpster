@@ -349,7 +349,11 @@ struct PhotoPoolView: View {
                     slotIndex: 0,
                     totalInDump: 0,
                     size: ResponsiveGrid.photoSize(for: appState.poolSize, screenWidth: UIScreen.main.bounds.width),
-                    onRemoveFromDump: nil
+                    onRemoveFromDump: nil,
+                    onDelete: {
+                        modelContext.delete(photo)
+                        try? modelContext.save()
+                    }
                 )
                 .onTapGesture {
                     if appState.addingToDumpId != nil {

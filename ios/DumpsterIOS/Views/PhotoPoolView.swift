@@ -346,22 +346,26 @@ struct PhotoPoolView: View {
                 PhotoCardView(
                     photo: photo,
                     context: .pool,
+                    isSelected: selectedPhotoIDs.contains(photo.id),
                     slotIndex: 0,
                     totalInDump: 0,
                     size: ResponsiveGrid.photoSize(for: appState.poolSize, screenWidth: UIScreen.main.bounds.width),
-                    onRemoveFromDump: nil
-                )
-                .onTapGesture {
-                    if appState.addingToDumpId != nil {
-                        if selectedPhotoIDs.contains(photo.id) {
-                            selectedPhotoIDs.remove(photo.id)
-                        } else {
-                            selectedPhotoIDs.insert(photo.id)
+                    onTap: {
+                        // Selection mode: toggle; otherwise PhotoCardView opens lightbox itself
+                        if appState.addingToDumpId != nil {
+                            if selectedPhotoIDs.contains(photo.id) {
+                                selectedPhotoIDs.remove(photo.id)
+                            } else {
+                                selectedPhotoIDs.insert(photo.id)
+                            }
                         }
-                    } else {
-                        appState.lightboxPhotoId = photo.id
+                    },
+                    onRemoveFromDump: nil,
+                    onDelete: {
+                        modelContext.delete(photo)
+                        try? modelContext.save()
                     }
-                }
+                )
                 .overlay(
                     Group {
                         if appState.addingToDumpId != nil && selectedPhotoIDs.contains(photo.id) {

@@ -40,6 +40,10 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Pool-size=small: never show the three-dot menu button */
 .pool-size-small .photo-menu-btn,
 .pool-size-small .photo-menu-wrap {

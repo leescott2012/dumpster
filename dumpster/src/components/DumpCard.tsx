@@ -55,10 +55,13 @@ export default function DumpCard({ dump, onActivate }: Props) {
     <div
       onClick={onActivate}
       style={{
-        marginBottom: 56, cursor: 'default',
+        marginBottom: 48, cursor: 'default',
         opacity: deleting ? 0 : 1,
         transform: deleting ? 'translateY(-8px) scale(0.98)' : 'none',
         transition: 'opacity 0.35s ease, transform 0.35s ease',
+        background: 'var(--bg1)', border: '1px solid var(--border2)',
+        borderRadius: 20, padding: '24px 24px 20px',
+        boxShadow: '0 2px 16px rgba(0,0,0,0.25)',
       }}
     >
       {/* Header row */}
@@ -262,9 +265,9 @@ function EditableTitle({ dump }: { dump: Dump }) {
       style={{
         display: 'block', width: '100%', background: 'transparent',
         border: 'none', outline: 'none', color: 'var(--text)',
-        fontSize: 36, fontWeight: 700, letterSpacing: '-0.02em',
-        lineHeight: 1.1, marginBottom: 10, padding: '0 0 2px',
-        cursor: 'text', fontFamily: 'var(--font)',
+        fontSize: 32, fontWeight: 400, letterSpacing: '-0.01em',
+        lineHeight: 1.15, marginBottom: 8, padding: '0 0 2px',
+        cursor: 'text', fontFamily: 'var(--font-display)',
       }}
     />
   );

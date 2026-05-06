@@ -13,7 +13,7 @@ const FILTER_OPTIONS: { key: Filter; label: string }[] = [
 const POOL_COLS: Record<string, number> = { small: 8, medium: 6, large: 4 };
 const POOL_HEIGHTS: Record<string, number> = { small: 120, medium: 160, large: 220 };
 
-export default function PhotoPool() {
+export default function PhotoPool({ onShowCaptions }: { onShowCaptions?: () => void }) {
   const {
     photos, dumps, filter, activeFilters, activeDumpId, poolSize, poolSearchQuery,
     addPhotos, addPhotoToDump, addPhotosToDump, toggleStar, toggleHuji, removePhoto,
@@ -26,6 +26,8 @@ export default function PhotoPool() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Independent select mode (not tied to a specific dump)
+  const [selectMode, setSelectMode] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const usedIds = new Set(dumps.flatMap((d) => d.photos));
@@ -33,10 +35,18 @@ export default function PhotoPool() {
   const cardHeight = POOL_HEIGHTS[poolSize] ?? 160;
   const cardWidth = Math.floor(cardHeight * 0.75);
 
+  const isSelecting = !!addingToDumpId || selectMode;
+
   // Reset selection when leaving add-mode
   useEffect(() => {
-    if (!addingToDumpId) setSelectedIds(new Set());
-  }, [addingToDumpId]);
+    if (!addingToDumpId && !selectMode) setSelectedIds(new Set());
+  }, [addingToDumpId, selectMode]);
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    if (addingToDumpId) setAddingToDump(null);
+  };
 
   // Close menu on outside click
   useEffect(() => {
@@ -92,8 +102,7 @@ export default function PhotoPool() {
   }, [addPhotos]);
 
   const handlePhotoClick = (photoId: string) => {
-    if (addingToDumpId) {
-      // Selection mode
+    if (isSelecting) {
       setSelectedIds(prev => {
         const next = new Set(prev);
         if (next.has(photoId)) next.delete(photoId);
@@ -105,10 +114,12 @@ export default function PhotoPool() {
     }
   };
 
-  const confirmAddToDump = () => {
-    if (addingToDumpId && selectedIds.size > 0) {
-      addPhotosToDump([...selectedIds], addingToDumpId);
+  const confirmAddToDump = (dumpId: string) => {
+    if (selectedIds.size > 0) {
+      addPhotosToDump([...selectedIds], dumpId);
       setSelectedIds(new Set());
+      setSelectMode(false);
+      if (addingToDumpId) setAddingToDump(null);
     }
   };
 
@@ -117,17 +128,47 @@ export default function PhotoPool() {
   return (
     <section id="photo-pool">
       {/* Header */}
-      <p style={{
-        fontSize: 10, fontWeight: 800, letterSpacing: '0.22em',
-        color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 6,
-      }}>PHOTO POOL</p>
-
-      <h2 style={{ fontSize: 34, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 4 }}>
-        Available Photos
-      </h2>
-      <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 18 }}>
-        {poolPhotos.length} available · {usedIds.size} in dumps
-      </p>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <p style={{
+            fontSize: 10, fontWeight: 800, letterSpacing: '0.22em',
+            color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 5,
+          }}>PHOTO POOL</p>
+          <h2 style={{ fontSize: 30, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 3, fontFamily: 'var(--font-display)' }}>
+            Available Photos
+          </h2>
+          <p style={{ fontSize: 13, color: 'var(--text3)' }}>
+            {poolPhotos.length} available · {usedIds.size} in dumps
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Select mode toggle */}
+          <button
+            onClick={() => { setSelectMode(s => !s); setSelectedIds(new Set()); }}
+            style={{
+              padding: '8px 16px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+              letterSpacing: '0.06em', border: selectMode ? '1px solid var(--accent)' : '1px solid var(--border2)',
+              background: selectMode ? 'var(--accent)' : 'var(--bg2)',
+              color: selectMode ? '#000' : 'var(--text2)', cursor: 'pointer', transition: 'all 0.15s',
+              fontFamily: 'var(--font)',
+            }}
+          >{selectMode ? '✕ Cancel Select' : 'Select'}</button>
+          {/* Caption shortcut */}
+          {onShowCaptions && (
+            <button
+              onClick={onShowCaptions}
+              style={{
+                padding: '8px 16px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.06em', border: '1px solid var(--border2)',
+                background: 'var(--bg2)', color: 'var(--accent)', cursor: 'pointer', transition: 'all 0.15s',
+                fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5,
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border2)'; }}
+            >✦ Captions</button>
+          )}
+        </div>
+      </div>
 
       {/* Filter bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -237,33 +278,49 @@ export default function PhotoPool() {
         </div>
       </div>
 
-      {/* Adding-to-dump banner */}
-      {addingToDumpId && (
+      {/* Selection banner — shown in both add-to-dump mode and free select mode */}
+      {isSelecting && (
         <div style={{
-          background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.3)',
-          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          background: 'var(--accent-dim)', border: '1px solid var(--accent)',
+          borderRadius: 12, padding: '12px 18px', marginBottom: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, animation: 'slideDown 0.18s ease',
         }}>
-          <p style={{ fontSize: 13, color: '#4CAF50', fontWeight: 600 }}>
-            Tap photos to select · {selectedIds.size} selected
+          <p style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>
+            {selectedIds.size === 0 ? 'Tap photos to select' : `${selectedIds.size} photo${selectedIds.size !== 1 ? 's' : ''} selected`}
           </p>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {/* Add to specific dump dropdown or active dump */}
+            {selectedIds.size > 0 && addingToDumpId && (
+              <button
+                onClick={() => confirmAddToDump(addingToDumpId)}
+                style={{
+                  padding: '7px 16px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                  background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font)',
+                }}
+              >Add {selectedIds.size} to Dump</button>
+            )}
+            {selectedIds.size > 0 && selectMode && dumps.length > 0 && (
+              <select
+                onChange={(e) => { if (e.target.value) confirmAddToDump(e.target.value); }}
+                defaultValue=""
+                style={{
+                  padding: '7px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                  background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font)',
+                }}
+              >
+                <option value="" disabled>Add {selectedIds.size} to…</option>
+                {dumps.map(d => <option key={d.id} value={d.id}>{d.title.slice(0, 28)}</option>)}
+              </select>
+            )}
             <button
-              onClick={confirmAddToDump}
-              disabled={selectedIds.size === 0}
+              onClick={exitSelectMode}
               style={{
-                padding: '7px 16px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                background: selectedIds.size > 0 ? '#4CAF50' : 'transparent',
-                color: selectedIds.size > 0 ? '#fff' : '#4CAF50',
-                border: '1px solid #4CAF50', cursor: selectedIds.size > 0 ? 'pointer' : 'default',
-              }}
-            >Add {selectedIds.size > 0 ? selectedIds.size : ''} Photos</button>
-            <button
-              onClick={() => setAddingToDump(null)}
-              style={{
-                padding: '7px 12px', borderRadius: 6, fontSize: 11,
+                padding: '7px 12px', borderRadius: 999, fontSize: 11,
                 background: 'transparent', border: '1px solid var(--border2)',
-                color: 'var(--text3)', cursor: 'pointer',
+                color: 'var(--text3)', cursor: 'pointer', fontFamily: 'var(--font)',
               }}
             >Cancel</button>
           </div>
@@ -346,10 +403,10 @@ export default function PhotoPool() {
                   photo={photo}
                   index={idx}
                   used={used && !addingToDumpId}
-                  selected={isSelected}
+                  selected={isSelecting && isSelected}
                   width={cardWidth}
                   height={cardHeight}
-                  onClick={used && !addingToDumpId ? undefined : () => handlePhotoClick(photo.id)}
+                  onClick={used && !isSelecting ? undefined : () => handlePhotoClick(photo.id)}
                   onToggleStar={() => toggleStar(photo.id)}
                   onToggleHuji={() => toggleHuji(photo.id)}
                   onRemove={() => removePhoto(photo.id)}

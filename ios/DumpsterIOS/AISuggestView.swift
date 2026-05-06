@@ -213,16 +213,16 @@ struct AISuggestView: View {
 
                     HStack(spacing: 20) {
                         Button {
-                            if maxPhotosPerDump > 5 { maxPhotosPerDump -= 1 }
+                            if maxPhotosPerDump > 1 { maxPhotosPerDump -= 1 }
                         } label: {
                             Image(systemName: "minus")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(maxPhotosPerDump > 5 ? .white : .white.opacity(0.2))
+                                .foregroundColor(maxPhotosPerDump > 1 ? .white : .white.opacity(0.2))
                                 .frame(width: 40, height: 40)
                                 .background(Color.white.opacity(0.08))
                                 .clipShape(Circle())
                         }
-                        .disabled(maxPhotosPerDump <= 5)
+                        .disabled(maxPhotosPerDump <= 1)
 
                         Text("\(maxPhotosPerDump)")
                             .font(.system(size: 36, weight: .bold, design: .monospaced))

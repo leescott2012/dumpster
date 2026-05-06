@@ -213,6 +213,8 @@ struct FileCabinetMenuView: View {
                             Text(tab.title)
                                 .font(.system(size: 9, weight: .bold))
                                 .tracking(1.5)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundColor(darkBg)
                         .padding(.horizontal, 14)
@@ -311,7 +313,11 @@ struct FileCabinetMenuView: View {
                         case .photoPool:
                             PhotoPoolTabView()
                         case .appearance:
-                            AppearanceTabView(appState: appState)
+                            AppearanceTabView(appState: appState, onDone: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                    selectedTab = nil
+                                }
+                            })
                         case .aboutHelp:
                             AboutHelpTabView(llmService: llmService, appState: appState, onDismiss: { dismissMenu() })
                         case .socialMedia:
@@ -521,11 +527,15 @@ struct AISettingsTabView: View {
             // Active Provider Status
             activeProviderBanner
 
-            // API Key Cards
+            // API Key Cards — Pro feature
             CabinetSectionHeader("API PROVIDERS", icon: "key")
 
-            ForEach(LLMService.LLMProvider.allCases) { provider in
-                apiKeyCard(for: provider)
+            if SubscriptionManager.shared.isPro {
+                ForEach(LLMService.LLMProvider.allCases) { provider in
+                    apiKeyCard(for: provider)
+                }
+            } else {
+                proGateCard
             }
 
             // Labeling Sensitivity
@@ -550,6 +560,66 @@ struct AISettingsTabView: View {
     }
 
     // MARK: - Active Provider Banner
+
+    @State private var showPaywallFromAISettings = false
+
+    private var proGateCard: some View {
+        Button { showPaywallFromAISettings = true } label: {
+            VStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("PRO FEATURE")
+                        .font(.system(size: 10, weight: .black))
+                        .tracking(1.6)
+                }
+                .foregroundColor(gold)
+
+                Text("Bring Your Own AI Keys")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+
+                Text("Subscribe to DUMPSTER Pro to plug in your own OpenAI, Claude, Gemini, Manus, or Perplexity keys for unlimited captions and full control.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.55))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .padding(.horizontal, 8)
+
+                HStack(spacing: 6) {
+                    Text("UNLOCK PRO")
+                        .font(.system(size: 11, weight: .heavy))
+                        .tracking(1.4)
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundColor(.black)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(gold)
+                .clipShape(Capsule())
+                .shadow(color: gold.opacity(0.30), radius: 8, x: 0, y: 3)
+                .padding(.top, 4)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 22)
+            .padding(.horizontal, 18)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(gold.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(gold.opacity(0.20), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showPaywallFromAISettings) {
+            PaywallView()
+                .presentationDetents([.large])
+        }
+    }
 
     private var activeProviderBanner: some View {
         HStack(spacing: 12) {
@@ -1386,6 +1456,7 @@ struct FlowLayout: Layout {
 
 struct AppearanceTabView: View {
     @ObservedObject var appState: AppState
+    var onDone: (() -> Void)? = nil
 
     private let gold = Color(hex: "#C8A96E")
 
@@ -1558,19 +1629,30 @@ struct AppearanceTabView: View {
                 }
 
                 HStack(spacing: 12) {
-                    Capsule()
-                        .fill(selectedAccent.color)
-                        .frame(height: 36)
-                        .overlay(
-                            Text("DUMPSTER")
-                                .font(.system(size: 11, weight: .bold))
-                                .tracking(2)
+                    Button {
+                        // Color is already saved on tap of the swatch — this just confirms + pops back
+                        onDone?()
+                    } label: {
+                        Capsule()
+                            .fill(selectedAccent.color)
+                            .frame(height: 44)
+                            .overlay(
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11, weight: .black))
+                                    Text("DUMPSTER")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .tracking(2)
+                                }
                                 .foregroundColor(.black)
-                        )
+                            )
+                            .shadow(color: selectedAccent.color.opacity(0.30), radius: 10, x: 0, y: 4)
+                    }
+                    .buttonStyle(.plain)
 
                     Circle()
                         .fill(selectedAccent.color.opacity(0.15))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .overlay(
                             Image(systemName: "sparkles")
                                 .font(.system(size: 14))

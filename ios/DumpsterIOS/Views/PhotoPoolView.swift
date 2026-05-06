@@ -288,15 +288,17 @@ struct PhotoPoolView: View {
 
     // MARK: - Empty state hero
 
+    @ViewBuilder
     private var emptyStateHero: some View {
+        let accent = appState.accentColor
         VStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(appState.accentColor.opacity(0.10))
+                    .fill(accent.opacity(0.10))
                     .frame(width: 88, height: 88)
                 Image(systemName: "photo.stack")
                     .font(.system(size: 34, weight: .semibold))
-                    .foregroundColor(appState.accentColor)
+                    .foregroundColor(accent)
             }
 
             VStack(spacing: 6) {
@@ -326,9 +328,9 @@ struct PhotoPoolView: View {
                 .foregroundColor(.black)
                 .padding(.horizontal, 22)
                 .padding(.vertical, 13)
-                .background(appState.accentColor)
+                .background(accent)
                 .clipShape(Capsule())
-                .shadow(color: appState.accentColor.opacity(0.30), radius: 10, x: 0, y: 4)
+                .shadow(color: accent.opacity(0.30), radius: 10, x: 0, y: 4)
             }
             .padding(.top, 4)
         }
@@ -376,6 +378,7 @@ struct PhotoPoolView: View {
             }
             let cellSize = ResponsiveGrid.photoSize(for: appState.poolSize, screenWidth: UIScreen.main.bounds.width)
             let cellBg = Theme.bg2(appState.colorMode, cs)
+            let accent = appState.accentColor
             PhotosPicker(
                 selection: $pickerItems,
                 maxSelectionCount: 50,
@@ -384,7 +387,7 @@ struct PhotoPoolView: View {
             ) {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 40))
-                    .foregroundColor(appState.accentColor)
+                    .foregroundColor(accent)
                     .frame(width: cellSize.width, height: cellSize.height)
                     .background(cellBg)
                     .clipShape(RoundedRectangle(cornerRadius: 8))

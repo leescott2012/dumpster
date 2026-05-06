@@ -285,7 +285,13 @@ struct DumpCardView: View {
                     .opacity(draggingPhotoId == photo.id ? 0.5 : 1.0)
                 }
                 if photos.count < 20 {
-                    addPhotosCard
+                    if photos.isEmpty {
+                        // Empty dump → show two clear options
+                        fromPoolCard
+                        fromLibraryCard
+                    } else {
+                        addPhotosCard
+                    }
                 }
             }
             .padding(.horizontal, 14)
@@ -293,7 +299,90 @@ struct DumpCardView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: dump.photoIDs)
     }
 
+    /// "Pick from Pool" — animates a scroll down to the photo pool with this dump in selection mode
+    @ViewBuilder
+    private var fromPoolCard: some View {
+        let accent = appState.accentColor
+        let text3  = Theme.text3(appState.colorMode, cs)
+        Button {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                appState.addingToDumpId = dump.id
+                appState.activePoolTab = .photos
+                appState.scrollToPool = UUID()
+            }
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: "square.stack.3d.down.right")
+                    .font(.system(size: 24, weight: .semibold))
+                Text("From Pool")
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(0.6)
+                Text("Pick photos already imported")
+                    .font(.system(size: 9))
+                    .foregroundColor(text3)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .padding(.horizontal, 8)
+            }
+            .foregroundColor(accent)
+            .frame(width: 145, height: 195)
+            .background(accent.opacity(0.06))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(accent.opacity(0.45), lineWidth: 1.2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// "From Library" — opens iOS PhotosPicker; imports straight into this dump
+    @ViewBuilder
+    private var fromLibraryCard: some View {
+        let bg2    = Theme.bg2(appState.colorMode, cs)
+        let text2  = Theme.text2(appState.colorMode, cs)
+        let text3  = Theme.text3(appState.colorMode, cs)
+        let border = Theme.border(appState.colorMode, cs)
+        PhotosPicker(
+            selection: $dumpPickerItems,
+            maxSelectionCount: 20,
+            selectionBehavior: .ordered,
+            matching: .images
+        ) {
+            VStack(spacing: 8) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 24, weight: .semibold))
+                Text("From Library")
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(0.6)
+                Text("Import new photos from iOS Photos")
+                    .font(.system(size: 9))
+                    .foregroundColor(text3)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .padding(.horizontal, 8)
+            }
+            .foregroundColor(text2)
+            .frame(width: 145, height: 195)
+            .background(bg2)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(border, style: StrokeStyle(lineWidth: 1, dash: [4]))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .onChange(of: dumpPickerItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task { await importPickedItems(items) }
+        }
+    }
+
+    /// Compact "+" card shown once a dump already has photos
+    @ViewBuilder
     private var addPhotosCard: some View {
+        let bg2    = Theme.bg2(appState.colorMode, cs)
+        let text2  = Theme.text2(appState.colorMode, cs)
+        let border = Theme.border(appState.colorMode, cs)
         PhotosPicker(
             selection: $dumpPickerItems,
             maxSelectionCount: 20,
@@ -306,13 +395,12 @@ struct DumpCardView: View {
                 Text("Add Photos")
                     .font(.system(size: 10, weight: .medium))
             }
-            .foregroundColor(Theme.text2(appState.colorMode, cs))
+            .foregroundColor(text2)
             .frame(width: 145, height: 195)
-            .background(Theme.bg2(appState.colorMode, cs))
+            .background(bg2)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Theme.border(appState.colorMode, cs),
-                                  style: StrokeStyle(lineWidth: 1, dash: [4]))
+                    .strokeBorder(border, style: StrokeStyle(lineWidth: 1, dash: [4]))
             )
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }

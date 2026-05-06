@@ -162,7 +162,7 @@ struct PhotoCardView: View {
                 }
                 Spacer()
                 // "..." dots button — top-right corner
-                if showDotsButton {
+                if showDotsButton && appState.poolSize != .small {
                     Button { showPhotoMenu = true } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 11, weight: .bold))

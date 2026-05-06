@@ -305,28 +305,42 @@ struct MainAppView: View {
 
     private var poolTabSwitcher: some View {
         HStack(spacing: 0) {
-            poolTab("Photos", tab: .photos)
-            poolTab("Captions", tab: .captions)
-            Spacer()
+            segmentedTab("PHOTOS",   tab: .photos)
+            segmentedTab("CAPTIONS", tab: .captions)
         }
+        .padding(4)
+        .background(
+            Capsule().fill(Theme.bg2(appState.colorMode, cs))
+        )
+        .overlay(
+            Capsule().stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
         .padding(.horizontal, 14)
     }
 
-    private func poolTab(_ label: String, tab: PoolTab) -> some View {
+    private func segmentedTab(_ label: String, tab: PoolTab) -> some View {
         let isSel = appState.activePoolTab == tab
-        return Text(label.uppercased())
-            .font(.system(size: 10, weight: .heavy))
-            .tracking(2.0)
-            .foregroundColor(isSel ? appState.accentColor : Theme.text3(appState.colorMode, cs))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .overlay(
-                Rectangle()
-                    .fill(isSel ? appState.accentColor : Color.clear)
-                    .frame(height: 1.5)
-                    .offset(y: 14)
-            )
-            .onTapGesture { appState.activePoolTab = tab }
+        return Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                appState.activePoolTab = tab
+            }
+        } label: {
+            Text(label)
+                .font(.system(size: 12, weight: .heavy))
+                .tracking(1.8)
+                .foregroundColor(isSel ? appState.accentColor : Theme.text3(appState.colorMode, cs))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(isSel ? appState.accentColor.opacity(0.18) : Color.clear)
+                        .overlay(
+                            Capsule().stroke(isSel ? appState.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
+                        )
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Pool content

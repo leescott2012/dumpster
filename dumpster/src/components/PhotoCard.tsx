@@ -82,7 +82,7 @@ export default function PhotoCard({
     : photo.isHuji
     ? 'rgba(190,60,45,0.8)'
     : isDragging
-    ? 'var(--gold)'
+    ? 'var(--accent)'
     : 'var(--border)';
 
   return (
@@ -107,7 +107,7 @@ export default function PhotoCard({
       }}
       onMouseEnter={(e) => {
         if (!used && !selected && !photo.isHuji)
-          (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)';
+          (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)';
       }}
       onMouseLeave={(e) => {
         if (!selected && !photo.isHuji)
@@ -138,7 +138,7 @@ export default function PhotoCard({
           <div style={{
             position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, color: 'var(--gold)',
+            fontSize: 22, color: 'var(--accent)',
           }}>✓</div>
         )}
 
@@ -181,7 +181,7 @@ export default function PhotoCard({
               style={{
                 fontSize: 7, fontWeight: 700, letterSpacing: '0.12em',
                 background: 'transparent', border: 'none', outline: '1px solid var(--gold)',
-                color: 'var(--gold)', width: '100%', padding: '1px 2px',
+                color: 'var(--accent)', width: '100%', padding: '1px 2px',
                 fontFamily: 'var(--font)',
               }}
             />
@@ -243,7 +243,7 @@ export default function PhotoCard({
           )}
           {photo.starred && (
             <span style={{
-              fontSize: 9, color: 'var(--gold)',
+              fontSize: 9, color: 'var(--accent)',
               background: 'rgba(0,0,0,0.55)', borderRadius: 3, padding: '1px 3px',
             }}>★</span>
           )}
@@ -261,7 +261,7 @@ export default function PhotoCard({
               key={l}
               onClick={e => { e.stopPropagation(); removeLabel(photo.id, l); }}
               style={{
-                fontSize: 7, background: 'var(--gold-dim)', color: 'var(--gold)',
+                fontSize: 7, background: 'var(--gold-dim)', color: 'var(--accent)',
                 padding: '1px 4px', borderRadius: 2, fontWeight: 600, cursor: 'pointer',
               }}
             >{l}</span>
@@ -287,9 +287,9 @@ export default function PhotoCard({
           }}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <circle cx="3" cy="8" r="1.5" fill="#C8A96E" />
-            <circle cx="8" cy="8" r="1.5" fill="#C8A96E" />
-            <circle cx="13" cy="8" r="1.5" fill="#C8A96E" />
+            <circle cx="3" cy="8" r="1.5" fill="var(--accent)" />
+            <circle cx="8" cy="8" r="1.5" fill="var(--accent)" />
+            <circle cx="13" cy="8" r="1.5" fill="var(--accent)" />
           </svg>
         </button>
 

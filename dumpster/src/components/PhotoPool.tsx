@@ -118,14 +118,14 @@ export default function PhotoPool() {
     <section id="photo-pool">
       {/* Header */}
       <p style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-        color: 'var(--gold)', textTransform: 'uppercase', marginBottom: 10,
+        fontSize: 10, fontWeight: 800, letterSpacing: '0.22em',
+        color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 6,
       }}>PHOTO POOL</p>
 
-      <h2 style={{ fontSize: 36, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 6 }}>
+      <h2 style={{ fontSize: 34, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 4 }}>
         Available Photos
       </h2>
-      <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20 }}>
+      <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 18 }}>
         {poolPhotos.length} available · {usedIds.size} in dumps
       </p>
 
@@ -151,19 +151,20 @@ export default function PhotoPool() {
 
           {menuOpen && (
             <div style={{
-              position: 'absolute', top: 38, left: 0, zIndex: 100,
+              position: 'absolute', top: 40, left: 0, zIndex: 100,
               background: '#1a1a1a', border: '1px solid var(--border2)',
-              borderRadius: 10, padding: 12, minWidth: 180,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              borderRadius: 12, padding: 12, minWidth: 180,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+              animation: 'slideDown 0.15s ease',
             }}>
-              <p style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', marginBottom: 10 }}>FILTERS</p>
+              <p style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.14em', marginBottom: 10 }}>FILTERS</p>
               {FILTER_OPTIONS.map(({ key, label }) => (
                 <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={activeFilters.includes(key)}
                     onChange={() => toggleActiveFilter(key)}
-                    style={{ accentColor: 'var(--gold)' }}
+                    style={{ accentColor: 'var(--accent)' }}
                   />
                   <span style={{ fontSize: 12, color: 'var(--text2)' }}>{label}</span>
                 </label>
@@ -191,14 +192,16 @@ export default function PhotoPool() {
             onClick={() => { setSearchOpen(o => !o); if (searchOpen) setPoolSearch(''); }}
             style={{
               width: 32, height: 32, borderRadius: '50%',
-              background: searchOpen ? 'var(--gold-dim)' : 'var(--bg2)',
-              border: `1px solid ${searchOpen ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
+              background: searchOpen ? 'var(--accent-dim)' : 'var(--bg2)',
+              border: `1px solid ${searchOpen ? 'var(--accent)' : 'var(--border2)'}`,
               cursor: 'pointer', fontSize: 14,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: searchOpen ? 'var(--gold)' : 'var(--text3)',
+              color: searchOpen ? 'var(--accent)' : 'var(--text3)',
               transition: 'all 0.15s',
             }}
-          >🔍</button>
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
           {searchOpen && (
             <input
               autoFocus
@@ -223,10 +226,11 @@ export default function PhotoPool() {
               key={s}
               onClick={() => setPoolSize(s)}
               style={{
-                width: 26, height: 26, borderRadius: 4, fontSize: 9, fontWeight: 700,
-                background: poolSize === s ? 'var(--gold-dim)' : 'var(--bg2)',
-                border: `1px solid ${poolSize === s ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-                color: poolSize === s ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer',
+                width: 28, height: 28, borderRadius: 20, fontSize: 9, fontWeight: 800,
+                background: poolSize === s ? 'var(--accent)' : 'var(--bg2)',
+                border: `1px solid ${poolSize === s ? 'var(--accent)' : 'var(--border2)'}`,
+                color: poolSize === s ? '#000' : 'var(--text3)', cursor: 'pointer',
+                transition: 'all 0.15s',
               }}
             >{sizeLabels[s]}</button>
           ))}
@@ -274,38 +278,65 @@ export default function PhotoPool() {
         onDragLeave={() => dropRef.current?.classList.remove('drag-over')}
         style={{ transition: 'background 0.2s', borderRadius: 12 }}
       >
-        {/* Empty state */}
+        {/* ── Empty state hero (matches iOS) ── */}
         {photos.length === 0 && (
-          <div
-            onClick={() => fileRef.current?.click()}
-            style={{
-              border: '1.5px dashed var(--border3)', borderRadius: 12,
-              padding: '40px 24px', textAlign: 'center', cursor: 'pointer',
-              marginBottom: 16, transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)';
-              (e.currentTarget as HTMLDivElement).style.background = 'var(--gold-dim2)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)';
-              (e.currentTarget as HTMLDivElement).style.background = 'transparent';
-            }}
-          >
-            <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 4 }}>
-              Drop photos & videos here or <span style={{ color: 'var(--gold)' }}>click to upload</span>
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: '64px 28px', animation: 'fadeIn 0.3s ease',
+          }}>
+            {/* Icon circle */}
+            <div style={{
+              width: 88, height: 88, borderRadius: '50%',
+              background: 'var(--accent-dim)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginBottom: 20,
+            }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </div>
+            <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--text)', marginBottom: 8, letterSpacing: '-0.01em' }}>
+              Your pool is empty
             </p>
-            <p style={{ fontSize: 11, color: 'var(--text3)' }}>Supports JPG, PNG, GIF, MOV, MP4</p>
+            <p style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.7, marginBottom: 28, maxWidth: 320 }}>
+              Import photos from your device to start building dumps and generating captions.
+            </p>
+            <button
+              onClick={() => fileRef.current?.click()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                background: 'var(--accent)', border: 'none',
+                borderRadius: 999, padding: '13px 26px',
+                color: '#000', fontSize: 11, fontWeight: 800,
+                letterSpacing: '0.14em', textTransform: 'uppercase',
+                cursor: 'pointer', fontFamily: 'var(--font)',
+                boxShadow: '0 8px 24px var(--accent-dim)',
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+            >
+              <span style={{ fontSize: 14, lineHeight: 1 }}>+</span>
+              Import Photos
+            </button>
+            <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 14 }}>
+              or drag & drop files anywhere above
+            </p>
           </div>
         )}
 
         {/* Photo grid */}
         {allFiltered.length > 0 && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${colCount}, 1fr)`,
-            gap: 8, marginBottom: 16,
-          }}>
+          <div
+            className={`pool-size-${poolSize}`}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${colCount}, 1fr)`,
+              gap: 8, marginBottom: 16,
+            }}
+          >
             {allFiltered.map((photo, idx) => {
               const used = usedIds.has(photo.id);
               const isSelected = selectedIds.has(photo.id);
@@ -337,8 +368,8 @@ export default function PhotoPool() {
                 color: 'var(--text3)', transition: 'all 0.15s',
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)';
-                (e.currentTarget as HTMLDivElement).style.color = 'var(--gold)';
+                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)';
+                (e.currentTarget as HTMLDivElement).style.color = 'var(--accent)';
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)';
@@ -365,11 +396,11 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
     <button
       onClick={onClick}
       style={{
-        flexShrink: 0, padding: '6px 14px', borderRadius: 999, fontSize: 11, fontWeight: 500,
-        letterSpacing: '0.06em', whiteSpace: 'nowrap',
-        border: active ? '1px solid rgba(200,169,110,0.4)' : '1px solid var(--border2)',
-        background: active ? 'var(--gold-dim)' : 'transparent',
-        color: active ? 'var(--gold)' : 'var(--text3)',
+        flexShrink: 0, padding: '6px 16px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+        letterSpacing: '0.04em', whiteSpace: 'nowrap',
+        border: active ? '1px solid var(--accent)' : '1px solid var(--border2)',
+        background: active ? 'var(--accent)' : 'var(--bg2)',
+        color: active ? '#000' : 'var(--text)',
         cursor: 'pointer', transition: 'all 0.15s',
       }}
     >{label}</button>

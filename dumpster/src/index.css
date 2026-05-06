@@ -14,9 +14,14 @@
   --border: #1e1e1e;
   --border2: #2a2a2a;
   --border3: #333;
-  --gold: #C8A96E;
-  --gold-dim: rgba(200, 169, 110, 0.15);
-  --gold-dim2: rgba(200, 169, 110, 0.08);
+  /* accent = user-customisable brand colour (defaults to gold) */
+  --accent: #C8A96E;
+  --accent-dim: rgba(200, 169, 110, 0.15);
+  --accent-dim2: rgba(200, 169, 110, 0.08);
+  /* keep --gold aliases so old references still compile */
+  --gold: var(--accent);
+  --gold-dim: var(--accent-dim);
+  --gold-dim2: var(--accent-dim2);
   --text: #e8e8e8;
   --text2: #999;
   --text3: #555;
@@ -28,6 +33,17 @@
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Pool-size=small: never show the three-dot menu button */
+.pool-size-small .photo-menu-btn,
+.pool-size-small .photo-menu-wrap {
+  display: none !important;
 }
 
 html, body {

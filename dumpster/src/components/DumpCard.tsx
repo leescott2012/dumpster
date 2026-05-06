@@ -64,8 +64,8 @@ export default function DumpCard({ dump, onActivate }: Props) {
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
         <p style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-          color: 'var(--gold)', textTransform: 'uppercase',
+          fontSize: 10, fontWeight: 800, letterSpacing: '0.18em',
+          color: 'var(--accent)', textTransform: 'uppercase',
         }}>
           DUMP {String(dump.num).padStart(2, '0')}
           {dump.vibeBadge === 'mismatch' && (
@@ -87,7 +87,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
       <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 28 }}>
         {dump.photos.length === 0 ? 'No photos yet' : `${dump.photos.length}/20 photos`}
         {dump.photos.length >= 10 && dump.photos.length <= 12 && (
-          <span style={{ marginLeft: 8, color: 'var(--gold)', fontSize: 10, fontWeight: 700 }}>★ PEAK ZONE</span>
+          <span style={{ marginLeft: 8, color: 'var(--accent)', fontSize: 10, fontWeight: 700 }}>★ PEAK ZONE</span>
         )}
       </p>
 
@@ -107,13 +107,95 @@ export default function DumpCard({ dump, onActivate }: Props) {
               />
             ))}
 
-            {/* Add slot — always at the end */}
-            {dump.photos.length < 20 && (
+            {/* ── When dump is empty: show two onboarding cards ── */}
+            {dump.photos.length === 0 && (
+              <>
+                {/* From Pool card */}
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAddingToDump(dump.id);
+                    document.getElementById('photo-pool')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  style={{
+                    flexShrink: 0, width: 175, height: 232,
+                    borderRadius: 12, border: '1.5px solid var(--border2)',
+                    background: 'var(--accent-dim2)',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: 10,
+                    cursor: 'pointer', color: 'var(--accent)', transition: 'all 0.18s',
+                    animation: 'slideDown 0.22s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-dim)';
+                    (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-dim2)';
+                    (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border2)';
+                  }}
+                >
+                  {/* Pool icon */}
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                  <div style={{ textAlign: 'center', padding: '0 10px' }}>
+                    <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>
+                      From Pool
+                    </p>
+                    <p style={{ fontSize: 9, color: 'var(--text3)', lineHeight: 1.5 }}>
+                      Pick from your uploaded photos
+                    </p>
+                  </div>
+                </div>
+
+                {/* From Library card */}
+                <div
+                  onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
+                  style={{
+                    flexShrink: 0, width: 175, height: 232,
+                    borderRadius: 12, border: '1.5px dashed var(--border3)',
+                    background: 'var(--bg2)',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: 10,
+                    cursor: 'pointer', color: 'var(--text3)', transition: 'all 0.18s',
+                    animation: 'slideDown 0.28s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)';
+                    (e.currentTarget as HTMLDivElement).style.color = 'var(--accent)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)';
+                    (e.currentTarget as HTMLDivElement).style.color = 'var(--text3)';
+                  }}
+                >
+                  {/* Upload icon */}
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                    <polyline points="16 16 12 12 8 16"/>
+                    <line x1="12" y1="12" x2="12" y2="21"/>
+                    <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/>
+                  </svg>
+                  <div style={{ textAlign: 'center', padding: '0 10px' }}>
+                    <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>
+                      From Device
+                    </p>
+                    <p style={{ fontSize: 9, color: 'var(--text3)', lineHeight: 1.5 }}>
+                      Upload directly from your device
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* When dump has photos: single compact + slot */}
+            {dump.photos.length > 0 && dump.photos.length < 20 && (
               <div
                 onClick={(e) => {
                   e.stopPropagation();
                   setAddingToDump(dump.id);
-                  // Scroll to pool
                   document.getElementById('photo-pool')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
                 style={{
@@ -126,8 +208,8 @@ export default function DumpCard({ dump, onActivate }: Props) {
                   backdropFilter: 'blur(4px)',
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)';
-                  (e.currentTarget as HTMLDivElement).style.color = 'var(--gold)';
+                  (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)';
+                  (e.currentTarget as HTMLDivElement).style.color = 'var(--accent)';
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)';
@@ -138,7 +220,6 @@ export default function DumpCard({ dump, onActivate }: Props) {
                 <span style={{ fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>
                   Add Photos
                 </span>
-                {/* Show next slot role hint */}
                 {(() => {
                   const nextSlot = getSlotRole(dump.photos.length, Math.max(dump.photos.length + 1, 7));
                   return nextSlot ? (
@@ -149,32 +230,6 @@ export default function DumpCard({ dump, onActivate }: Props) {
                 })()}
               </div>
             )}
-
-            {/* File upload slot */}
-            <div
-              onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
-              style={{
-                flexShrink: 0, width: 175, height: 232,
-                borderRadius: 10, border: '1.5px dashed var(--border3)',
-                background: 'var(--bg2)', display: 'flex',
-                flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 8,
-                cursor: 'pointer', color: 'var(--text3)', transition: 'all 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)';
-                (e.currentTarget as HTMLDivElement).style.color = 'var(--gold)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)';
-                (e.currentTarget as HTMLDivElement).style.color = 'var(--text3)';
-              }}
-            >
-              <span style={{ fontSize: 18, lineHeight: 1 }}>↑</span>
-              <span style={{ fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>
-                Upload
-              </span>
-            </div>
           </div>
         </SortableContext>
       </DndContext>
@@ -184,7 +239,7 @@ export default function DumpCard({ dump, onActivate }: Props) {
         <div style={{
           position: 'absolute', left: 0, top: 0, bottom: 0,
           width: `${fillRatio * 100}%`,
-          background: dump.photos.length >= 10 && dump.photos.length <= 12 ? 'var(--gold)' : 'var(--text3)',
+          background: dump.photos.length >= 10 && dump.photos.length <= 12 ? 'var(--accent)' : 'var(--text3)',
           borderRadius: 1, transition: 'width 0.3s ease',
         }} />
       </div>
@@ -230,8 +285,8 @@ function SmallBtn({ label, onClick, danger }: { label: string; onClick: (e: Reac
         cursor: 'pointer', transition: 'all 0.15s',
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.color = danger ? 'var(--red)' : 'var(--gold)';
-        (e.currentTarget as HTMLButtonElement).style.borderColor = danger ? 'var(--red)' : 'var(--gold)';
+        (e.currentTarget as HTMLButtonElement).style.color = danger ? 'var(--red)' : 'var(--accent)';
+        (e.currentTarget as HTMLButtonElement).style.borderColor = danger ? 'var(--red)' : 'var(--accent)';
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLButtonElement).style.color = danger ? 'var(--red)' : 'var(--text3)';

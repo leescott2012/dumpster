@@ -57,7 +57,7 @@ struct DumpCaptionBubble: View {
                 Text(result.dumpTitle.uppercased())
                     .font(.system(size: 11, weight: .heavy))
                     .tracking(1.5)
-                    .foregroundColor(Theme.gold)
+                    .foregroundColor(appState.accentColor)
                 Spacer()
                 Text(result.vibe)
                     .font(.system(size: 10, weight: .medium))
@@ -102,7 +102,7 @@ struct DumpCaptionBubble: View {
             HStack(alignment: .top, spacing: 10) {
                 Text("\(idx + 1)")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Theme.gold)
+                    .foregroundColor(appState.accentColor)
                     .frame(width: 18, alignment: .leading)
                 Text(text)
                     .font(.system(size: 13))
@@ -112,7 +112,7 @@ struct DumpCaptionBubble: View {
                 if copiedIndex == idx {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 14))
-                        .foregroundColor(Theme.gold)
+                        .foregroundColor(appState.accentColor)
                 } else {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 12))

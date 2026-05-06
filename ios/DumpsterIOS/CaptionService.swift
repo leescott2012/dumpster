@@ -36,7 +36,7 @@ final class CaptionService: ObservableObject {
     // MARK: - Caption Generation (Delegates to LLMService)
 
     func generateCaptions(for request: CaptionRequest) async throws -> CaptionResult {
-        try await LLMService.shared.generateCaptions(for: request)
+        try await LLMService.shared.generateCaption(for: request.dumpTitle, category: request.category)
     }
 
     func generateCaptions(for requests: [CaptionRequest]) async throws -> [CaptionResult] {
@@ -61,7 +61,7 @@ final class CaptionService: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .noAPIKey:
-                return "No API key configured. Add one in the File Cabinet menu."
+                return "No API key configured. Add one in the Main Menu → AI Settings."
             case .encodingFailed:
                 return "Failed to encode the request."
             case .invalidResponse:

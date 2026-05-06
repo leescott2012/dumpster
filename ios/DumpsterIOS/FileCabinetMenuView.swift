@@ -26,6 +26,7 @@ struct FileCabinetMenuView: View {
         case photoPool = 2
         case appearance = 3
         case aboutHelp = 4
+        case socialMedia = 5
 
         var id: Int { rawValue }
 
@@ -36,6 +37,7 @@ struct FileCabinetMenuView: View {
             case .photoPool:  return "PHOTO POOL"
             case .appearance: return "APPEARANCE"
             case .aboutHelp:  return "ABOUT / HELP"
+            case .socialMedia: return "SOCIAL MEDIA"
             }
         }
 
@@ -46,6 +48,7 @@ struct FileCabinetMenuView: View {
             case .photoPool:  return "photo.on.rectangle.angled"
             case .appearance: return "paintbrush"
             case .aboutHelp:  return "questionmark.circle"
+            case .socialMedia: return "person.2.wave.2"
             }
         }
 
@@ -56,6 +59,7 @@ struct FileCabinetMenuView: View {
             case .photoPool:  return Color(hex: "#A0B8C8")
             case .appearance: return Color(hex: "#C8A0C0")
             case .aboutHelp:  return Color(hex: "#C8B8A0")
+            case .socialMedia: return Color(hex: "#C8B0A0")
             }
         }
     }
@@ -99,6 +103,16 @@ struct FileCabinetMenuView: View {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15)) {
                 tabsVisible = true
             }
+            // Deep-link into a specific tab if requested
+            if let rawTab = appState.fileCabinetInitialTab,
+               let tab = CabinetTab(rawValue: rawTab) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        selectedTab = tab
+                    }
+                }
+                appState.fileCabinetInitialTab = nil
+            }
         }
     }
 
@@ -140,7 +154,7 @@ struct FileCabinetMenuView: View {
     private var cabinetHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("FILE CABINET")
+                Text("MAIN MENU")
                     .font(.system(size: 22, weight: .black))
                     .tracking(4)
                     .foregroundColor(.white)
@@ -272,6 +286,8 @@ struct FileCabinetMenuView: View {
             return "Theme & colors"
         case .aboutHelp:
             return "Version 1.0.0"
+        case .socialMedia:
+            return "Connect & export"
         }
     }
 
@@ -295,9 +311,11 @@ struct FileCabinetMenuView: View {
                         case .photoPool:
                             PhotoPoolTabView()
                         case .appearance:
-                            AppearanceTabView()
+                            AppearanceTabView(appState: appState)
                         case .aboutHelp:
-                            AboutHelpTabView(llmService: llmService)
+                            AboutHelpTabView(llmService: llmService, appState: appState, onDismiss: { dismissMenu() })
+                        case .socialMedia:
+                            SocialMediaTabView()
                         }
                     }
                     .padding(.bottom, 60)
@@ -315,19 +333,11 @@ struct FileCabinetMenuView: View {
                     selectedTab = nil
                 }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 12, weight: .bold))
-                    Text("CABINET")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(2)
-                }
-                .foregroundColor(gold)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule().fill(gold.opacity(0.12))
-                )
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(gold)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(gold.opacity(0.12)))
             }
 
             Spacer()
@@ -345,7 +355,7 @@ struct FileCabinetMenuView: View {
             Spacer()
 
             // Invisible spacer for centering
-            Color.clear.frame(width: 90, height: 1)
+            Color.clear.frame(width: 36, height: 1)
         }
         .padding(.horizontal, 20)
         .padding(.top, 64)
@@ -432,11 +442,81 @@ struct AISettingsTabView: View {
     @State private var apiKeyInputs: [LLMService.LLMProvider: String] = [:]
     @State private var keyVisibility: [LLMService.LLMProvider: Bool] = [:]
     @State private var savedConfirmation: LLMService.LLMProvider? = nil
+    @AppStorage("ai_style_profile") private var styleProfile = ""
+    @AppStorage("ai_rules") private var aiRules = ""
 
     private let gold = Color(hex: "#C8A96E")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+
+            // AI Style Profile
+            CabinetSectionHeader("AI STYLE PROFILE", icon: "person.text.rectangle")
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Describe your aesthetic. The AI uses this when generating dumps and captions.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.35))
+                    .lineSpacing(3)
+
+                TextEditor(text: $styleProfile)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 80, maxHeight: 120)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
+
+                Text("\(styleProfile.count)/750")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.2))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
+
+            // AI Rules
+            CabinetSectionHeader("AI RULES", icon: "list.bullet.rectangle")
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Set rules the AI must follow when generating content (e.g. \"never use emojis\", \"always mention location\").")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.35))
+                    .lineSpacing(3)
+
+                TextEditor(text: $aiRules)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 80, maxHeight: 120)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
+
+                Text("\(aiRules.count)/750")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.2))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
 
             // Active Provider Status
             activeProviderBanner
@@ -1037,7 +1117,13 @@ struct MyDumpsTabView: View {
 // MARK: - ═══════════════════════════════════════════
 
 struct PhotoPoolTabView: View {
-    @State private var hujiSensitivity: Double = 0.7
+    @AppStorage("pool_autoAnalyze") private var autoAnalyze = true
+    @AppStorage("pool_preserveExif") private var preserveExif = true
+    @AppStorage("pool_smartThumbnails") private var smartThumbnails = true
+    @StateObject private var llmService = LLMService.shared
+    @AppStorage("custom_labels") private var customLabelsJSON = "[]"
+    @State private var newLabelText = ""
+
     private let gold = Color(hex: "#C8A96E")
 
     var body: some View {
@@ -1047,9 +1133,9 @@ struct PhotoPoolTabView: View {
             CabinetSectionHeader("UPLOAD SETTINGS", icon: "arrow.up.circle")
 
             VStack(alignment: .leading, spacing: 14) {
-                settingToggle(title: "Auto-Analyze on Import", subtitle: "Run Vision AI when photos are added", isOn: true)
-                settingToggle(title: "Preserve EXIF Data", subtitle: "Keep location and camera metadata", isOn: true)
-                settingToggle(title: "Smart Thumbnails", subtitle: "Generate optimized preview images", isOn: true)
+                settingToggle(title: "Auto-Analyze on Import", subtitle: "Run Vision AI when photos are added", isOn: $autoAnalyze)
+                settingToggle(title: "Preserve EXIF Data", subtitle: "Keep location and camera metadata", isOn: $preserveExif)
+                settingToggle(title: "Smart Thumbnails", subtitle: "Generate optimized preview images", isOn: $smartThumbnails)
             }
             .padding(16)
             .background(
@@ -1088,6 +1174,69 @@ struct PhotoPoolTabView: View {
                             )
                     }
                 }
+
+                // Custom labels
+                let customLabels = parseCustomLabels()
+                if !customLabels.isEmpty {
+                    Text("CUSTOM LABELS")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundColor(.white.opacity(0.25))
+                        .padding(.top, 4)
+
+                    FlowLayout(spacing: 8) {
+                        ForEach(customLabels, id: \.self) { label in
+                            HStack(spacing: 4) {
+                                Text(label.uppercased())
+                                    .font(.system(size: 10, weight: .bold))
+                                    .tracking(1)
+                                    .foregroundColor(.white.opacity(0.7))
+                                Button {
+                                    removeCustomLabel(label)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.4))
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule().fill(Color.white.opacity(0.08))
+                            )
+                            .overlay(
+                                Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+
+                // Add new label
+                HStack(spacing: 8) {
+                    TextField("New label...", text: $newLabelText)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white)
+                        .padding(10)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+
+                    Button {
+                        addCustomLabel()
+                    } label: {
+                        Text("Add")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(gold)
+                            .cornerRadius(8)
+                    }
+                    .disabled(newLabelText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
             }
             .padding(16)
             .background(
@@ -1100,24 +1249,31 @@ struct PhotoPoolTabView: View {
             )
             .padding(.horizontal, 24)
 
-            // Huji Detection
-            CabinetSectionHeader("HUJI DETECTION", icon: "camera.filters")
+            // Labeling Sensitivity
+            CabinetSectionHeader("LABELING SENSITIVITY", icon: "slider.horizontal.3")
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("Detection Sensitivity")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
+                    Text("Permissive")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.3))
                     Spacer()
-                    Text(String(format: "%.0f%%", hujiSensitivity * 100))
+                    Text(String(format: "%.0f%%", llmService.labelingSensitivity * 100))
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundColor(gold)
+                    Spacer()
+                    Text("Strict")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.3))
                 }
 
-                Slider(value: $hujiSensitivity, in: 0...1, step: 0.05)
-                    .tint(gold)
+                Slider(value: Binding(
+                    get: { llmService.labelingSensitivity },
+                    set: { llmService.labelingSensitivity = $0 }
+                ), in: 0...1, step: 0.05)
+                .tint(gold)
 
-                Text("Adjusts how aggressively the app detects Huji-style film photos for special grouping.")
+                Text("Controls the confidence threshold for AI photo auto-labeling. Higher values require more confidence before applying a label.")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.25))
                     .lineSpacing(3)
@@ -1135,7 +1291,7 @@ struct PhotoPoolTabView: View {
         }
     }
 
-    private func settingToggle(title: String, subtitle: String, isOn: Bool) -> some View {
+    private func settingToggle(title: String, subtitle: String, isOn: Binding<Bool>) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -1146,16 +1302,38 @@ struct PhotoPoolTabView: View {
                     .foregroundColor(.white.opacity(0.3))
             }
             Spacer()
-            // Static toggle representation (would be @State in production)
-            RoundedRectangle(cornerRadius: 16)
-                .fill(isOn ? gold.opacity(0.3) : Color.white.opacity(0.1))
-                .frame(width: 44, height: 26)
-                .overlay(
-                    Circle()
-                        .fill(isOn ? gold : Color.white.opacity(0.4))
-                        .frame(width: 22, height: 22)
-                        .offset(x: isOn ? 9 : -9)
-                )
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(gold)
+        }
+    }
+
+    private func parseCustomLabels() -> [String] {
+        guard let data = customLabelsJSON.data(using: .utf8),
+              let arr = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return arr
+    }
+
+    private func addCustomLabel() {
+        let trimmed = newLabelText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        var labels = parseCustomLabels()
+        labels.append(trimmed)
+        if let data = try? JSONEncoder().encode(labels),
+           let json = String(data: data, encoding: .utf8) {
+            customLabelsJSON = json
+        }
+        newLabelText = ""
+    }
+
+    private func removeCustomLabel(_ label: String) {
+        var labels = parseCustomLabels()
+        labels.removeAll { $0 == label }
+        if let data = try? JSONEncoder().encode(labels),
+           let json = String(data: data, encoding: .utf8) {
+            customLabelsJSON = json
         }
     }
 }
@@ -1207,10 +1385,21 @@ struct FlowLayout: Layout {
 // MARK: - ═══════════════════════════════════════════
 
 struct AppearanceTabView: View {
-    @State private var selectedTheme: ThemeMode = .dark
-    @State private var selectedAccent: AccentOption = .gold
+    @ObservedObject var appState: AppState
 
     private let gold = Color(hex: "#C8A96E")
+
+    private var selectedTheme: ThemeMode {
+        switch appState.colorMode {
+        case .day:    return .light
+        case .dark:   return .dark
+        case .system: return .system
+        }
+    }
+
+    private var selectedAccent: AccentOption {
+        AccentOption(rawValue: appState.accentColorName.capitalized) ?? .gold
+    }
 
     enum ThemeMode: String, CaseIterable, Identifiable {
         case light = "Light"
@@ -1260,7 +1449,11 @@ struct AppearanceTabView: View {
                 ForEach(ThemeMode.allCases) { mode in
                     let isSelected = selectedTheme == mode
                     Button {
-                        selectedTheme = mode
+                        switch mode {
+                        case .light:  appState.colorMode = .day
+                        case .dark:   appState.colorMode = .dark
+                        case .system: appState.colorMode = .system
+                        }
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         VStack(spacing: 10) {
@@ -1327,7 +1520,7 @@ struct AppearanceTabView: View {
                     ForEach(AccentOption.allCases) { accent in
                         let isSelected = selectedAccent == accent
                         Button {
-                            selectedAccent = accent
+                            appState.accentColorName = accent.rawValue.lowercased()
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
                             VStack(spacing: 8) {
@@ -1410,6 +1603,8 @@ extension LinearGradient {
 
 struct AboutHelpTabView: View {
     @ObservedObject var llmService: LLMService
+    @ObservedObject var appState: AppState
+    var onDismiss: () -> Void = {}
 
     private let gold = Color(hex: "#C8A96E")
 
@@ -1551,6 +1746,41 @@ struct AboutHelpTabView: View {
             .padding(.horizontal, 24)
             .padding(.top, 24)
 
+            // Replay Tutorial
+            CabinetSectionHeader("TUTORIAL", icon: "graduationcap")
+
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                appState.showOnboarding = true
+                onDismiss()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "play.circle")
+                        .font(.system(size: 14))
+                        .foregroundColor(gold.opacity(0.6))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Replay Tutorial")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white.opacity(0.7))
+                        Text("Walk through the onboarding guide again")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.3))
+                    }
+                    Spacer()
+                }
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.03))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+
             // Cache
             CabinetSectionHeader("STORAGE", icon: "internaldrive")
 
@@ -1627,5 +1857,257 @@ struct AboutHelpTabView: View {
                         .stroke(Color.white.opacity(0.06), lineWidth: 1)
                 )
         )
+    }
+}
+
+// MARK: - ═══════════════════════════════════════════
+// MARK: Tab 6 — Social Media
+// MARK: - ═══════════════════════════════════════════
+
+struct SocialMediaTabView: View {
+    @AppStorage("apify_api_key") private var apifyKey = ""
+    @AppStorage("instagram_handle") private var instagramHandle = ""
+    @AppStorage("tiktok_handle") private var tiktokHandle = ""
+    @State private var showApifyKey = false
+
+    private let gold = Color(hex: "#C8A96E")
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+
+            // Apify Connection
+            CabinetSectionHeader("APIFY CONNECTION", icon: "link")
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Connect to Apify to enable social media scraping and data import.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.35))
+                    .lineSpacing(3)
+
+                HStack(spacing: 10) {
+                    Group {
+                        if showApifyKey {
+                            TextField("apify_api_...", text: $apifyKey)
+                        } else {
+                            SecureField("apify_api_...", text: $apifyKey)
+                        }
+                    }
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding(12)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+
+                    Button {
+                        showApifyKey.toggle()
+                    } label: {
+                        Image(systemName: showApifyKey ? "eye.slash" : "eye")
+                            .font(.system(size: 13))
+                            .foregroundColor(.white.opacity(0.4))
+                            .frame(width: 40, height: 40)
+                            .background(Color.white.opacity(0.05))
+                            .cornerRadius(10)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(apifyKey.isEmpty ? Color.orange : Color.green)
+                        .frame(width: 6, height: 6)
+                    Text(apifyKey.isEmpty ? "Not connected" : "Connected")
+                        .font(.system(size: 11))
+                        .foregroundColor(apifyKey.isEmpty ? .white.opacity(0.3) : .green.opacity(0.7))
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
+
+            // Instagram
+            CabinetSectionHeader("INSTAGRAM", icon: "camera")
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Text("@")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(gold.opacity(0.6))
+                    TextField("your_handle", text: $instagramHandle)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white)
+                        .padding(12)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                }
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.system(size: 13))
+                        Text("Scrape My Data")
+                            .font(.system(size: 12, weight: .bold))
+                        Spacer()
+                        Text("PREMIUM")
+                            .font(.system(size: 8, weight: .heavy))
+                            .tracking(1.5)
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(gold))
+                    }
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(gold.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(gold.opacity(0.2), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
+
+            // TikTok
+            CabinetSectionHeader("TIKTOK", icon: "play.rectangle")
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Text("@")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(gold.opacity(0.6))
+                    TextField("your_handle", text: $tiktokHandle)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white)
+                        .padding(12)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                }
+
+                HStack(spacing: 8) {
+                    Text("PREMIUM")
+                        .font(.system(size: 8, weight: .heavy))
+                        .tracking(1.5)
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(gold))
+                    Text("TikTok scraping requires a premium subscription")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.3))
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
+
+            // Smart Export
+            CabinetSectionHeader("SMART EXPORT", icon: "square.and.arrow.up")
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Export your dump to the camera roll with AI-generated captions copied to your clipboard, ready to paste into Instagram.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.35))
+                    .lineSpacing(3)
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Export to Camera Roll + Copy Caption")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(gold)
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
+
+            // Direct Post
+            CabinetSectionHeader("DIRECT POST", icon: "paperplane")
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Post directly to Instagram without background music. This uses the Instagram Graph API and requires a connected business account.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.35))
+                    .lineSpacing(3)
+
+                HStack(spacing: 8) {
+                    Text("PREMIUM")
+                        .font(.system(size: 8, weight: .heavy))
+                        .tracking(1.5)
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(gold))
+                    Text("Coming soon")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.3))
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
+        }
     }
 }

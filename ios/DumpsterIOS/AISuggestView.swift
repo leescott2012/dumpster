@@ -45,6 +45,7 @@ struct AISuggestView: View {
     @ObservedObject var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Query private var existingDumps: [PhotoDump]
+    @Query(sort: \AITasteExample.createdAt, order: .reverse) private var tasteExamples: [AITasteExample]
 
     @State private var phase: Phase = .picker
     @State private var selectedItems: [PhotosPickerItem] = []
@@ -54,6 +55,7 @@ struct AISuggestView: View {
     @State private var progress: Double = 0.0
     @State private var statusMessage: String = ""
     @State private var isCreating = false
+    @State private var maxPhotosPerDump: Int = 10
 
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
@@ -170,7 +172,83 @@ struct AISuggestView: View {
                     .lineSpacing(5)
             }
 
+            if !llmService.hasAnyAPIKey {
+                VStack(spacing: 10) {
+                    Image(systemName: "key.fill")
+                        .font(.system(size: 22, weight: .light))
+                        .foregroundColor(gold.opacity(0.6))
+                    Text("No API Key Configured")
+                        .font(.system(size: 13, weight: .bold))
+                        .tracking(1)
+                        .foregroundColor(.white.opacity(0.5))
+                    Text("AI will use local logic to cluster your photos.\nAdd an API key in Settings for smarter results.")
+                        .font(.system(size: 12))
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.white.opacity(0.3))
+                        .lineSpacing(4)
+                    Button("Add API Key") {
+                        isPresented = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            appState.showSettings = true
+                        }
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundColor(gold)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                    .overlay(Capsule().strokeBorder(gold.opacity(0.5), lineWidth: 1))
+                }
+                .padding(.horizontal, 32)
+                .padding(.vertical, 8)
+            }
+
             if !isAnalyzing {
+                // Photos per dump stepper
+                VStack(spacing: 8) {
+                    Text("PHOTOS PER DUMP")
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(2)
+                        .foregroundColor(.white.opacity(0.35))
+
+                    HStack(spacing: 20) {
+                        Button {
+                            if maxPhotosPerDump > 5 { maxPhotosPerDump -= 1 }
+                        } label: {
+                            Image(systemName: "minus")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(maxPhotosPerDump > 5 ? .white : .white.opacity(0.2))
+                                .frame(width: 40, height: 40)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(Circle())
+                        }
+                        .disabled(maxPhotosPerDump <= 5)
+
+                        Text("\(maxPhotosPerDump)")
+                            .font(.system(size: 36, weight: .bold, design: .monospaced))
+                            .foregroundColor(gold)
+                            .frame(width: 64)
+
+                        Button {
+                            if maxPhotosPerDump < 20 { maxPhotosPerDump += 1 }
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(maxPhotosPerDump < 20 ? .white : .white.opacity(0.2))
+                                .frame(width: 40, height: 40)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(Circle())
+                        }
+                        .disabled(maxPhotosPerDump >= 20)
+                    }
+
+                    // Peak zone hint
+                    Text(maxPhotosPerDump >= 10 && maxPhotosPerDump <= 12 ? "✦ Peak zone" : "Peak: 10–12")
+                        .font(.system(size: 11))
+                        .foregroundColor(maxPhotosPerDump >= 10 && maxPhotosPerDump <= 12 ? gold : .white.opacity(0.25))
+                }
+                .padding(.horizontal, 32)
+
                 PhotosPicker(
                     selection: $selectedItems,
                     maxSelectionCount: 100,
@@ -312,16 +390,18 @@ struct AISuggestView: View {
                 lock.unlock()
 
                 PhotoAnalyzer.analyze(images: safeLoaded) { result in
-                    self.clusters = result
-                    self.selectedClusters = Set(result.indices)
-                    self.isAnalyzing = false
-                    self.appState.isAnalyzing = false
-                    self.appState.showStatus("Found \(result.count) dumps", duration: 3)
-                    self.statusMessage = ""
-                    withAnimation { self.phase = .results }
+                    Task { @MainActor in
+                        self.clusters = result
+                        self.selectedClusters = Set(result.indices)
+                        self.isAnalyzing = false
+                        self.appState.isAnalyzing = false
+                        self.appState.showStatus("Found \(result.count) dumps", duration: 3)
+                        self.statusMessage = ""
+                        withAnimation { self.phase = .results }
 
-                    // Trigger caption generation using LLMService
-                    self.generateCaptionsForClusters(result)
+                        // Trigger caption generation using LLMService
+                        self.generateCaptionsForClusters(result)
+                    }
                 }
             }
         }
@@ -343,9 +423,10 @@ struct AISuggestView: View {
             // Use the best available LLM provider
             let providerName = llmService.preferredProvider()?.displayName ?? "AI"
             appState.showStatus("Generating captions via \(providerName)...", duration: 30)
+            let tasteBlock = AITasteExample.promptBlock(from: Array(tasteExamples.prefix(10)))
             Task {
                 do {
-                    let results = try await llmService.generateCaptions(for: requests)
+                    let results = try await llmService.generateCaptions(for: requests, tasteBlock: tasteBlock)
                     await MainActor.run {
                         appState.captionResults = results
                         appState.showStatus("Captions ready", duration: 3)
@@ -400,7 +481,7 @@ struct AISuggestView: View {
                 )
                 modelContext.insert(dp)
                 photoIDs.append(dp.id)
-                if photoIDs.count >= 20 { break }
+                if photoIDs.count >= maxPhotosPerDump { break }
             }
 
             // 2. Create the PhotoDump record.
@@ -418,6 +499,7 @@ struct AISuggestView: View {
                 photoIDs: photoIDs,
                 vibeBadge: vibe,
                 liked: false,
+                isAIGenerated: true,
                 titleApproved: nil
             )
             modelContext.insert(dump)

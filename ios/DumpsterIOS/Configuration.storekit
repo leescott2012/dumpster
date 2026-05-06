@@ -1,0 +1,112 @@
+{
+  "identifier" : "DUMPSTER_IAP",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "C1001",
+      "localizations" : [
+        { "description" : "50 AI credits", "displayName" : "50 Credits", "locale" : "en_US" }
+      ],
+      "productID" : "com.dumpster.credits.50",
+      "referenceName" : "50 Credits",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "C1002",
+      "localizations" : [
+        { "description" : "200 AI credits", "displayName" : "200 Credits", "locale" : "en_US" }
+      ],
+      "productID" : "com.dumpster.credits.200",
+      "referenceName" : "200 Credits",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "C1003",
+      "localizations" : [
+        { "description" : "500 AI credits", "displayName" : "500 Credits", "locale" : "en_US" }
+      ],
+      "productID" : "com.dumpster.credits.500",
+      "referenceName" : "500 Credits",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_compatibilityTimeRate" : 0,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21500001",
+      "localizations" : [
+        { "description" : "DUMPSTER Pro", "displayName" : "DUMPSTER Pro", "locale" : "en_US" }
+      ],
+      "name" : "DUMPSTER Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "S1001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            { "description" : "Unlimited AI weekly", "displayName" : "Pro Weekly", "locale" : "en_US" }
+          ],
+          "productID" : "com.dumpster.pro.weekly",
+          "recurringSubscriptionPeriod" : "P1W",
+          "referenceName" : "Pro Weekly",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "S1002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            { "description" : "Unlimited AI monthly", "displayName" : "Pro Monthly", "locale" : "en_US" }
+          ],
+          "productID" : "com.dumpster.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "29.99",
+          "familyShareable" : false,
+          "groupNumber" : 3,
+          "internalID" : "S1003",
+          "introductoryOffer" : {
+            "internalID" : "S1003-TRIAL",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            { "description" : "Unlimited AI yearly — best value", "displayName" : "Pro Yearly", "locale" : "en_US" }
+          ],
+          "productID" : "com.dumpster.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Yearly",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : { "major" : 3, "minor" : 0 }
+}

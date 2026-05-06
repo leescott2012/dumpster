@@ -12,6 +12,7 @@ final class PhotoDump {
     var photoIDs: [String]        // Ordered. Cap at 20 photos per Instagram carousel limit.
     var vibeBadge: String?        // nil or "mismatch"
     var liked: Bool
+    var isAIGenerated: Bool       // true = created by AUTO-GENERATE
     var titleApproved: Bool?      // true = kept, false = rejected, nil = untouched
     var createdAt: Date
 
@@ -22,6 +23,7 @@ final class PhotoDump {
         photoIDs: [String] = [],
         vibeBadge: String? = nil,
         liked: Bool = false,
+        isAIGenerated: Bool = false,
         titleApproved: Bool? = nil
     ) {
         self.id = id
@@ -30,6 +32,7 @@ final class PhotoDump {
         self.photoIDs = photoIDs
         self.vibeBadge = vibeBadge
         self.liked = liked
+        self.isAIGenerated = isAIGenerated
         self.titleApproved = titleApproved
         self.createdAt = Date()
     }

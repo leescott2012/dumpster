@@ -3,7 +3,6 @@ import SwiftUI
 // MARK: - App State (Observable)
 
 /// Centralized app state shared across native views.
-/// Phase 6: removed all WKWebView / JS-bridge fields.
 @MainActor
 final class AppState: ObservableObject {
 
@@ -11,6 +10,7 @@ final class AppState: ObservableObject {
     @Published var showAISuggest = false
     @Published var showSettings = false
     @Published var showFileCabinet = false
+    @Published var fileCabinetInitialTab: Int? = nil
 
     // ── Dynamic Island ──
     @Published var statusText: String = "DUMPSTER"
@@ -20,11 +20,16 @@ final class AppState: ObservableObject {
     // ── AI results ──
     @Published var captionResults: [LLMService.CaptionResult] = []
 
-    // ── Native UI state (used by views built in Phases 4–6) ──
+    // ── Onboarding ──
+    @Published var showOnboarding: Bool = false
+
+    // ── Native UI state ──
     @Published var activeDumpId: String?
+    // ColorMode is defined in Models/AppEnums.swift (cases: dark, day, system)
     @Published var colorMode: ColorMode = .dark {
         didSet { UserDefaults.standard.set(colorMode.rawValue, forKey: "dumpster_colorMode") }
     }
+    // PoolSize is defined in Models/AppEnums.swift (cases: small, medium, large)
     @Published var poolSize: PoolSize = .medium {
         didSet { UserDefaults.standard.set(poolSize.rawValue, forKey: "dumpster_poolSize") }
     }
@@ -33,6 +38,25 @@ final class AppState: ObservableObject {
     @Published var lightboxPhotoId: String?
     @Published var addingToDumpId: String?
     @Published var activePoolTab: PoolTab = .photos
+
+    // ── Accent color ──
+    @Published var accentColorName: String = "gold" {
+        didSet { UserDefaults.standard.set(accentColorName, forKey: "dumpster_accentColor") }
+    }
+
+    var accentColor: Color {
+        switch accentColorName {
+        case "silver":   return Color(hex: "#B0B0B0")
+        case "rose":     return Color(hex: "#C8787E")
+        case "emerald":  return Color(hex: "#6EC8A0")
+        case "sapphire": return Color(hex: "#6E8EC8")
+        case "lavender": return Color(hex: "#A06EC8")
+        default:         return Color(hex: "#C8A96E") // gold
+        }
+    }
+
+    // ── Pool scroll trigger ──
+    @Published var scrollToPool: UUID? = nil
 
     // MARK: - Init
 
@@ -45,12 +69,13 @@ final class AppState: ObservableObject {
            let size = PoolSize(rawValue: ps) {
             poolSize = size
         }
+        if let ac = UserDefaults.standard.string(forKey: "dumpster_accentColor") {
+            accentColorName = ac
+        }
     }
 
     // MARK: - Status helper
 
-    /// Show a transient status in the Dynamic Island, then revert to "DUMPSTER".
-    /// If a newer status comes in before the timer fires, the older revert is skipped.
     func showStatus(_ text: String, duration: TimeInterval = 3.0) {
         statusText = text
         let captured = text
@@ -59,7 +84,6 @@ final class AppState: ObservableObject {
             if self.statusText == captured { self.statusText = "DUMPSTER" }
         }
     }
-
 }
 
 // MARK: - Root View
@@ -68,29 +92,17 @@ struct ContentView: View {
     @StateObject private var appState = AppState()
     @StateObject private var undoManager = DumpsterUndoManager()
 
-    // Dynamic Island state — collapsed by default, auto-expands at launch
     @State private var isExpanded = false
-
-    // Haptic Feedback
+    @AppStorage("dumpster_onboardingDone") private var onboardingDone = false
     private let impact = UIImpactFeedbackGenerator(style: .medium)
 
     var body: some View {
         ZStack(alignment: .top) {
-            // 1. NATIVE CONTENT (replaces DumpsterWebView)
             MainAppView()
                 .environmentObject(appState)
                 .environmentObject(undoManager)
 
-            // 2. THE DYNAMIC ISLAND
-            // — Sits OVER the app but UNDER the iOS system status bar (time/battery)
-            // — Blank black capsule when collapsed (blends with hardware DI cutout)
-            // — Expands to full status-bar width 5s after launch for 3s,
-            //   acting as a separator so system fonts don't clash with app content
             dynamicIslandView
-                // When collapsed: nudge down 11pt to sit on the hardware DI cutout.
-                // When expanded: start at y=0 so the black bar covers the full status
-                // bar area (time sits on the left, battery on the right, both render
-                // above this layer — system UI is always on top of SwiftUI views).
                 .padding(.top, isExpanded ? 0 : 11)
                 .ignoresSafeArea(.all)
                 .animation(.spring(response: 0.55, dampingFraction: 0.82), value: isExpanded)
@@ -107,12 +119,6 @@ struct ContentView: View {
                     }
                 }
 
-            // 3. AI DUMP BUILDER — full-screen photo picker + clustering
-            // showAISuggest is toggled by the AUTO-GENERATE button in MainAppView.
-            // AISuggestView handles its own PhotosPicker; API key is optional
-            // (falls back to local caption generation automatically).
-
-            // 4. FILE CABINET MENU (Full Screen Overlay)
             if appState.showFileCabinet {
                 FileCabinetMenuView(
                     isPresented: $appState.showFileCabinet,
@@ -122,22 +128,22 @@ struct ContentView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
 
-            // 5. LIGHTBOX (full-screen photo overlay — Phase 5)
             if appState.lightboxPhotoId != nil {
                 LightboxView()
                     .environmentObject(appState)
                     .zIndex(30)
             }
+
+            if appState.showOnboarding {
+                SpotlightTutorialView(isPresented: $appState.showOnboarding)
+                    .zIndex(40)
+                    .transition(.opacity)
+            }
         }
         .background(Color.black)
         .onAppear {
-            // Expand DI 2s after launch across the full status bar for 5s, then collapse
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) { isExpanded = true }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 7) {
-                withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) { isExpanded = false }
-            }
+            isExpanded = true
+            if !onboardingDone { appState.showOnboarding = true }
         }
         .fullScreenCover(isPresented: $appState.showSettings) {
             SettingsView(isPresented: $appState.showSettings)
@@ -145,336 +151,18 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $appState.showAISuggest) {
             AISuggestView(isPresented: $appState.showAISuggest, appState: appState)
         }
-        // Default state: collapsed black pill that blends with the hardware Dynamic Island.
-        // Tap to expand with status + credit badge + menu.
+        .onChange(of: appState.showOnboarding) { _, showing in
+            if !showing { onboardingDone = true }
+        }
     }
 
-    // MARK: - Dynamic Island
-    //
-    // Blank black capsule. Collapsed = 126×37 (matches hardware DI cutout).
-    // Expanded = full screen width × 54pt — spans from the time label to the
-    // battery icon, providing a clean black backdrop behind the system status
-    // bar so the white system fonts don't clash with app content underneath.
-    // No text or interactive content inside — the system UI renders on top.
-
     private var dynamicIslandView: some View {
-        // Use explicit numeric values so SwiftUI can animate between them
         let screenW = UIScreen.main.bounds.width
         let pillW: CGFloat = isExpanded ? screenW : 126
         let pillH: CGFloat = isExpanded ? 54 : 37
-
         return Capsule()
             .fill(Color.black)
             .frame(width: pillW, height: pillH)
-    }
-}
-
-// MARK: - File Cabinet Menu Component (AI Suggestions — Connected to Real Data)
-
-struct CabinetMenuView: View {
-    @Binding var isPresented: Bool
-    @ObservedObject var appState: AppState
-    @ObservedObject private var llmService = LLMService.shared
-    @State private var dragOffset: CGFloat = 0
-    @State private var selectedCaptionIndex: [String: Int] = [:]
-    @State private var copiedCaption: String?
-
-    private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
-
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            // Dimmed backdrop
-            Color.black.opacity(dragOffset > 0 ? 0.4 - (dragOffset / 1000) : 0.4)
-                .ignoresSafeArea(.all)
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        isPresented = false
-                    }
-                }
-
-            // Background shadow card
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(Color(white: 0.15))
-                .frame(height: 700)
-                .offset(y: 60 + (dragOffset * 0.5))
-                .scaleEffect(0.92)
-                .shadow(radius: 10)
-
-            // Main content card
-            VStack(spacing: 0) {
-                // Drag handle
-                Capsule()
-                    .fill(Color.white.opacity(0.2))
-                    .frame(width: 40, height: 5)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-
-                // Header
-                HStack {
-                    Text("AI SUGGESTIONS")
-                        .font(.system(size: 13, weight: .black))
-                        .tracking(2)
-                        .foregroundColor(gold)
-                    Spacer()
-
-                    // Show active provider
-                    if let provider = llmService.activeProvider {
-                        HStack(spacing: 4) {
-                            Image(systemName: provider.iconName)
-                                .font(.system(size: 10))
-                            Text(provider.displayName)
-                                .font(.system(size: 9, weight: .bold))
-                                .tracking(1)
-                        }
-                        .foregroundColor(gold.opacity(0.5))
-                    }
-
-                    if llmService.isGenerating {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: gold))
-                            .scaleEffect(0.7)
-                    } else {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 16)
-
-                Divider().background(Color.white.opacity(0.1))
-
-                // Content
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        if appState.captionResults.isEmpty && !llmService.isGenerating {
-                            emptyStateView
-                        } else if llmService.isGenerating {
-                            generatingView
-                        } else {
-                            captionResultsView
-                        }
-                    }
-                    .padding(24)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 750)
-            .background(Color(hex: "#121212"))
-            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-            .offset(y: dragOffset)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        if value.translation.height > 0 {
-                            dragOffset = value.translation.height
-                        }
-                    }
-                    .onEnded { value in
-                        if value.translation.height > 150 || value.velocity.height > 500 {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                isPresented = false
-                            }
-                        } else {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                dragOffset = 0
-                            }
-                        }
-                    }
-            )
-        }
-        .ignoresSafeArea(.all, edges: .bottom)
-    }
-
-    // MARK: - Empty State
-
-    private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "text.bubble")
-                .font(.system(size: 36, weight: .light))
-                .foregroundColor(gold.opacity(0.4))
-                .padding(.top, 40)
-
-            Text("No captions yet")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundColor(.white.opacity(0.6))
-
-            Text("Use the AI Builder to select photos.\nVision AI will group them and generate captions.")
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.3))
-                .multilineTextAlignment(.center)
-                .lineSpacing(5)
-                .padding(.horizontal, 16)
-
-            if !llmService.hasAnyAPIKey {
-                HStack(spacing: 8) {
-                    Image(systemName: "key")
-                        .font(.system(size: 12))
-                        .foregroundColor(.yellow.opacity(0.7))
-                    Text("Add an API key in the File Cabinet menu for AI captions")
-                        .font(.system(size: 12))
-                        .foregroundColor(.yellow.opacity(0.6))
-                }
-                .padding(12)
-                .background(Color.yellow.opacity(0.06))
-                .cornerRadius(10)
-                .padding(.top, 8)
-            } else if let provider = llmService.preferredProvider() {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
-                    Text("\(provider.displayName) ready")
-                        .font(.system(size: 12))
-                        .foregroundColor(.green.opacity(0.6))
-                }
-                .padding(12)
-                .background(Color.green.opacity(0.06))
-                .cornerRadius(10)
-                .padding(.top, 8)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Generating State
-
-    private var generatingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: gold))
-                .scaleEffect(1.2)
-                .padding(.top, 40)
-
-            Text("Generating captions...")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-
-            if let provider = llmService.activeProvider {
-                Text("Using \(provider.displayName) to craft the perfect captions")
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.3))
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Caption Results
-
-    private var captionResultsView: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            ForEach(appState.captionResults) { result in
-                captionCard(for: result)
-            }
-        }
-    }
-
-    private func captionCard(for result: LLMService.CaptionResult) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            captionCardHeader(result: result)
-            captionCardOptions(result: result)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.03))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    private func captionCardHeader(result: LLMService.CaptionResult) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(result.dumpTitle)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(.white)
-                Text(result.vibe.uppercased())
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(2)
-                    .foregroundColor(gold.opacity(0.6))
-            }
-            Spacer()
-            Image(systemName: "sparkles")
-                .font(.system(size: 12))
-                .foregroundColor(gold.opacity(0.4))
-        }
-    }
-
-    private func captionCardOptions(result: LLMService.CaptionResult) -> some View {
-        ForEach(Array(result.captions.enumerated()), id: \.offset) { index, caption in
-            CaptionOptionButton(
-                caption: caption,
-                isSelected: selectedCaptionIndex[result.dumpTitle] == index,
-                isCopied: copiedCaption == caption,
-                gold: gold,
-                onTap: {
-                    selectedCaptionIndex[result.dumpTitle] = index
-                    UIPasteboard.general.string = caption
-                    copiedCaption = caption
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        if copiedCaption == caption { copiedCaption = nil }
-                    }
-                }
-            )
-        }
-    }
-}
-
-// MARK: - Caption Option Button (Extracted to fix compiler type-check)
-
-struct CaptionOptionButton: View {
-    let caption: String
-    let isSelected: Bool
-    let isCopied: Bool
-    let gold: Color
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                captionText
-                Spacer()
-                statusIcon
-            }
-            .padding(14)
-            .background(backgroundShape)
-            .overlay(borderShape)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var captionText: some View {
-        Text(caption)
-            .font(.system(size: 14))
-            .foregroundColor(isSelected ? .white : .white.opacity(0.6))
-            .multilineTextAlignment(.leading)
-            .lineSpacing(3)
-    }
-
-    @ViewBuilder
-    private var statusIcon: some View {
-        if isCopied {
-            Image(systemName: "checkmark")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.green)
-        } else {
-            Image(systemName: "doc.on.doc")
-                .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.2))
-        }
-    }
-
-    private var backgroundShape: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(isSelected ? gold.opacity(0.1) : Color.white.opacity(0.04))
-    }
-
-    private var borderShape: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .stroke(isSelected ? gold.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
     }
 }
 
@@ -487,10 +175,14 @@ extension Color {
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
         switch hex.count {
-        case 3:  (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:  (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:  (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default: (a, r, g, b) = (255, 1, 1, 0)
+        case 3:
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6:
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8:
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
         }
         self.init(
             .sRGB,

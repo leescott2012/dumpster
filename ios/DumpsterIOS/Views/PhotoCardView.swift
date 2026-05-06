@@ -1,11 +1,11 @@
 import SwiftUI
 import SwiftData
+import Photos
 
 /// Reusable photo tile used by both the pool grid and dump carousels.
 ///
 /// Visual states (mutually compatible):
 ///   • default      — image fills, rounded corners
-///   • starred      — gold star badge top-left (both contexts)
 ///   • selected     — green border + green tint (add-to-dump mode)
 ///   • used (pool)  — 40% black overlay + checkmark badge
 ///   • dragging     — gold border + 1.05 scale (dump context only)
@@ -27,16 +27,19 @@ struct PhotoCardView: View {
     var slotIndex: Int? = nil
     var totalInDump: Int? = nil
     var size: CGSize = CGSize(width: 160, height: 200)
+    var showDotsButton: Bool = true
 
     var onTap: (() -> Void)? = nil
     var onDoubleTap: (() -> Void)? = nil
     var onRemoveFromDump: (() -> Void)? = nil
-    var onToggleStar: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
     var onOpenLightbox: (() -> Void)? = nil
+    var onSaveToPhotos: (() -> Void)? = nil
+    var onCrop: (() -> Void)? = nil
 
     @EnvironmentObject var appState: AppState
     @State private var showMenu = false
+    @State private var showPhotoMenu = false
     @State private var isDragging = false
 
     private var isDumpContext: Bool {
@@ -66,21 +69,18 @@ struct PhotoCardView: View {
             if appState.addingToDumpId != nil && !isDumpContext {
                 onTap?()
             } else {
-                showMenu = true
+                appState.lightboxPhotoId = photo.id
             }
         }
-        .confirmationDialog(photo.filename, isPresented: $showMenu, titleVisibility: .hidden) {
-            Button(photo.starred ? "Unfavorite" : "Favorite") { onToggleStar?() }
-            Button("Open Lightbox") {
-                if let onOpenLightbox { onOpenLightbox() }
-                else { appState.lightboxPhotoId = photo.id }
-            }
-            if isDumpContext {
-                Button("Remove from Dump", role: .destructive) { onRemoveFromDump?() }
-            } else {
-                Button("Delete Photo", role: .destructive) { onDelete?() }
-            }
-            Button("Cancel", role: .cancel) {}
+        .sheet(isPresented: $showPhotoMenu) {
+            PhotoMenuSheet(
+                photo: photo,
+                isDumpContext: isDumpContext,
+                onLightbox: { appState.lightboxPhotoId = photo.id },
+                onCrop: { onCrop?() },
+                onSaveToPhotos: { if let cb = onSaveToPhotos { cb() } else { saveToPhotoLibrary() } },
+                onRemove: { isDumpContext ? onRemoveFromDump?() : onDelete?() }
+            )
         }
     }
 
@@ -160,19 +160,27 @@ struct PhotoCardView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                         .padding(7)
                 }
-                if photo.starred {
-                    Image(systemName: "star.fill")
-                        .foregroundColor(Theme.starBadge)
-                        .font(.system(size: 11))
-                        .padding(5)
-                        .background(Color.black.opacity(0.5))
-                        .clipShape(Circle())
-                        .padding(6)
-                }
                 Spacer()
+                // "..." dots button — top-right corner
+                if showDotsButton {
+                    Button { showPhotoMenu = true } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 24, height: 24)
+                            .background(Color.black.opacity(0.55))
+                            .clipShape(Circle())
+                    }
+                    .padding(6)
+                }
             }
             Spacer()
         }
+    }
+
+    private func saveToPhotoLibrary() {
+        guard let img = PhotoStorageManager.shared.loadImage(relativePath: photo.localPath) else { return }
+        UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
     }
 
     @ViewBuilder
@@ -180,7 +188,7 @@ struct PhotoCardView: View {
         let cornerRadius: CGFloat = 10
         if isDragging {
             RoundedRectangle(cornerRadius: cornerRadius)
-                .strokeBorder(Theme.gold, lineWidth: 2)
+                .strokeBorder(appState.accentColor, lineWidth: 2)
         } else if isSelected {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .strokeBorder(Color.green, lineWidth: 2)

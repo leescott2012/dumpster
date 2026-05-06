@@ -23,7 +23,7 @@ enum PoolSize: String, CaseIterable {
 }
 
 enum FilterType: String, CaseIterable, Identifiable {
-    case all, starred, huji, used, videos
+    case all, huji, used, videos
     var id: String { rawValue }
 }
 

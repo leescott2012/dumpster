@@ -99,7 +99,7 @@ final class CreditManager: ObservableObject {
             // Sort by price ascending
             products = fetched.sorted { $0.price < $1.price }
         } catch {
-            print("[CreditManager] Failed to fetch products: \(error)")
+            CrashReporter.shared.capture(error, tags: ["op": "credits_fetch_products"])
         }
     }
 

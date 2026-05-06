@@ -52,11 +52,10 @@ struct PoolFilterMenu: View {
 
     private func label(for filter: FilterType) -> String {
         switch filter {
-        case .all:     return "All"
-        case .starred: return "Starred"
-        case .huji:    return "Huji"
-        case .used:    return "Used"
-        case .videos:  return "Videos"
+        case .all:    return "All"
+        case .huji:   return "Huji"
+        case .used:   return "Used"
+        case .videos: return "Videos"
         }
     }
 }

@@ -42,7 +42,6 @@ enum DebugSeeder {
                 labels: ["sample", p.category.lowercased()],
                 isHuji: idx == 1
             )
-            if idx == 0 { dp.starred = true }
             context.insert(dp)
             if idx < 5 { dumpPhotoIDs.append(dp.id) }
             else       { poolOnlyIDs.append(dp.id) }

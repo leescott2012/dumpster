@@ -20,33 +20,46 @@ struct MainAppView: View {
 
     @Query(sort: \PhotoDump.num, order: .reverse) private var dumps: [PhotoDump]
     @Query private var allPhotos: [DumpPhoto]
+    @Query(sort: \AITasteExample.createdAt, order: .reverse) private var tasteExamples: [AITasteExample]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                // Reserve space for the Dynamic Island pill at the top
-                Color.clear.frame(height: 50)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    // Reserve space for the Dynamic Island pill at the top
+                    Color.clear.frame(height: 50)
 
-                hero
-                statsBar
-                undoBar
-                dumpsSection
-                newDumpButton
-                poolTabSwitcher
-                poolContent
-                Color.clear.frame(height: 80) // bottom safe area
+                    hero
+                    statsBar
+                    if undoManager.canUndo || undoManager.canRedo {
+                        undoBar
+                    }
+                    dumpsSection
+                    newDumpButton
+                    poolTabSwitcher
+                        .id("poolTop")
+                    poolContent
+                    Color.clear.frame(height: 80)
+                }
+            }
+            .background(Theme.bg(appState.colorMode, cs).ignoresSafeArea())
+            .preferredColorScheme(appState.colorMode == .day ? .light :
+                                  appState.colorMode == .dark ? .dark : nil)
+            .onAppear {
+                appState.dumpCount = dumps.count
+                #if DEBUG
+                DebugSeeder.seedIfEmpty(context: modelContext)
+                #endif
+            }
+            .onChange(of: dumps.count) { _, new in appState.dumpCount = new }
+            .onChange(of: appState.scrollToPool) { _, trigger in
+                guard trigger != nil else { return }
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    proxy.scrollTo("poolTop", anchor: .top)
+                }
+                appState.scrollToPool = nil
             }
         }
-        .background(Theme.bg(appState.colorMode, cs).ignoresSafeArea())
-        .preferredColorScheme(appState.colorMode == .day ? .light :
-                              appState.colorMode == .dark ? .dark : nil)
-        .onAppear {
-            appState.dumpCount = dumps.count
-            #if DEBUG
-            DebugSeeder.seedIfEmpty(context: modelContext)
-            #endif
-        }
-        .onChange(of: dumps.count) { _, new in appState.dumpCount = new }
     }
 
     // MARK: - Header
@@ -83,17 +96,12 @@ struct MainAppView: View {
                         .foregroundColor(Theme.text(appState.colorMode, cs))
                     Text("Dumps")
                         .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(Theme.gold)
+                        .foregroundColor(appState.accentColor)
                 }
                 .tracking(-0.6)
                 Spacer(minLength: 8)
-                HStack(spacing: 6) {
-                    iconButton("line.3.horizontal") {
-                        appState.showFileCabinet = true
-                    }
-                    iconButton("gearshape") {
-                        appState.showSettings = true
-                    }
+                iconButton("line.3.horizontal") {
+                    appState.showFileCabinet = true
                 }
                 .padding(.top, 6)
             }
@@ -142,7 +150,7 @@ struct MainAppView: View {
         HStack(spacing: 5) {
             Text("\(value)")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Theme.gold)
+                .foregroundColor(appState.accentColor)
             Text(label)
                 .font(.system(size: 13))
                 .foregroundColor(Theme.text2(appState.colorMode, cs))
@@ -233,8 +241,9 @@ struct MainAppView: View {
     private var dumpsSection: some View {
         LazyVStack(spacing: 14) {
             ForEach(dumps) { dump in
-                DumpCardView(dump: dump, isActive: dump.id == appState.activeDumpId)
+                DumpCardView(dump: dump, isActive: dump.id == appState.activeDumpId, allPhotos: allPhotos, tasteExamples: tasteExamples)
                     .onTapGesture { appState.activeDumpId = dump.id }
+                    .id(dump.id) // FIX: Stabilize view identity for LazyVStack reuse
             }
         }
     }
@@ -255,9 +264,9 @@ struct MainAppView: View {
                 .foregroundColor(.black)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .background(Theme.gold)
+                .background(appState.accentColor)
                 .clipShape(Capsule())
-                .shadow(color: Theme.gold.opacity(0.3), radius: 8, x: 0, y: 3)
+                .shadow(color: appState.accentColor.opacity(0.3), radius: 8, x: 0, y: 3)
             }
 
             Button(action: createNewDump) {
@@ -268,10 +277,12 @@ struct MainAppView: View {
                         .font(.system(size: 11, weight: .heavy))
                         .tracking(1.4)
                 }
-                .foregroundColor(Theme.gold)
+                .foregroundColor(appState.accentColor)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .overlay(Capsule().strokeBorder(Theme.gold, lineWidth: 1.2))
+                .background(Color.black.opacity(0.001)) // ensure full capsule is hit-testable
+                .overlay(Capsule().strokeBorder(appState.accentColor, lineWidth: 1.2))
+                .contentShape(Capsule())
             }
         }
         .padding(.horizontal, 20)
@@ -280,10 +291,14 @@ struct MainAppView: View {
     private func createNewDump() {
         undoManager.pushSnapshot(photos: allPhotos, dumps: dumps)
         let nextNum = (dumps.map { $0.num }.max() ?? 0) + 1
-        let dump = PhotoDump(num: nextNum, title: "New Dump", photoIDs: [])
+        let dump = PhotoDump(num: nextNum, title: "New Dump", photoIDs: [], isAIGenerated: false)
         modelContext.insert(dump)
         try? modelContext.save()
         appState.activeDumpId = dump.id
+        // Enter pool selection mode and scroll down so user can pick photos
+        appState.addingToDumpId = dump.id
+        appState.activePoolTab = .photos
+        appState.scrollToPool = UUID()
     }
 
     // MARK: - Pool tab switcher
@@ -302,12 +317,12 @@ struct MainAppView: View {
         return Text(label.uppercased())
             .font(.system(size: 10, weight: .heavy))
             .tracking(2.0)
-            .foregroundColor(isSel ? Theme.gold : Theme.text3(appState.colorMode, cs))
+            .foregroundColor(isSel ? appState.accentColor : Theme.text3(appState.colorMode, cs))
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .overlay(
                 Rectangle()
-                    .fill(isSel ? Theme.gold : Color.clear)
+                    .fill(isSel ? appState.accentColor : Color.clear)
                     .frame(height: 1.5)
                     .offset(y: 14)
             )
@@ -319,8 +334,9 @@ struct MainAppView: View {
     @ViewBuilder
     private var poolContent: some View {
         switch appState.activePoolTab {
-        case .photos:   PhotoPoolView()
+        case .photos:   PhotoPoolView(allPhotos: allPhotos, allDumps: dumps)
         case .captions: CaptionPoolView()
         }
     }
 }
+

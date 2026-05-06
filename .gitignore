@@ -11,5 +11,10 @@ dist/
 **/xcuserdata/
 **/*.xcuserstate
 **/build/
+**/build-device/
 **/DerivedData/
 **/.build/
+**/.swiftpm/
+
+# Generated source bundle
+dumpster-source.txt

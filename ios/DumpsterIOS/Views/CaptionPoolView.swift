@@ -75,7 +75,7 @@ struct CaptionPoolView: View {
             Text("CAPTION POOL")
                 .font(.system(size: 11, weight: .heavy))
                 .tracking(2.0)
-                .foregroundColor(Theme.gold)
+                .foregroundColor(appState.accentColor)
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -92,7 +92,7 @@ struct CaptionPoolView: View {
                         .foregroundColor(isSel ? .black : Theme.text(appState.colorMode, cs))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(isSel ? Theme.gold : Theme.bg2(appState.colorMode, cs))
+                        .background(isSel ? appState.accentColor : Theme.bg2(appState.colorMode, cs))
                         .clipShape(Capsule())
                         .onTapGesture { selectedStyle = style.key }
                 }
@@ -112,7 +112,7 @@ struct CaptionPoolView: View {
                 .foregroundColor(.black)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(Theme.gold)
+                .background(appState.accentColor)
                 .clipShape(Capsule())
             }
             Spacer()
@@ -150,7 +150,7 @@ struct CaptionPoolView: View {
             } label: {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 24))
-                    .foregroundColor(Theme.gold)
+                    .foregroundColor(appState.accentColor)
             }
         }
         .padding(.horizontal, 12)
@@ -162,12 +162,12 @@ struct CaptionPoolView: View {
                 let isSel = tab == captionTab
                 Text(tab.rawValue.capitalized)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(isSel ? Theme.gold : Theme.text2(appState.colorMode, cs))
+                    .foregroundColor(isSel ? appState.accentColor : Theme.text2(appState.colorMode, cs))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .overlay(
                         Rectangle()
-                            .fill(isSel ? Theme.gold : Color.clear)
+                            .fill(isSel ? appState.accentColor : Color.clear)
                             .frame(height: 1.5)
                             .offset(y: 10)
                     )
@@ -214,7 +214,7 @@ struct CaptionPoolView: View {
                 Spacer()
                 actionButton("doc.on.doc") { UIPasteboard.general.string = cap.text }
                 actionButton(cap.favorited ? "hand.thumbsup.fill" : "hand.thumbsup",
-                             tint: cap.favorited ? Theme.gold : nil) {
+                             tint: cap.favorited ? appState.accentColor : nil) {
                     cap.favorited.toggle()
                     if cap.favorited { cap.banned = false }
                     try? modelContext.save()

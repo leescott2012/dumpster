@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import PhotosUI
 
 // MARK: - Drop delegate for reordering photos within a dump
 
@@ -36,18 +37,16 @@ struct DumpPhotoDropDelegate: DropDelegate {
 
 // MARK: - DumpCardView
 
-/// A single PhotoDump rendered as a card with header, horizontal photo carousel,
-/// progress bar footer, and action buttons (like, share, delete, generate captions).
 struct DumpCardView: View {
 
     let dump: PhotoDump
     let isActive: Bool
+    let allPhotos: [DumpPhoto]
+    let tasteExamples: [AITasteExample]
 
     @EnvironmentObject var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var cs
-
-    @Query private var allPhotos: [DumpPhoto]
 
     @State private var editingTitle = false
     @State private var titleDraft = ""
@@ -55,11 +54,10 @@ struct DumpCardView: View {
     @State private var captionResult: LLMService.CaptionResult?
     @State private var isGenerating = false
     @State private var captionError: String?
-
-    /// For drag-to-reorder within the carousel
+    @State private var showDumpMenu = false
     @State private var draggingPhotoId: String? = nil
+    @State private var dumpPickerItems: [PhotosPickerItem] = []
 
-    /// Resolve the dump's photo IDs in order.
     private var photos: [DumpPhoto] {
         let byID = Dictionary(uniqueKeysWithValues: allPhotos.map { ($0.id, $0) })
         return dump.photoIDs.compactMap { byID[$0] }
@@ -79,11 +77,22 @@ struct DumpCardView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(
-                    isActive ? Theme.gold : Theme.border(appState.colorMode, cs),
+                    isActive ? appState.accentColor : Theme.border(appState.colorMode, cs),
                     lineWidth: isActive ? 2 : 1
                 )
         )
         .padding(.horizontal, 12)
+        .sheet(isPresented: $showDumpMenu) {
+            DumpMenuSheet(
+                dump: dump,
+                isGenerating: isGenerating,
+                photosEmpty: photos.isEmpty,
+                onCaptions: { Task { await generateCaptions() } },
+                onShare: shareDump,
+                onDelete: { showDeleteConfirm = true },
+                onHeart: { recordTasteExample(positive: true) }
+            )
+        }
         .confirmationDialog("Delete this dump?", isPresented: $showDeleteConfirm) {
             Button("Delete Dump", role: .destructive) { deleteDump() }
             Button("Cancel", role: .cancel) {}
@@ -109,12 +118,11 @@ struct DumpCardView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Row 1: small "DUMP 01" tracked label  |  action icons
             HStack(spacing: 8) {
                 Text("DUMP \(String(format: "%02d", dump.num))")
                     .font(.system(size: 10, weight: .heavy))
                     .tracking(2.0)
-                    .foregroundColor(Theme.gold)
+                    .foregroundColor(appState.accentColor)
 
                 if dump.vibeBadge == "mismatch" {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -122,22 +130,29 @@ struct DumpCardView: View {
                         .foregroundColor(.yellow)
                 }
 
+                if dump.isAIGenerated {
+                    Text("AI")
+                        .font(.system(size: 8, weight: .black))
+                        .tracking(1.0)
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(appState.accentColor)
+                        .clipShape(Capsule())
+                }
+
                 Spacer()
 
-                iconButton(symbol: dump.liked ? "heart.fill" : "heart",
-                           tint: dump.liked ? .red : nil) {
-                    dump.liked.toggle()
-                    try? modelContext.save()
+                Button { showDumpMenu = true } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Theme.text2(appState.colorMode, cs))
+                        .frame(width: 28, height: 28)
+                        .background(Theme.bg2(appState.colorMode, cs))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
-                iconButton(symbol: "sparkles", tint: isGenerating ? Theme.text3(appState.colorMode, cs) : Theme.gold) {
-                    Task { await generateCaptions() }
-                }
-                .disabled(isGenerating || photos.isEmpty)
-                iconButton(symbol: "square.and.arrow.up") { shareDump() }
-                iconButton(symbol: "trash", tint: Theme.removeText) { showDeleteConfirm = true }
             }
 
-            // Row 2: BIG title on its own line
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 titleView
                 if dump.titleApproved == nil {
@@ -181,9 +196,9 @@ struct DumpCardView: View {
             } label: {
                 Image(systemName: "checkmark")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Theme.gold)
+                    .foregroundColor(appState.accentColor)
                     .frame(width: 20, height: 20)
-                    .background(Theme.goldDim)
+                    .background(appState.accentColor.opacity(0.15))
                     .clipShape(Circle())
             }
             Button {
@@ -198,17 +213,6 @@ struct DumpCardView: View {
                     .background(Theme.bg2(appState.colorMode, cs))
                     .clipShape(Circle())
             }
-        }
-    }
-
-    private func iconButton(symbol: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13))
-                .foregroundColor(tint ?? Theme.text2(appState.colorMode, cs))
-                .frame(width: 28, height: 28)
-                .background(Theme.bg2(appState.colorMode, cs))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
         }
     }
 
@@ -263,10 +267,8 @@ struct DumpCardView: View {
                         slotIndex: index,
                         totalInDump: photos.count,
                         size: CGSize(width: 145, height: 195),
-                        onRemoveFromDump: { removePhoto(photo) },
-                        onToggleStar: { photo.starred.toggle(); try? modelContext.save() }
+                        onRemoveFromDump: { removePhoto(photo) }
                     )
-                    // Drag to reorder
                     .onDrag {
                         draggingPhotoId = photo.id
                         return NSItemProvider(object: photo.id as NSString)
@@ -292,10 +294,12 @@ struct DumpCardView: View {
     }
 
     private var addPhotosCard: some View {
-        Button {
-            appState.addingToDumpId = dump.id
-            appState.activePoolTab = .photos
-        } label: {
+        PhotosPicker(
+            selection: $dumpPickerItems,
+            maxSelectionCount: 20,
+            selectionBehavior: .ordered,
+            matching: .images
+        ) {
             VStack(spacing: 6) {
                 Image(systemName: "plus")
                     .font(.system(size: 22, weight: .semibold))
@@ -312,9 +316,13 @@ struct DumpCardView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
+        .onChange(of: dumpPickerItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task { await importPickedItems(items) }
+        }
     }
 
-    // MARK: - Progress
+    // MARK: - Progress bar
 
     private var progressBar: some View {
         let count = photos.count
@@ -325,7 +333,7 @@ struct DumpCardView: View {
                     .fill(Theme.bg3(appState.colorMode, cs))
                     .frame(height: 3)
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(isPeak ? Theme.gold : Color.white.opacity(0.4))
+                    .fill(isPeak ? appState.accentColor : Color.white.opacity(0.4))
                     .frame(width: geo.size.width * min(1.0, CGFloat(count) / 20.0), height: 3)
             }
         }
@@ -347,8 +355,13 @@ struct DumpCardView: View {
                     .foregroundColor(.black)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
-                    .background(Theme.gold)
+                    .background(appState.accentColor)
                     .cornerRadius(3)
+            }
+            if dump.liked {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(.red.opacity(0.8))
             }
             Spacer()
             if let err = captionError {
@@ -357,7 +370,7 @@ struct DumpCardView: View {
                     .foregroundColor(Theme.removeText)
                     .lineLimit(1)
             } else if isGenerating {
-                ProgressView().scaleEffect(0.7).tint(Theme.gold)
+                ProgressView().scaleEffect(0.7).tint(appState.accentColor)
             }
         }
         .padding(.horizontal, 14)
@@ -400,19 +413,48 @@ struct DumpCardView: View {
             .map { $0.category.uppercased() }
             .reduce(into: [String: Int]()) { acc, c in acc[c, default: 0] += 1 }
             .max { $0.value < $1.value }?.key ?? "LIFESTYLE"
-        let labels = Array(Set(photos.flatMap { $0.labels })).prefix(20).map { $0 }
 
-        let req = LLMService.CaptionRequest(
-            dumpTitle: dump.title,
-            category: topCategory,
-            labels: labels,
-            photoCount: photos.count
-        )
+        let taste = AITasteExample.promptBlock(from: tasteExamples)
+
         do {
-            let result = try await LLMService.shared.generateCaptions(for: req)
+            let result = try await LLMService.shared.generateCaption(
+                for: dump.title,
+                category: topCategory,
+                tasteBlock: taste
+            )
             withAnimation(.spring()) { captionResult = result }
         } catch {
             captionError = error.localizedDescription
+            CrashReporter.shared.capture(error, tags: ["op": "caption_generate", "dumpId": dump.id])
         }
+    }
+
+    /// Record this dump as a taste signal (positive = loved, negative = disliked).
+    @MainActor
+    private func importPickedItems(_ items: [PhotosPickerItem]) async {
+        var newPhotoIDs: [String] = []
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data) else { continue }
+            let filename = UUID().uuidString + ".jpg"
+            let localPath = PhotoStorageManager.shared.saveImage(uiImage, filename: filename)
+            let photo = DumpPhoto(localPath: localPath, filename: filename)
+            modelContext.insert(photo)
+            newPhotoIDs.append(photo.id)
+        }
+        if !newPhotoIDs.isEmpty {
+            dump.photoIDs.append(contentsOf: newPhotoIDs)
+            try? modelContext.save()
+        }
+        dumpPickerItems.removeAll()
+    }
+
+    private func recordTasteExample(positive: Bool) {
+        let example = AITasteExample.from(dump: dump, photos: photos, isPositive: positive)
+        modelContext.insert(example)
+        if positive {
+            dump.liked = true
+        }
+        try? modelContext.save()
     }
 }

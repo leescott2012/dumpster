@@ -45,7 +45,7 @@ struct SettingsView: View {
                             .font(.system(size: 17, weight: .bold))
                             .foregroundColor(.white)
 
-                        Text("All settings are now in the File Cabinet menu.\nLong-press the Dynamic Island or tap the menu icon to open it.")
+                        Text("All settings are now in the Main Menu.\nLong-press the Dynamic Island or tap the menu icon to open it.")
                             .font(.system(size: 14))
                             .foregroundColor(.white.opacity(0.4))
                             .multilineTextAlignment(.center)
@@ -74,7 +74,7 @@ struct SettingsView: View {
                     sectionHeader("QUICK API KEY SETUP")
 
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Quickly add an OpenAI API key. For more providers, use the File Cabinet menu.")
+                        Text("Quickly add an OpenAI API key. For more providers, use the Main Menu → AI Settings.")
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.4))
                             .lineSpacing(4)

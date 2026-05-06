@@ -50,7 +50,7 @@ struct LightboxView: View {
                         Text(photo.category.uppercased())
                             .font(.system(size: 11, weight: .bold))
                             .tracking(1.0)
-                            .foregroundColor(Theme.gold)
+                            .foregroundColor(appState.accentColor)
                         Text(photo.filename)
                             .font(.system(size: 11))
                             .foregroundColor(.white.opacity(0.4))
@@ -64,11 +64,6 @@ struct LightboxView: View {
                                 .padding(.vertical, 2)
                                 .background(Color.red.opacity(0.18))
                                 .cornerRadius(4)
-                        }
-                        if photo.starred {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 11))
-                                .foregroundColor(Theme.gold)
                         }
                     }
                     .padding(.top, 14)

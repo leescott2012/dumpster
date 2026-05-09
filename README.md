@@ -1,73 +1,47 @@
-# React + TypeScript + Vite
+# DUMPSTER
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**DUMPSTER** is a high-end photo curation and sequencing platform designed to help creators build the perfect Instagram "dump." By combining aesthetic heuristics with advanced AI, Dumpster transforms a chaotic photo library into a curated narrative.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Executive Summary
 
-## React Compiler
+In the era of the "photo dump," the challenge isn't taking photos—it's selecting and sequencing them. Dumpster uses a proprietary **Dump Formula** to score and arrange photos based on visual contrast, category mix, and narrative flow. Whether you're a professional creator or a casual user, Dumpster provides the tools to build carousels that feel intentional and high-end.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## ✨ Core Features
 
-## Expanding the ESLint configuration
+### 🧠 AI-Powered Curation
+- **Intelligent Clustering**: Automatically groups photos from your library into suggested "dumps" using Apple Vision and custom clustering algorithms.
+- **Automated Sequencing**: Uses the "Dump Formula" to arrange photos into a 7 or 12-slot carousel, ensuring a perfect mix of "hooks," "details," and "atmosphere."
+- **Multi-Provider Captions**: Generates professional, on-brand captions using Anthropic Claude, OpenAI, and other LLM providers.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 📱 Dual-Platform Architecture
+- **Native iOS App**: A high-performance SwiftUI implementation leveraging SwiftData for local persistence and Apple Vision for on-device image analysis.
+- **Web Application**: A modern React + Vite + TypeScript web app for rapid curation and cross-platform accessibility.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 🛠 Professional Workflow
+- **Vibe Check**: Real-time analysis of color temperature and category consistency across your dump.
+- **Undo/Redo System**: A robust, snapshot-based state management system for non-destructive editing.
+- **Custom Heuristics**: Fine-tune the arrangement logic to match your personal aesthetic.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🛠 Tech Stack
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### iOS (Native)
+- **Framework**: SwiftUI
+- **Persistence**: SwiftData
+- **AI/ML**: Apple Vision (Image Classification & Clustering)
+- **Networking**: Multi-provider LLM integration (OpenAI, Claude, Gemini, etc.)
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Web
+- **Framework**: React 19 + Vite
+- **State Management**: Zustand
+- **Styling**: Modern CSS with native-feel design tokens
+- **Drag & Drop**: @dnd-kit
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🗺 Roadmap
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+The project is currently undergoing a **Native Conversion**, migrating the core web UI into a 100% native SwiftUI experience to leverage deeper iOS integrations and improved performance. See `docs/NATIVE_CONVERSION_SPEC.pdf` for the full technical specification.
+
+---
+
+*Built for the next generation of digital storytellers.*

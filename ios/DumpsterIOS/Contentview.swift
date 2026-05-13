@@ -193,3 +193,89 @@ extension Color {
         )
     }
 }
+
+// MARK: - Slidable Segmented Control
+
+/// A custom slidable segmented control for the Dumpster app.
+/// Supports real-time finger tracking and snapping on release.
+struct SlidableSegmentedControl: View {
+    @Binding var selectedOption: String
+    let options: [String]
+    let selectionColor: Color
+    let unselectionColor: Color
+    let textColor: Color
+
+    @State private var buttonWidth: CGFloat = 0
+    @State private var currentOffset: CGFloat = 0
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging: Bool = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Background Track
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(unselectionColor)
+                    .frame(height: 40)
+
+                // The Pill (Real-time tracking)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(selectionColor)
+                    .frame(width: buttonWidth - 4, height: 36)
+                    .offset(x: currentOffset + dragOffset + 2)
+                    // This ensures 1:1 tracking during drag, and spring snapping on release
+                    .animation(isDragging ? .interactiveSpring(response: 0.15, dampingFraction: 0.86) : .interactiveSpring(response: 0.3, dampingFraction: 0.7), value: currentOffset + dragOffset)
+
+                // Labels
+                HStack(spacing: 0) {
+                    ForEach(options, id: \.self) { option in
+                        Text(option)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(textColor.opacity(selectedOption == option ? 1.0 : 0.4))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.7)) {
+                                    selectedOption = option
+                                    updateOffset()
+                                }
+                            }
+                    }
+                }
+            }
+            .frame(height: 40)
+            .onAppear {
+                buttonWidth = geometry.size.width / CGFloat(options.count)
+                updateOffset()
+            }
+            // THE FIX: Use highPriorityGesture to override parent ScrollViews/Lists
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        isDragging = true
+                        dragOffset = value.translation.width
+                    }
+                    .onEnded { value in
+                        isDragging = false
+                        let totalOffset = currentOffset + value.translation.width
+                        let targetIndex = Int(round(totalOffset / buttonWidth))
+                        let clampedIndex = min(max(targetIndex, 0), options.count - 1)
+                        
+                        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedOption = options[clampedIndex]
+                            dragOffset = 0
+                            updateOffset()
+                        }
+                    }
+            )
+        }
+        .frame(height: 40)
+        .onChange(of: selectedOption) { _ in updateOffset() }
+    }
+
+    private func updateOffset() {
+        if let index = options.firstIndex(of: selectedOption) {
+            currentOffset = CGFloat(index) * buttonWidth
+        }
+    }
+}

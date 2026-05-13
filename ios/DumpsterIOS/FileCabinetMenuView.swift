@@ -451,6 +451,9 @@ struct AISettingsTabView: View {
     @AppStorage("ai_style_profile") private var styleProfile = ""
     @AppStorage("ai_rules") private var aiRules = ""
 
+    @State private var showScrubSheet = false
+    @State private var showScrubPaywall = false
+
     private let gold = Color(hex: "#C8A96E")
 
     var body: some View {
@@ -474,10 +477,34 @@ struct AISettingsTabView: View {
                     .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
 
-                Text("\(styleProfile.count)/750")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.2))
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                HStack(spacing: 8) {
+                    Button {
+                        if SubscriptionManager.shared.isPro {
+                            showScrubSheet = true
+                        } else {
+                            showScrubPaywall = true
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: SubscriptionManager.shared.isPro ? "sparkles" : "lock.fill")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Generate from Instagram")
+                                .font(.system(size: 11, weight: .heavy))
+                                .tracking(0.8)
+                        }
+                        .foregroundColor(gold)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .overlay(Capsule().strokeBorder(gold.opacity(0.45), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    Text("\(styleProfile.count)/750")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.2))
+                }
             }
             .padding(16)
             .background(
@@ -489,6 +516,13 @@ struct AISettingsTabView: View {
                     )
             )
             .padding(.horizontal, 24)
+            .sheet(isPresented: $showScrubSheet) {
+                ScrubInstagramSheet(currentProfile: $styleProfile)
+                    .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showScrubPaywall) {
+                PaywallView().presentationDetents([.large])
+            }
 
             // AI Rules
             CabinetSectionHeader("AI RULES", icon: "list.bullet.rectangle")

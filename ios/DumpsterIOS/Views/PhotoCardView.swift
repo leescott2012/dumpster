@@ -161,8 +161,8 @@ struct PhotoCardView: View {
                         .padding(7)
                 }
                 Spacer()
-                // "..." dots button — top-right corner
-                if showDotsButton && appState.poolSize != .small {
+                // "..." dots button — dump context only, not in pool
+                if showDotsButton && isDumpContext {
                     Button { showPhotoMenu = true } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 11, weight: .bold))

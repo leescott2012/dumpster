@@ -252,7 +252,7 @@ struct PhotoPoolView: View {
         HStack {
             Text("\(selectedPhotoIDs.count) photos selected")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.black)
+                .foregroundColor(Theme.text(appState.colorMode, cs))
             Spacer()
             Button {
                 addSelectedPhotosToDump()
@@ -260,16 +260,16 @@ struct PhotoPoolView: View {
                 Text("ADD TO DUMP")
                     .font(.system(size: 11, weight: .heavy))
                     .tracking(1.4)
-                    .foregroundColor(.black)
+                    .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
-                    .background(appState.accentColor)
+                    .background(Color.green)
                     .clipShape(Capsule())
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(appState.accentColor.opacity(0.15))
+        .background(Color.green.opacity(0.15))
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.horizontal, 14)
     }
@@ -279,6 +279,13 @@ struct PhotoPoolView: View {
         if let dump = allDumps.first(where: { $0.id == dumpId }) {
             dump.photoIDs.append(contentsOf: Array(selectedPhotoIDs))
             try? modelContext.save()
+            // Peak zone reached?
+            let newCount = dump.photoIDs.count
+            if newCount >= 10 && newCount <= 12 {
+                HapticManager.shared.playSuccess()
+            } else {
+                HapticManager.shared.playAdded()
+            }
             appState.addingToDumpId = nil
             selectedPhotoIDs.removeAll()
         }
@@ -353,6 +360,7 @@ struct PhotoPoolView: View {
                     onTap: {
                         // Selection mode: toggle; otherwise PhotoCardView opens lightbox itself
                         if appState.addingToDumpId != nil {
+                            HapticManager.shared.playTick()
                             if selectedPhotoIDs.contains(photo.id) {
                                 selectedPhotoIDs.remove(photo.id)
                             } else {
@@ -362,6 +370,7 @@ struct PhotoPoolView: View {
                     },
                     onRemoveFromDump: nil,
                     onDelete: {
+                        HapticManager.shared.playRemove()
                         modelContext.delete(photo)
                         try? modelContext.save()
                     }

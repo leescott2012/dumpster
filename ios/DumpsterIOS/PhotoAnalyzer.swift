@@ -84,7 +84,7 @@ class PhotoAnalyzer {
 
     // MARK: - Analyze
 
-    static func analyze(images: [(UIImage, URL)], completion: @escaping ([PhotoCluster]) -> Void) {
+    static func analyze(images: [(UIImage, URL)], limit: Int = 5, completion: @escaping ([PhotoCluster]) -> Void) {
         DispatchQueue.global(qos: .utility).async {
             var analyzed: [AnalyzedPhoto] = []
             let group = DispatchGroup()
@@ -119,9 +119,9 @@ class PhotoAnalyzer {
                 return PhotoCluster(title: title, category: category, photos: photos)
             }
 
-            // Sort by photo count (largest clusters first), limit to 5 clusters / 20 photos each
+            // Sort by photo count (largest clusters first), limit to requested clusters / 20 photos each
             result.sort { $0.photos.count > $1.photos.count }
-            result = result.prefix(5).map { cluster in
+            result = result.prefix(limit).map { cluster in
                 PhotoCluster(
                     title: cluster.title,
                     category: cluster.category,
@@ -228,3 +228,4 @@ class PhotoAnalyzer {
         }
     }
 }
+

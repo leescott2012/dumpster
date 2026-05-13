@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import PhotosUI
 import ImageIO
 
 // MARK: - AI Suggest Button (Floating Overlay)
@@ -45,10 +44,10 @@ struct AISuggestView: View {
     @ObservedObject var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Query private var existingDumps: [PhotoDump]
+    @Query private var allPhotos: [DumpPhoto]
     @Query(sort: \AITasteExample.createdAt, order: .reverse) private var tasteExamples: [AITasteExample]
 
     @State private var phase: Phase = .picker
-    @State private var selectedItems: [PhotosPickerItem] = []
     @State private var isAnalyzing = false
     @State private var clusters: [PhotoCluster] = []
     @State private var selectedClusters: Set<Int> = []
@@ -56,12 +55,30 @@ struct AISuggestView: View {
     @State private var statusMessage: String = ""
     @State private var isCreating = false
     @State private var maxPhotosPerDump: Int = 10
+    @State private var requestedDumpCount: Int = 3
+    // Maps AnalyzedPhoto.filename → existing DumpPhoto.id (pool source)
+    @State private var poolPhotoMap: [String: String] = [:]
 
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
     private let llmService = LLMService.shared
 
     enum Phase { case picker, results }
+
+    /// Pool photos = photos not assigned to any dump.
+    private var availablePhotos: [DumpPhoto] {
+        let usedIDs = Set(existingDumps.flatMap { $0.photoIDs })
+        return allPhotos.filter { !usedIDs.contains($0.id) }
+    }
+
+    /// Upper bound for the stepper (pool size, capped at 20).
+    private var stepperMax: Int {
+        min(20, availablePhotos.count)
+    }
+
+    private var dumpCountMax: Int {
+        3
+    }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -77,7 +94,6 @@ struct AISuggestView: View {
 
                     Spacer()
 
-                    // Show active provider indicator
                     if let provider = llmService.preferredProvider() {
                         HStack(spacing: 4) {
                             Circle()
@@ -151,6 +167,15 @@ struct AISuggestView: View {
         .preferredColorScheme(.dark)
     }
 
+    /// Kick off full-pool analysis automatically — no user picking.
+    private func startAutoAnalyze() {
+        guard !availablePhotos.isEmpty else { return }
+        isAnalyzing = true
+        appState.isAnalyzing = true
+        appState.showStatus("Analyzing photos...", duration: 60)
+        loadAndAnalyzeFromPool(photos: availablePhotos)
+    }
+
     // MARK: - Picker Phase
 
     private var pickerPhase: some View {
@@ -165,7 +190,7 @@ struct AISuggestView: View {
                     .font(.system(size: 18, weight: .black))
                     .tracking(4)
                     .foregroundColor(.white)
-                Text("Pick your photos and Vision AI will\ngroup them into perfect dumps.")
+                Text("Vision AI will analyze your pool and\nbuild dumps automatically.")
                     .font(.system(size: 15))
                     .multilineTextAlignment(.center)
                     .foregroundColor(.white.opacity(0.4))
@@ -204,73 +229,90 @@ struct AISuggestView: View {
             }
 
             if !isAnalyzing {
-                // Photos per dump stepper
+                // Number of dumps stepper
                 VStack(spacing: 8) {
-                    Text("PHOTOS PER DUMP")
+                    Text("HOW MANY DUMPS?")
                         .font(.system(size: 10, weight: .heavy))
                         .tracking(2)
                         .foregroundColor(.white.opacity(0.35))
 
                     HStack(spacing: 20) {
                         Button {
-                            if maxPhotosPerDump > 1 { maxPhotosPerDump -= 1 }
+                            if requestedDumpCount > 1 { requestedDumpCount -= 1 }
                         } label: {
                             Image(systemName: "minus")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(maxPhotosPerDump > 1 ? .white : .white.opacity(0.2))
+                                .foregroundColor(requestedDumpCount > 1 ? .white : .white.opacity(0.2))
                                 .frame(width: 40, height: 40)
                                 .background(Color.white.opacity(0.08))
                                 .clipShape(Circle())
                         }
-                        .disabled(maxPhotosPerDump <= 1)
+                        .disabled(requestedDumpCount <= 1)
 
-                        Text("\(maxPhotosPerDump)")
+                        Text("\(requestedDumpCount)")
                             .font(.system(size: 36, weight: .bold, design: .monospaced))
                             .foregroundColor(gold)
                             .frame(width: 64)
 
                         Button {
-                            if maxPhotosPerDump < 20 { maxPhotosPerDump += 1 }
+                            if requestedDumpCount < dumpCountMax { requestedDumpCount += 1 }
                         } label: {
                             Image(systemName: "plus")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(maxPhotosPerDump < 20 ? .white : .white.opacity(0.2))
+                                .foregroundColor(requestedDumpCount < dumpCountMax ? .white : .white.opacity(0.2))
                                 .frame(width: 40, height: 40)
                                 .background(Color.white.opacity(0.08))
                                 .clipShape(Circle())
                         }
-                        .disabled(maxPhotosPerDump >= 20)
+                        .disabled(requestedDumpCount >= dumpCountMax)
                     }
 
-                    // Peak zone hint
-                    Text(maxPhotosPerDump >= 10 && maxPhotosPerDump <= 12 ? "✦ Peak zone" : "Peak: 10–12")
-                        .font(.system(size: 11))
-                        .foregroundColor(maxPhotosPerDump >= 10 && maxPhotosPerDump <= 12 ? gold : .white.opacity(0.25))
+                    // Pool size hint
+                    VStack(spacing: 4) {
+                        Text("\(availablePhotos.count) photo\(availablePhotos.count == 1 ? "" : "s") in pool")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.25))
+                        Text("Max 3 dumps")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.25))
+                    }
                 }
                 .padding(.horizontal, 32)
 
-                PhotosPicker(
-                    selection: $selectedItems,
-                    maxSelectionCount: 100,
-                    matching: .images
-                ) {
-                    Text("SELECT PHOTOS")
-                        .font(.system(size: 13, weight: .bold))
-                        .tracking(3)
+                if availablePhotos.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 28, weight: .light))
+                            .foregroundColor(.white.opacity(0.2))
+                        Text("No photos in pool")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white.opacity(0.3))
+                        Text("Add photos to your pool first,\nthen use AI Builder to organize them.")
+                            .font(.system(size: 12))
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.white.opacity(0.2))
+                            .lineSpacing(4)
+                    }
+                    .padding(.horizontal, 32)
+                } else {
+                    Button {
+                        haptic.impactOccurred()
+                        startAutoAnalyze()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("AUTO-GENERATE \(availablePhotos.count) PHOTO\(availablePhotos.count == 1 ? "" : "S")")
+                                .font(.system(size: 13, weight: .bold))
+                                .tracking(3)
+                        }
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 18)
                         .background(gold)
                         .cornerRadius(14)
-                }
-                .padding(.horizontal, 32)
-                .onChange(of: selectedItems) { oldItems, newItems in
-                    guard !newItems.isEmpty else { return }
-                    haptic.impactOccurred()
-                    isAnalyzing = true
-                    appState.isAnalyzing = true
-                    appState.showStatus("Analyzing photos...", duration: 60)
-                    loadAndAnalyze(items: newItems)
+                    }
+                    .padding(.horizontal, 32)
                 }
             } else {
                 VStack(spacing: 16) {
@@ -314,100 +356,84 @@ struct AISuggestView: View {
         }
     }
 
-    // MARK: - Load & Analyze
+    // MARK: - Load & Analyze from Pool
 
-    private func loadAndAnalyze(items: [PhotosPickerItem]) {
+    private func loadAndAnalyzeFromPool(photos: [DumpPhoto]) {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("dumpster_ai", isDirectory: true)
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
         let lock = NSLock()
         var loaded: [(UIImage, URL)] = []
-        let total = Double(items.count)
+        var map: [String: String] = [:]   // filename → DumpPhoto.id
+        let total = Double(photos.count)
         var completed = 0.0
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let group = DispatchGroup()
-            let semaphore = DispatchSemaphore(value: 3)
-
-            for item in items {
-                semaphore.wait()
-                group.enter()
-
-                item.loadTransferable(type: Data.self) { result in
-                    defer {
-                        group.leave()
-                        semaphore.signal()
-                    }
-
-                    guard case .success(let data) = result, let data,
-                          let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-                        DispatchQueue.main.async {
-                            completed += 1
-                            self.progress = completed / total
-                        }
-                        return
-                    }
-
-                    let options: [CFString: Any] = [
-                        kCGImageSourceCreateThumbnailFromImageAlways: true,
-                        kCGImageSourceCreateThumbnailWithTransform: true,
-                        kCGImageSourceThumbnailMaxPixelSize: 512
-                    ]
-
-                    guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-                        DispatchQueue.main.async {
-                            completed += 1
-                            self.progress = completed / total
-                        }
-                        return
-                    }
-
-                    let thumbnail = UIImage(cgImage: cgImage)
-                    let filename = "\(UUID().uuidString).jpg"
-                    let url = tempDir.appendingPathComponent(filename)
-
-                    if let thumbData = thumbnail.jpegData(compressionQuality: 0.7) {
-                        try? thumbData.write(to: url)
-                    }
-
-                    lock.lock()
-                    loaded.append((thumbnail, url))
-                    lock.unlock()
-
+            for photo in photos {
+                guard let original = PhotoStorageManager.shared.loadImage(relativePath: photo.localPath) else {
                     DispatchQueue.main.async {
                         completed += 1
                         self.progress = completed / total
                     }
+                    continue
+                }
+
+                // Downsample to 512px for Vision analysis
+                let thumbnail: UIImage
+                let maxDim: CGFloat = 512
+                let scale = min(maxDim / original.size.width, maxDim / original.size.height, 1.0)
+                if scale < 1.0 {
+                    let newSize = CGSize(width: original.size.width * scale, height: original.size.height * scale)
+                    let renderer = UIGraphicsImageRenderer(size: newSize)
+                    thumbnail = renderer.image { _ in original.draw(in: CGRect(origin: .zero, size: newSize)) }
+                } else {
+                    thumbnail = original
+                }
+
+                let filename = photo.id + ".jpg"
+                let url = tempDir.appendingPathComponent(filename)
+                if let data = thumbnail.jpegData(compressionQuality: 0.7) {
+                    try? data.write(to: url)
+                }
+
+                lock.lock()
+                loaded.append((thumbnail, url))
+                map[filename] = photo.id
+                lock.unlock()
+
+                DispatchQueue.main.async {
+                    completed += 1
+                    self.progress = completed / total
                 }
             }
 
-            group.notify(queue: .main) {
+            DispatchQueue.main.async {
                 self.statusMessage = "Clustering photos..."
+            }
 
-                lock.lock()
-                let safeLoaded = loaded
-                lock.unlock()
+            lock.lock()
+            let safeLoaded = loaded
+            let safeMap = map
+            lock.unlock()
 
-                PhotoAnalyzer.analyze(images: safeLoaded) { result in
-                    Task { @MainActor in
-                        self.clusters = result
-                        self.selectedClusters = Set(result.indices)
-                        self.isAnalyzing = false
-                        self.appState.isAnalyzing = false
-                        self.appState.showStatus("Found \(result.count) dumps", duration: 3)
-                        self.statusMessage = ""
-                        withAnimation { self.phase = .results }
-
-                        // Trigger caption generation using LLMService
-                        self.generateCaptionsForClusters(result)
-                    }
+            PhotoAnalyzer.analyze(images: safeLoaded, limit: requestedDumpCount) { result in
+                Task { @MainActor in
+                    self.poolPhotoMap = safeMap
+                    self.clusters = result
+                    self.selectedClusters = Set(result.indices)
+                    self.isAnalyzing = false
+                    self.appState.isAnalyzing = false
+                    self.appState.showStatus("Found \(result.count) dumps", duration: 3)
+                    self.statusMessage = ""
+                    withAnimation { self.phase = .results }
+                    self.generateCaptionsForClusters(result)
                 }
             }
         }
     }
 
-    // MARK: - Caption Generation (Now uses LLMService)
+    // MARK: - Caption Generation
 
     private func generateCaptionsForClusters(_ clusters: [PhotoCluster]) {
         let requests = clusters.map { cluster in
@@ -420,7 +446,6 @@ struct AISuggestView: View {
         }
 
         if llmService.hasAnyAPIKey {
-            // Use the best available LLM provider
             let providerName = llmService.preferredProvider()?.displayName ?? "AI"
             appState.showStatus("Generating captions via \(providerName)...", duration: 30)
             let tasteBlock = AITasteExample.promptBlock(from: Array(tasteExamples.prefix(10)))
@@ -443,7 +468,6 @@ struct AISuggestView: View {
                 }
             }
         } else {
-            // No API key — use local fallback captions
             let fallbacks = requests.map {
                 LLMService.fallbackCaptions(for: $0.category, title: $0.dumpTitle)
             }
@@ -451,7 +475,7 @@ struct AISuggestView: View {
         }
     }
 
-    // MARK: - Create Dumps (Native SwiftData — Phase 6)
+    // MARK: - Create Dumps
 
     private func createDumps() {
         isCreating = true
@@ -462,40 +486,49 @@ struct AISuggestView: View {
             .map { $0.element }
 
         var nextNum = (existingDumps.map { $0.num }.max() ?? 0) + 1
+        // Build a quick lookup for existing pool photos by ID
+        let photoByID = Dictionary(uniqueKeysWithValues: allPhotos.map { ($0.id, $0) })
 
         for cluster in selectedGroups {
-            // 1. Save each AnalyzedPhoto's UIImage to disk + insert DumpPhoto.
-            var photoIDs: [String] = []
+            // 1. Resolve cluster photos → real DumpPhoto records (reuse pool, fallback to new).
+            var resolvedPhotos: [DumpPhoto] = []
+
             for p in cluster.photos {
-                let relPath = PhotoStorageManager.shared.saveImage(
-                    p.image,
-                    filename: p.filename
-                )
-                let dp = DumpPhoto(
-                    localPath: relPath,
-                    filename: p.filename,
-                    category: p.category,
-                    labels: p.labels,
-                    starred: false,
-                    isHuji: FormulaEngine.detectHuji(filename: p.filename)
-                )
-                modelContext.insert(dp)
-                photoIDs.append(dp.id)
-                if photoIDs.count >= maxPhotosPerDump { break }
+                if resolvedPhotos.count >= maxPhotosPerDump { break }
+
+                if let existingID = poolPhotoMap[p.filename],
+                   let existing = photoByID[existingID] {
+                    resolvedPhotos.append(existing)
+                } else {
+                    // Fallback: shouldn't happen in pool flow.
+                    let relPath = PhotoStorageManager.shared.saveImage(p.image, filename: p.filename)
+                    let dp = DumpPhoto(
+                        localPath: relPath,
+                        filename: p.filename,
+                        category: p.category,
+                        labels: p.labels,
+                        starred: false,
+                        isHuji: FormulaEngine.detectHuji(filename: p.filename)
+                    )
+                    modelContext.insert(dp)
+                    resolvedPhotos.append(dp)
+                }
             }
 
-            // 2. Create the PhotoDump record.
-            let vibe: String?
-            // Resolve the photos we just created back into DumpPhoto for vibe check.
-            // (The AnalyzedPhoto.category is sufficient for the warm/cool ratio.)
-            let stub = cluster.photos.map { p -> DumpPhoto in
-                DumpPhoto(localPath: "", filename: p.filename, category: p.category, labels: p.labels)
-            }
-            vibe = FormulaEngine.checkColorTemp(stub) ? nil : "mismatch"
+            // 2. APPLY THE FORMULA — arrange photos into HOOK → CONTRAST → ... → CLOSER.
+            //    arrangePhotos picks the best photo for each slot based on category scores.
+            let arranged = FormulaEngine.arrangePhotos(resolvedPhotos)
+            let photoIDs = arranged.map { $0.id }
+
+            // 3. Vibe check on the real arranged photos (not stubs).
+            let vibe = FormulaEngine.checkColorTemp(arranged) ? nil : "mismatch"
+
+            // 4. Use the formula's title generator — multi-category combos beat single-cat fallbacks.
+            let formulaTitle = FormulaEngine.generateDumpTitle(for: arranged)
 
             let dump = PhotoDump(
                 num: nextNum,
-                title: cluster.title,
+                title: formulaTitle,
                 photoIDs: photoIDs,
                 vibeBadge: vibe,
                 liked: false,
@@ -505,7 +538,8 @@ struct AISuggestView: View {
             modelContext.insert(dump)
             nextNum += 1
 
-            // 3. Save associated captions if we generated any.
+            // Captions are still keyed by the Vision cluster.title (since they were generated
+            // before formula re-titling). Attach them anyway — they're about the same photos.
             if let cr = appState.captionResults.first(where: { $0.dumpTitle == cluster.title }) {
                 for line in cr.captions {
                     let cap = DumpCaption(text: line, style: "ai", dumpId: dump.id)
@@ -601,3 +635,4 @@ struct ClusterRow: View {
         .padding(.vertical, 4)
     }
 }
+

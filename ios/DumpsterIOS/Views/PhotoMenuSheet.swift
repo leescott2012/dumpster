@@ -60,6 +60,7 @@ struct PhotoMenuSheet: View {
                 Divider().background(Color.white.opacity(0.07))
                 // Destructive
                 Button {
+                    HapticManager.shared.playRemove()
                     onRemove(); dismiss()
                 } label: {
                     HStack(spacing: 14) {

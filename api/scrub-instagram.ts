@@ -173,16 +173,32 @@ Respond with ONLY the JSON object. No preamble, no markdown fences, no commentar
     const block = distill.content[0];
     const raw = block && 'text' in block ? block.text.trim() : '';
 
-    // 4. Parse Claude's JSON
+    // 4. Parse Claude's JSON (robust to markdown fences and trailing chatter)
     let parsed: { styleDescription?: string; engagementPlaybook?: string } = {};
-    try {
-      // Strip markdown fences if Claude adds them despite instructions
-      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```$/g, '').trim();
-      parsed = JSON.parse(cleaned);
-    } catch (e) {
-      console.error('[scrub-instagram] JSON parse failed, raw was:', raw.slice(0, 300));
-      // Graceful fallback: dump everything into styleDescription
-      parsed = { styleDescription: raw.slice(0, 750), engagementPlaybook: '' };
+    const tryParse = (s: string): boolean => {
+      try {
+        parsed = JSON.parse(s);
+        return typeof parsed === 'object' && parsed != null;
+      } catch {
+        return false;
+      }
+    };
+
+    // Try the raw response first
+    if (!tryParse(raw)) {
+      // Strip markdown fences
+      const stripped = raw
+        .replace(/^[\s`]*(?:json)?\s*/i, '')
+        .replace(/[\s`]*$/g, '')
+        .trim();
+      if (!tryParse(stripped)) {
+        // Extract the first {…} block anywhere in the response
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match || !tryParse(match[0])) {
+          console.error('[scrub-instagram] JSON parse failed, raw was:', raw.slice(0, 400));
+          parsed = { styleDescription: raw.slice(0, 750), engagementPlaybook: '' };
+        }
+      }
     }
 
     res.status(200).json({

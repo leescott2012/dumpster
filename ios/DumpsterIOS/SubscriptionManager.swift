@@ -12,7 +12,13 @@ final class SubscriptionManager: ObservableObject {
     static let shared = SubscriptionManager()
 
     // MARK: - Published State
+    #if DEBUG
+    /// DEBUG ONLY — force-unlock Pro for local testing (e.g. Apify scrub flow).
+    /// Set via launch argument or override below; ignored in release builds.
+    @Published private(set) var isPro: Bool = ProcessInfo.processInfo.arguments.contains("-debugForcePro") || true
+    #else
     @Published private(set) var isPro: Bool = false
+    #endif
     @Published private(set) var products: [Product] = []
     @Published private(set) var activeProductID: String?
     @Published var isPurchasing = false
@@ -85,6 +91,12 @@ final class SubscriptionManager: ObservableObject {
 
     /// Walks current entitlements and updates `isPro`.
     func refreshEntitlement() async {
+        #if DEBUG
+        // DEBUG: keep isPro = true so we can exercise Pro-gated flows
+        // (Apify scrub, etc.) without needing a StoreKit transaction.
+        await MainActor.run { isPro = true }
+        return
+        #else
         var active = false
         var activeID: String?
         for await result in Transaction.currentEntitlements {
@@ -98,6 +110,7 @@ final class SubscriptionManager: ObservableObject {
         }
         isPro = active
         activeProductID = activeID
+        #endif
     }
 
     /// Listens for renewals/refunds while the app is running.

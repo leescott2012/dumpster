@@ -13,6 +13,6 @@ struct DumpsterApp: App {
             ContentView()
                 .ignoresSafeArea()
         }
-        .modelContainer(for: [DumpPhoto.self, PhotoDump.self, DumpCaption.self, AITasteExample.self])
+        .modelContainer(for: [DumpPhoto.self, PhotoDump.self, DumpCaption.self, AITasteExample.self, SavedScrub.self])
     }
 }

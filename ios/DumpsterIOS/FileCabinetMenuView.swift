@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - File Cabinet Menu View
 
@@ -450,9 +451,18 @@ struct AISettingsTabView: View {
     @State private var savedConfirmation: LLMService.LLMProvider? = nil
     @AppStorage("ai_style_profile") private var styleProfile = ""
     @AppStorage("ai_rules") private var aiRules = ""
+    /// ID of the SavedScrub currently driving `styleProfile`. Empty = manual / none.
+    @AppStorage("active_scrub_id") private var activeScrubId = ""
 
     @State private var showScrubSheet = false
     @State private var showScrubPaywall = false
+    @State private var reapplyingScrub: SavedScrub? = nil
+    @Query(sort: \SavedScrub.createdAt, order: .reverse) private var savedScrubs: [SavedScrub]
+
+    // AI Rules editor state
+    @State private var draftRule: String = ""
+    @FocusState private var newRuleFocused: Bool
+    @State private var savedToast: Bool = false
 
     private let gold = Color(hex: "#C8A96E")
 
@@ -461,102 +471,20 @@ struct AISettingsTabView: View {
 
             // AI Style Profile
             CabinetSectionHeader("AI STYLE PROFILE", icon: "person.text.rectangle")
+            styleProfileCard
+                .padding(.horizontal, 24)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Describe your aesthetic. The AI uses this when generating dumps and captions.")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.35))
-                    .lineSpacing(3)
-
-                TextEditor(text: $styleProfile)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 80, maxHeight: 120)
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
-
-                HStack(spacing: 8) {
-                    Button {
-                        if SubscriptionManager.shared.isPro {
-                            showScrubSheet = true
-                        } else {
-                            showScrubPaywall = true
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: SubscriptionManager.shared.isPro ? "sparkles" : "lock.fill")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("Generate from Instagram")
-                                .font(.system(size: 11, weight: .heavy))
-                                .tracking(0.8)
-                        }
-                        .foregroundColor(gold)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .overlay(Capsule().strokeBorder(gold.opacity(0.45), lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-
-                    Text("\(styleProfile.count)/750")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.2))
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-            .sheet(isPresented: $showScrubSheet) {
-                ScrubInstagramSheet(currentProfile: $styleProfile)
-                    .presentationDetents([.medium, .large])
-            }
-            .sheet(isPresented: $showScrubPaywall) {
-                PaywallView().presentationDetents([.large])
+            // Scrub Library
+            if !savedScrubs.isEmpty {
+                CabinetSectionHeader("SCRUB LIBRARY", icon: "bookmark")
+                scrubLibraryCard
+                    .padding(.horizontal, 24)
             }
 
             // AI Rules
             CabinetSectionHeader("AI RULES", icon: "list.bullet.rectangle")
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Set rules the AI must follow when generating content (e.g. \"never use emojis\", \"always mention location\").")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.35))
-                    .lineSpacing(3)
-
-                TextEditor(text: $aiRules)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 80, maxHeight: 120)
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
-
-                Text("\(aiRules.count)/750")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.2))
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
+            aiRulesCard
+                .padding(.horizontal, 24)
 
             // Active Provider Status
             activeProviderBanner
@@ -596,6 +524,355 @@ struct AISettingsTabView: View {
     // MARK: - Active Provider Banner
 
     @State private var showPaywallFromAISettings = false
+
+    // MARK: - AI Style Profile card
+
+    @Environment(\.modelContext) private var modelContext
+
+    private var styleProfileCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Describe your aesthetic. The AI uses this when generating dumps and captions.")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.35))
+                .lineSpacing(3)
+
+            styleProfileEditor
+
+            HStack(spacing: 8) {
+                generateFromInstagramButton
+                Spacer()
+                Text("\(styleProfile.count)/750")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.2))
+            }
+        }
+        .padding(16)
+        .background(cardBackground)
+        .sheet(isPresented: $showScrubSheet) {
+            ScrubInstagramSheet(currentProfile: $styleProfile, activeScrubId: $activeScrubId)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $reapplyingScrub) { saved in
+            ScrubInstagramSheet(currentProfile: $styleProfile, activeScrubId: $activeScrubId, preloadedScrub: saved)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showScrubPaywall) {
+            PaywallView().presentationDetents([.large])
+        }
+    }
+
+    private var styleProfileEditor: some View {
+        TextEditor(text: $styleProfile)
+            .font(.system(size: 13))
+            .foregroundColor(.white)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: 80, maxHeight: 120)
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .onChange(of: styleProfile) { _, newVal in
+                guard !activeScrubId.isEmpty else { return }
+                if let active = savedScrubs.first(where: { $0.id == activeScrubId }),
+                   active.styleDescription != newVal {
+                    activeScrubId = ""
+                }
+            }
+    }
+
+    private var generateFromInstagramButton: some View {
+        Button {
+            if SubscriptionManager.shared.isPro {
+                showScrubSheet = true
+            } else {
+                showScrubPaywall = true
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: SubscriptionManager.shared.isPro ? "sparkles" : "lock.fill")
+                    .font(.system(size: 10, weight: .bold))
+                Text("Generate from Instagram")
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(0.8)
+            }
+            .foregroundColor(gold)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .overlay(Capsule().strokeBorder(gold.opacity(0.45), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var scrubLibraryCard: some View {
+        VStack(spacing: 8) {
+            Text("Past scrubs — tap to re-apply without paying.")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.35))
+                .lineSpacing(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            ForEach(savedScrubs) { scrub in
+                scrubLibraryRow(scrub)
+            }
+        }
+        .padding(16)
+        .background(cardBackground)
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Color.white.opacity(0.03))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            )
+    }
+
+    // MARK: - AI Rules (numbered list)
+
+    /// Split the stored \n-separated string into rule strings, dropping empties.
+    private var rulesList: [String] {
+        aiRules.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func writeRules(_ rules: [String]) {
+        aiRules = rules.joined(separator: "\n")
+        flashSaved()
+    }
+
+    private func deleteRule(at index: Int) {
+        var current = rulesList
+        guard current.indices.contains(index) else { return }
+        HapticManager.shared.playRemove()
+        current.remove(at: index)
+        writeRules(current)
+    }
+
+    private func addDraftRule() {
+        let trimmed = draftRule.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var current = rulesList
+        current.append(trimmed)
+        writeRules(current)
+        draftRule = ""
+        HapticManager.shared.playAdded()
+    }
+
+    private func flashSaved() {
+        withAnimation(.easeOut(duration: 0.2)) { savedToast = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            withAnimation(.easeIn(duration: 0.25)) { savedToast = false }
+        }
+    }
+
+    private var aiRulesCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Rules the AI MUST follow when generating dumps and captions. Add one rule per line.")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.35))
+                .lineSpacing(3)
+
+            // Existing rules
+            if rulesList.isEmpty {
+                emptyRulesHint
+            } else {
+                VStack(spacing: 6) {
+                    ForEach(Array(rulesList.enumerated()), id: \.offset) { idx, rule in
+                        ruleRow(index: idx, text: rule)
+                    }
+                }
+            }
+
+            // Add a rule
+            HStack(spacing: 8) {
+                TextField("Add a rule — e.g. \"no emojis\"", text: $draftRule)
+                    .focused($newRuleFocused)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .submitLabel(.done)
+                    .onSubmit { addDraftRule() }
+
+                Button { addDraftRule() } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(draftRule.isEmpty ? .white.opacity(0.25) : .black)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(draftRule.isEmpty ? Color.white.opacity(0.08) : gold))
+                }
+                .buttonStyle(.plain)
+                .disabled(draftRule.isEmpty)
+            }
+
+            // Footer: count + saved indicator
+            HStack {
+                if savedToast {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("SAVED")
+                            .font(.system(size: 10, weight: .heavy))
+                            .tracking(1.2)
+                    }
+                    .foregroundColor(.green)
+                    .transition(.opacity)
+                }
+                Spacer()
+                Text("\(rulesList.count) RULE\(rulesList.count == 1 ? "" : "S")")
+                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                    .tracking(1.2)
+                    .foregroundColor(.white.opacity(0.3))
+            }
+        }
+        .padding(16)
+        .background(cardBackground)
+    }
+
+    private var emptyRulesHint: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "list.bullet.rectangle")
+                .font(.system(size: 18, weight: .light))
+                .foregroundColor(.white.opacity(0.2))
+            Text("No rules yet — add your first rule below")
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.3))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+    }
+
+    private func ruleRow(index: Int, text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("\(index + 1).")
+                .font(.system(size: 12, weight: .heavy, design: .monospaced))
+                .foregroundColor(gold)
+                .frame(width: 22, alignment: .leading)
+
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundColor(.white.opacity(0.85))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button { deleteRule(at: index) } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white.opacity(0.4))
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(Color.white.opacity(0.06)))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.04)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.05), lineWidth: 1))
+    }
+
+    // MARK: - Scrub Library Row
+
+    private func scrubLibraryRow(_ scrub: SavedScrub) -> some View {
+        let isActive = activeScrubId == scrub.id
+
+        return HStack(spacing: 12) {
+            // Left badge: bookmark normally, green check when active
+            ZStack {
+                Circle()
+                    .fill((isActive ? Color.green : gold).opacity(isActive ? 0.18 : 0.12))
+                Image(systemName: isActive ? "checkmark" : "bookmark.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(isActive ? .green : gold)
+            }
+            .frame(width: 28, height: 28)
+
+            // Tappable body — instant apply
+            Button { applyScrub(scrub) } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("@\(scrub.handle)")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        if isActive {
+                            Text("ACTIVE")
+                                .font(.system(size: 8, weight: .heavy))
+                                .tracking(0.8)
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.green.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Text("\(scrub.postsAnalyzed) posts · \(Self.relativeDate(scrub.createdAt))")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Eye = view full report (preloads sheet, no network call)
+            Button { reapplyingScrub = scrub } label: {
+                Image(systemName: "eye")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.4))
+                    .padding(6)
+            }
+            .buttonStyle(.plain)
+
+            // Trash = delete
+            Button { deleteScrub(scrub) } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.3))
+                    .padding(6)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(isActive ? Color.green.opacity(0.06) : Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(isActive ? Color.green.opacity(0.35) : Color.white.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    /// Tap-row-to-apply: replace the style profile text + mark this scrub as active.
+    private func applyScrub(_ scrub: SavedScrub) {
+        guard activeScrubId != scrub.id else {
+            // Already active — small haptic so the tap still feels acknowledged.
+            HapticManager.shared.playTick()
+            return
+        }
+        HapticManager.shared.playSuccess()
+        styleProfile = String(scrub.styleDescription.prefix(750))
+        activeScrubId = scrub.id
+    }
+
+    private func deleteScrub(_ scrub: SavedScrub) {
+        HapticManager.shared.playRemove()
+        // If we're deleting the active one, clear the active marker (textbox stays
+        // as-is so the user doesn't lose what they're working with).
+        if activeScrubId == scrub.id {
+            activeScrubId = ""
+        }
+        modelContext.delete(scrub)
+        try? modelContext.save()
+    }
+
+    private static func relativeDate(_ date: Date) -> String {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f.localizedString(for: date, relativeTo: Date())
+    }
 
     private var proGateCard: some View {
         Button { showPaywallFromAISettings = true } label: {

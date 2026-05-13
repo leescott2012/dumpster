@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
-import PhotosUI
 
 // MARK: - Drop delegate for reordering photos within a dump
 
@@ -16,6 +15,7 @@ struct DumpPhotoDropDelegate: DropDelegate {
               from != targetId,
               let fromIdx = dump.photoIDs.firstIndex(of: from),
               let toIdx   = dump.photoIDs.firstIndex(of: targetId) else { return }
+        HapticManager.shared.playTick()
         withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
             dump.photoIDs.move(
                 fromOffsets: IndexSet(integer: fromIdx),
@@ -30,6 +30,7 @@ struct DumpPhotoDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         draggingId = nil
+        HapticManager.shared.playDrop()
         try? modelContext.save()
         return true
     }
@@ -56,7 +57,6 @@ struct DumpCardView: View {
     @State private var captionError: String?
     @State private var showDumpMenu = false
     @State private var draggingPhotoId: String? = nil
-    @State private var dumpPickerItems: [PhotosPickerItem] = []
 
     private var photos: [DumpPhoto] {
         let byID = Dictionary(uniqueKeysWithValues: allPhotos.map { ($0.id, $0) })
@@ -191,6 +191,7 @@ struct DumpCardView: View {
     private var approveButtons: some View {
         HStack(spacing: 4) {
             Button {
+                HapticManager.shared.playAdded()
                 dump.titleApproved = true
                 try? modelContext.save()
             } label: {
@@ -202,6 +203,7 @@ struct DumpCardView: View {
                     .clipShape(Circle())
             }
             Button {
+                HapticManager.shared.playTick()
                 dump.titleApproved = false
                 dump.title = FormulaEngine.generateDumpTitle(for: photos)
                 try? modelContext.save()
@@ -222,6 +224,7 @@ struct DumpCardView: View {
             dump.title = trimmed
             dump.titleApproved = true
             try? modelContext.save()
+            HapticManager.shared.playTick()
         }
         editingTitle = false
     }
@@ -336,26 +339,27 @@ struct DumpCardView: View {
         .buttonStyle(.plain)
     }
 
-    /// "From Library" — opens iOS PhotosPicker; imports straight into this dump
+    /// "Add More" — routes to pool in selection mode (same as fromPoolCard)
     @ViewBuilder
     private var fromLibraryCard: some View {
         let bg2    = Theme.bg2(appState.colorMode, cs)
         let text2  = Theme.text2(appState.colorMode, cs)
         let text3  = Theme.text3(appState.colorMode, cs)
         let border = Theme.border(appState.colorMode, cs)
-        PhotosPicker(
-            selection: $dumpPickerItems,
-            maxSelectionCount: 20,
-            selectionBehavior: .ordered,
-            matching: .images
-        ) {
+        Button {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                appState.addingToDumpId = dump.id
+                appState.activePoolTab = .photos
+                appState.scrollToPool = UUID()
+            }
+        } label: {
             VStack(spacing: 8) {
-                Image(systemName: "photo.on.rectangle.angled")
+                Image(systemName: "plus.square.on.square")
                     .font(.system(size: 24, weight: .semibold))
-                Text("From Library")
+                Text("Add More")
                     .font(.system(size: 11, weight: .heavy))
                     .tracking(0.6)
-                Text("Import new photos from iOS Photos")
+                Text("Pick more photos from your pool")
                     .font(.system(size: 9))
                     .foregroundColor(text3)
                     .multilineTextAlignment(.center)
@@ -371,10 +375,7 @@ struct DumpCardView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-        .onChange(of: dumpPickerItems) { _, items in
-            guard !items.isEmpty else { return }
-            Task { await importPickedItems(items) }
-        }
+        .buttonStyle(.plain)
     }
 
     /// Compact "+" card shown once a dump already has photos
@@ -383,12 +384,13 @@ struct DumpCardView: View {
         let bg2    = Theme.bg2(appState.colorMode, cs)
         let text2  = Theme.text2(appState.colorMode, cs)
         let border = Theme.border(appState.colorMode, cs)
-        PhotosPicker(
-            selection: $dumpPickerItems,
-            maxSelectionCount: 20,
-            selectionBehavior: .ordered,
-            matching: .images
-        ) {
+        Button {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                appState.addingToDumpId = dump.id
+                appState.activePoolTab = .photos
+                appState.scrollToPool = UUID()
+            }
+        } label: {
             VStack(spacing: 6) {
                 Image(systemName: "plus")
                     .font(.system(size: 22, weight: .semibold))
@@ -404,10 +406,7 @@ struct DumpCardView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-        .onChange(of: dumpPickerItems) { _, items in
-            guard !items.isEmpty else { return }
-            Task { await importPickedItems(items) }
-        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Progress bar
@@ -467,6 +466,7 @@ struct DumpCardView: View {
     // MARK: - Actions
 
     private func removePhoto(_ photo: DumpPhoto) {
+        HapticManager.shared.playRemove()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             dump.photoIDs.removeAll { $0 == photo.id }
         }
@@ -474,6 +474,7 @@ struct DumpCardView: View {
     }
 
     private func deleteDump() {
+        HapticManager.shared.playDelete()
         modelContext.delete(dump)
         try? modelContext.save()
     }
@@ -510,31 +511,12 @@ struct DumpCardView: View {
                 category: topCategory,
                 tasteBlock: taste
             )
+            HapticManager.shared.playSuccess()
             withAnimation(.spring()) { captionResult = result }
         } catch {
             captionError = error.localizedDescription
             CrashReporter.shared.capture(error, tags: ["op": "caption_generate", "dumpId": dump.id])
         }
-    }
-
-    /// Record this dump as a taste signal (positive = loved, negative = disliked).
-    @MainActor
-    private func importPickedItems(_ items: [PhotosPickerItem]) async {
-        var newPhotoIDs: [String] = []
-        for item in items {
-            guard let data = try? await item.loadTransferable(type: Data.self),
-                  let uiImage = UIImage(data: data) else { continue }
-            let filename = UUID().uuidString + ".jpg"
-            let localPath = PhotoStorageManager.shared.saveImage(uiImage, filename: filename)
-            let photo = DumpPhoto(localPath: localPath, filename: filename)
-            modelContext.insert(photo)
-            newPhotoIDs.append(photo.id)
-        }
-        if !newPhotoIDs.isEmpty {
-            dump.photoIDs.append(contentsOf: newPhotoIDs)
-            try? modelContext.save()
-        }
-        dumpPickerItems.removeAll()
     }
 
     private func recordTasteExample(positive: Bool) {

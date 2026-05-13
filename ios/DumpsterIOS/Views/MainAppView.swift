@@ -18,9 +18,13 @@ struct MainAppView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var cs
 
-    @Query(sort: \PhotoDump.num, order: .reverse) private var dumps: [PhotoDump]
+    @Query(sort: \PhotoDump.createdAt, order: .forward) private var dumps: [PhotoDump]
     @Query private var allPhotos: [DumpPhoto]
     @Query(sort: \AITasteExample.createdAt, order: .reverse) private var tasteExamples: [AITasteExample]
+
+    @State private var poolTabSegmentWidth: CGFloat = 0
+    @State private var pillDragOffset: CGFloat = 0
+    @State private var isDraggingPill: Bool = false
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -35,7 +39,11 @@ struct MainAppView: View {
                         undoBar
                     }
                     dumpsSection
+                    Color.clear.frame(height: 12)
                     newDumpButton
+                    sectionDivider
+                        .padding(.top, 18)
+                        .padding(.bottom, 4)
                     poolTabSwitcher
                         .id("poolTop")
                     poolContent
@@ -301,56 +309,147 @@ struct MainAppView: View {
         appState.scrollToPool = UUID()
     }
 
+    // MARK: - Section divider (between New Dump area and Pool)
+
+    private var sectionDivider: some View {
+        HStack(spacing: 10) {
+            Rectangle()
+                .fill(Theme.text3(appState.colorMode, cs).opacity(0.25))
+                .frame(height: 1)
+            Text("POOL")
+                .font(.system(size: 10, weight: .heavy))
+                .tracking(2.5)
+                .foregroundColor(Theme.text3(appState.colorMode, cs))
+            Rectangle()
+                .fill(Theme.text3(appState.colorMode, cs).opacity(0.25))
+                .frame(height: 1)
+        }
+        .padding(.horizontal, 20)
+    }
+
     // MARK: - Pool tab switcher
 
     private var poolTabSwitcher: some View {
-        HStack(spacing: 0) {
-            segmentedTab("PHOTOS",   tab: .photos)
-            segmentedTab("CAPTIONS", tab: .captions)
+        let tabs: [(String, PoolTab)] = [("PHOTOS", .photos), ("CAPTIONS", .captions)]
+        let selectedIndex = appState.activePoolTab == .photos ? 0 : 1
+
+        return GeometryReader { geo in
+            let inset: CGFloat = 4
+            let segWidth = (geo.size.width - inset * 2) / CGFloat(tabs.count)
+            let baseOffset = inset + CGFloat(selectedIndex) * segWidth
+            let maxOffset = inset + CGFloat(tabs.count - 1) * segWidth
+            let liveOffset = min(maxOffset, max(inset, baseOffset + pillDragOffset))
+
+            ZStack(alignment: .leading) {
+                // Track background
+                Capsule().fill(Theme.bg2(appState.colorMode, cs))
+
+                // Sliding highlight — follows finger while dragging, snaps on release
+                Capsule()
+                    .fill(appState.accentColor.opacity(0.18))
+                    .overlay(
+                        Capsule().stroke(appState.accentColor.opacity(0.5), lineWidth: 1)
+                    )
+                    .frame(width: max(0, segWidth), height: geo.size.height - inset * 2)
+                    .offset(x: liveOffset)
+                    .animation(isDraggingPill ? nil : .spring(response: 0.45, dampingFraction: 0.78),
+                               value: liveOffset)
+
+                // Tappable labels on top
+                HStack(spacing: 0) {
+                    ForEach(Array(tabs.enumerated()), id: \.offset) { _, item in
+                        let isSel = appState.activePoolTab == item.1
+                        Button { switchPoolTab(to: item.1) } label: {
+                            Text(item.0)
+                                .font(.system(size: 12, weight: .heavy))
+                                .tracking(1.8)
+                                .foregroundColor(isSel ? appState.accentColor : Theme.text3(appState.colorMode, cs))
+                                .animation(.easeInOut(duration: 0.2), value: isSel)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .overlay(
+                Capsule().stroke(Color.white.opacity(0.06), lineWidth: 1)
+            )
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if !isDraggingPill {
+                            isDraggingPill = true
+                            HapticManager.shared.playTick()
+                        }
+                        pillDragOffset = value.translation.width
+                    }
+                    .onEnded { value in
+                        let projectedOffset = baseOffset + value.translation.width + value.predictedEndTranslation.width * 0.1
+                        let pillCenter = projectedOffset + segWidth / 2
+                        let nearest = Int((pillCenter - inset) / segWidth)
+                        let clamped = max(0, min(tabs.count - 1, nearest))
+                        let target: PoolTab = clamped == 0 ? .photos : .captions
+
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.78)) {
+                            pillDragOffset = 0
+                            isDraggingPill = false
+                            if appState.activePoolTab != target {
+                                HapticManager.shared.playTick()
+                                appState.activePoolTab = target
+                            }
+                        }
+                    }
+            )
         }
-        .padding(4)
-        .background(
-            Capsule().fill(Theme.bg2(appState.colorMode, cs))
-        )
-        .overlay(
-            Capsule().stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
+        .frame(height: 44)
         .padding(.horizontal, 14)
     }
 
-    private func segmentedTab(_ label: String, tab: PoolTab) -> some View {
-        let isSel = appState.activePoolTab == tab
-        return Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                appState.activePoolTab = tab
-            }
-        } label: {
-            Text(label)
-                .font(.system(size: 12, weight: .heavy))
-                .tracking(1.8)
-                .foregroundColor(isSel ? appState.accentColor : Theme.text3(appState.colorMode, cs))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(isSel ? appState.accentColor.opacity(0.18) : Color.clear)
-                        .overlay(
-                            Capsule().stroke(isSel ? appState.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
-                        )
-                )
-                .contentShape(Capsule())
+    private func switchPoolTab(to tab: PoolTab) {
+        guard appState.activePoolTab != tab else { return }
+        HapticManager.shared.playTick()
+        // Set state directly — the highlight animates via its own .animation(value:) modifier.
+        // Wrap content transition in withTransaction for the slide-in effect.
+        withTransaction(Transaction(animation: .spring(response: 0.45, dampingFraction: 0.85))) {
+            appState.activePoolTab = tab
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Pool content
 
     @ViewBuilder
     private var poolContent: some View {
-        switch appState.activePoolTab {
-        case .photos:   PhotoPoolView(allPhotos: allPhotos, allDumps: dumps)
-        case .captions: CaptionPoolView()
+        Group {
+            switch appState.activePoolTab {
+            case .photos:
+                PhotoPoolView(allPhotos: allPhotos, allDumps: dumps)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .leading).combined(with: .opacity),
+                        removal: .move(edge: .trailing).combined(with: .opacity)
+                    ))
+            case .captions:
+                CaptionPoolView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
+            }
         }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 20)
+                .onEnded { value in
+                    let h = value.translation.width
+                    let v = value.translation.height
+                    // Only trigger when motion is mostly horizontal
+                    guard abs(h) > abs(v) * 1.5, abs(h) > 50 else { return }
+                    if h < 0, appState.activePoolTab == .photos {
+                        switchPoolTab(to: .captions)
+                    } else if h > 0, appState.activePoolTab == .captions {
+                        switchPoolTab(to: .photos)
+                    }
+                }
+        )
     }
 }
 

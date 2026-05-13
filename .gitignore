@@ -18,3 +18,7 @@ dist/
 
 # Generated source bundle
 dumpster-source.txt
+
+# Build artifacts and backups
+ios/DumpsterIOS.zip
+ios/DumpsterIOS/Assets.xcassets/AppIcon.appiconset/*.original.png

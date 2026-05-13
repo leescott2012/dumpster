@@ -293,12 +293,16 @@ final class LLMService: ObservableObject {
     /// Builds the personalization block injected into every AI request.
     /// `tasteBlock` is optional and should come from `AITasteExample.promptBlock(from:)`.
     func userContextBlock(tasteBlock: String = "") -> String {
-        let profile = UserDefaults.standard.string(forKey: "ai_style_profile") ?? ""
-        let rules   = UserDefaults.standard.string(forKey: "ai_rules") ?? ""
+        let profile  = UserDefaults.standard.string(forKey: "ai_style_profile") ?? ""
+        let playbook = UserDefaults.standard.string(forKey: "ai_engagement_playbook") ?? ""
+        let rules    = UserDefaults.standard.string(forKey: "ai_rules") ?? ""
 
         var parts: [String] = []
         if !profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             parts.append("User's aesthetic style: \(profile.trimmingCharacters(in: .whitespacesAndNewlines))")
+        }
+        if !playbook.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            parts.append("Engagement playbook (what wins for this creator's audience — apply this when shaping hooks and structure):\n\(playbook.trimmingCharacters(in: .whitespacesAndNewlines))")
         }
         if !rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             parts.append("Rules you MUST follow:\n\(rules.trimmingCharacters(in: .whitespacesAndNewlines))")

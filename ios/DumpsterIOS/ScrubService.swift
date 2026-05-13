@@ -26,8 +26,38 @@ final class ScrubService {
 
     struct ScrubResult: Codable {
         let description: String
+        let engagementPlaybook: String
         let postsAnalyzed: Int
         let hashtags: [String]
+        let topPosts: [TopPost]
+
+        struct TopPost: Codable {
+            let firstLine: String
+            let likes: Int
+            let comments: Int
+            let views: Int
+            let productType: String
+        }
+
+        // Tolerate missing fields from older backend or fallback paths.
+        enum CodingKeys: String, CodingKey {
+            case description, engagementPlaybook, postsAnalyzed, hashtags, topPosts
+        }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            description = (try? c.decode(String.self, forKey: .description)) ?? ""
+            engagementPlaybook = (try? c.decode(String.self, forKey: .engagementPlaybook)) ?? ""
+            postsAnalyzed = (try? c.decode(Int.self, forKey: .postsAnalyzed)) ?? 0
+            hashtags = (try? c.decode([String].self, forKey: .hashtags)) ?? []
+            topPosts = (try? c.decode([TopPost].self, forKey: .topPosts)) ?? []
+        }
+        init(description: String, engagementPlaybook: String, postsAnalyzed: Int, hashtags: [String], topPosts: [TopPost]) {
+            self.description = description
+            self.engagementPlaybook = engagementPlaybook
+            self.postsAnalyzed = postsAnalyzed
+            self.hashtags = hashtags
+            self.topPosts = topPosts
+        }
     }
 
     struct ScrubError: Error, LocalizedError {

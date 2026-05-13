@@ -12,11 +12,14 @@ final class SavedScrub {
     var profileURL: String
     /// Extracted handle (without @ or trailing slash), e.g. "cristiano"
     var handle: String
-    /// The Claude-distilled 2-3 sentence aesthetic description.
+    /// Claude-distilled aesthetic + verbal voice (used by caption tone).
     var styleDescription: String
+    /// Claude-distilled engagement playbook — what WORKS for this creator.
+    /// Empty string for scrubs persisted before Phase F.
+    var engagementPlaybook: String
     /// Top hashtags from the analyzed posts.
     var hashtags: [String]
-    /// How many posts Apify actually returned + Claude analyzed.
+    /// How many posts Apify returned + Claude analyzed.
     var postsAnalyzed: Int
     /// When the scrub completed.
     var createdAt: Date
@@ -24,6 +27,7 @@ final class SavedScrub {
     init(
         profileURL: String,
         styleDescription: String,
+        engagementPlaybook: String = "",
         hashtags: [String] = [],
         postsAnalyzed: Int = 0
     ) {
@@ -31,6 +35,7 @@ final class SavedScrub {
         self.profileURL = profileURL
         self.handle = SavedScrub.extractHandle(from: profileURL)
         self.styleDescription = styleDescription
+        self.engagementPlaybook = engagementPlaybook
         self.hashtags = hashtags
         self.postsAnalyzed = postsAnalyzed
         self.createdAt = Date()

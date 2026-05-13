@@ -450,6 +450,7 @@ struct AISettingsTabView: View {
     @State private var keyVisibility: [LLMService.LLMProvider: Bool] = [:]
     @State private var savedConfirmation: LLMService.LLMProvider? = nil
     @AppStorage("ai_style_profile") private var styleProfile = ""
+    @AppStorage("ai_engagement_playbook") private var engagementPlaybook = ""
     @AppStorage("ai_rules") private var aiRules = ""
     /// ID of the SavedScrub currently driving `styleProfile`. Empty = manual / none.
     @AppStorage("active_scrub_id") private var activeScrubId = ""

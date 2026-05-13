@@ -8,6 +8,7 @@ struct ScrubInstagramSheet: View {
 
     @Binding var currentProfile: String
     @Binding var activeScrubId: String
+    @AppStorage("ai_engagement_playbook") private var enginePlaybook: String = ""
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
@@ -16,16 +17,20 @@ struct ScrubInstagramSheet: View {
     var preloadedScrub: SavedScrub? = nil
 
     @State private var profileURL: String = ""
+    @State private var resultsLimit: Int = 12
     @State private var phase: Phase = .input
     @State private var result: ScrubService.ScrubResult? = nil
     @State private var savedRecord: SavedScrub? = nil
     @State private var errorText: String? = nil
     @State private var editableResult: String = ""
+    @State private var editablePlaybook: String = ""
+    @State private var activeTab: ResultTab = .style
     @State private var resolvedHandle: String = ""
 
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
 
     private enum Phase { case input, scrubbing, review }
+    private enum ResultTab: String, CaseIterable { case style = "STYLE", playbook = "PLAYBOOK" }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -106,6 +111,8 @@ struct ScrubInstagramSheet: View {
             }
             .padding(.horizontal, 24)
 
+            postsCountStepper
+
             if let errorText {
                 Text(errorText)
                     .font(.system(size: 12))
@@ -153,6 +160,61 @@ struct ScrubInstagramSheet: View {
     private var canStart: Bool {
         let trimmed = profileURL.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.contains("instagram.com") && trimmed.count > 20 && ScrubService.shared.canScrub()
+    }
+
+    private var postsCountStepper: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("POSTS TO ANALYZE")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(2)
+                    .foregroundColor(.white.opacity(0.4))
+                Spacer()
+                Text(approxCost)
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.3))
+            }
+
+            HStack(spacing: 14) {
+                Button { if resultsLimit > 4 { resultsLimit -= 1; HapticManager.shared.playTick() } } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(resultsLimit > 4 ? .white : .white.opacity(0.2))
+                        .frame(width: 32, height: 32)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .disabled(resultsLimit <= 4)
+
+                Text("\(resultsLimit)")
+                    .font(.system(size: 28, weight: .bold, design: .monospaced))
+                    .foregroundColor(gold)
+                    .frame(minWidth: 48)
+
+                Button { if resultsLimit < 25 { resultsLimit += 1; HapticManager.shared.playTick() } } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(resultsLimit < 25 ? .white : .white.opacity(0.2))
+                        .frame(width: 32, height: 32)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .disabled(resultsLimit >= 25)
+
+                Spacer()
+
+                Text("Range: 4–25")
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.25))
+            }
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private var approxCost: String {
+        // Apify charges ~$0.004/post + Claude distill ~$0.003. Rough estimate.
+        let dollars = Double(resultsLimit) * 0.004 + 0.003
+        return String(format: "~$%.3f / scrub", dollars)
     }
 
     // MARK: - Scrubbing (progress)
@@ -217,23 +279,96 @@ struct ScrubInstagramSheet: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
                 .padding(.horizontal, 24)
 
-                // Distilled style (editable)
+                // Tab switcher between STYLE and PLAYBOOK
+                if !(result?.engagementPlaybook ?? "").isEmpty {
+                    HStack(spacing: 0) {
+                        ForEach(ResultTab.allCases, id: \.self) { tab in
+                            let isSel = activeTab == tab
+                            Button { withAnimation(.easeOut(duration: 0.15)) { activeTab = tab } } label: {
+                                Text(tab.rawValue)
+                                    .font(.system(size: 11, weight: .heavy))
+                                    .tracking(1.6)
+                                    .foregroundColor(isSel ? gold : .white.opacity(0.45))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 9)
+                                    .background(
+                                        Capsule()
+                                            .fill(isSel ? gold.opacity(0.16) : Color.clear)
+                                            .overlay(Capsule().stroke(isSel ? gold.opacity(0.45) : Color.clear, lineWidth: 1))
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(3)
+                    .background(Capsule().fill(Color.white.opacity(0.05)))
+                    .padding(.horizontal, 24)
+                }
+
+                // Editable result content (style or playbook)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("DISTILLED STYLE")
+                    Text(activeTab == .style ? "DISTILLED STYLE" : "ENGAGEMENT PLAYBOOK")
                         .font(.system(size: 10, weight: .heavy))
                         .tracking(2)
                         .foregroundColor(gold)
+                    if activeTab == .playbook {
+                        Text("What WINS for this creator's audience — hooks, post types, and patterns the AI will copy.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.4))
+                            .lineSpacing(2)
+                    }
 
-                    TextEditor(text: $editableResult)
-                        .font(.system(size: 13))
-                        .foregroundColor(.white)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 140, maxHeight: 200)
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(gold.opacity(0.25), lineWidth: 1))
+                    if activeTab == .style {
+                        TextEditor(text: $editableResult)
+                            .font(.system(size: 13))
+                            .foregroundColor(.white)
+                            .scrollContentBackground(.hidden)
+                            .frame(minHeight: 140, maxHeight: 200)
+                            .padding(10)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(gold.opacity(0.25), lineWidth: 1))
+                    } else {
+                        TextEditor(text: $editablePlaybook)
+                            .font(.system(size: 13))
+                            .foregroundColor(.white)
+                            .scrollContentBackground(.hidden)
+                            .frame(minHeight: 140, maxHeight: 200)
+                            .padding(10)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(gold.opacity(0.25), lineWidth: 1))
+                    }
                 }
                 .padding(.horizontal, 24)
+
+                // Top performing posts preview
+                if let top = result?.topPosts, !top.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("TOP POSTS")
+                            .font(.system(size: 10, weight: .heavy))
+                            .tracking(2)
+                            .foregroundColor(.white.opacity(0.4))
+                        ForEach(Array(top.prefix(3).enumerated()), id: \.offset) { idx, p in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("#\(idx + 1)")
+                                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                    .foregroundColor(gold)
+                                    .frame(width: 24, alignment: .leading)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(p.firstLine.isEmpty ? "[no caption]" : p.firstLine)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .lineLimit(2)
+                                    Text(engagementSummary(p))
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.4))
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 24)
+                }
 
                 // Hashtags
                 if let tags = result?.hashtags, !tags.isEmpty {
@@ -335,14 +470,16 @@ struct ScrubInstagramSheet: View {
         errorText = nil
         phase = .scrubbing
         let url = profileURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let limit = resultsLimit
         Task {
             do {
-                let r = try await ScrubService.shared.scrub(profileURL: url)
+                let r = try await ScrubService.shared.scrub(profileURL: url, resultsLimit: limit)
                 await MainActor.run {
-                    // 1. Persist the scrub to the library so it's never lost.
+                    // 1. Persist to library.
                     let record = SavedScrub(
                         profileURL: url,
                         styleDescription: r.description,
+                        engagementPlaybook: r.engagementPlaybook,
                         hashtags: r.hashtags,
                         postsAnalyzed: r.postsAnalyzed
                     )
@@ -353,6 +490,7 @@ struct ScrubInstagramSheet: View {
                     savedRecord = record
                     result = r
                     editableResult = r.description
+                    editablePlaybook = r.engagementPlaybook
                     resolvedHandle = record.handle
                     phase = .review
                     HapticManager.shared.playSuccess()
@@ -371,26 +509,28 @@ struct ScrubInstagramSheet: View {
     private func loadFromSaved(_ saved: SavedScrub) {
         savedRecord = saved
         editableResult = saved.styleDescription
+        editablePlaybook = saved.engagementPlaybook
         resolvedHandle = saved.handle
-        // Synthesize a result struct so the review view can render uniformly.
+        // Synthesize a result struct so the review view renders uniformly.
         result = ScrubService.ScrubResult(
             description: saved.styleDescription,
+            engagementPlaybook: saved.engagementPlaybook,
             postsAnalyzed: saved.postsAnalyzed,
-            hashtags: saved.hashtags
+            hashtags: saved.hashtags,
+            topPosts: []
         )
         phase = .review
     }
 
     private func replaceProfile() {
-        let trimmed = editableResult.trimmingCharacters(in: .whitespacesAndNewlines)
-        currentProfile = String(trimmed.prefix(750))
-        // Mark this scrub as the active one in the library, so the green
-        // checkmark accurately reflects what's loaded in the textbox.
-        if let active = savedRecord, trimmed == active.styleDescription {
+        let trimmedStyle = editableResult.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPlay  = editablePlaybook.trimmingCharacters(in: .whitespacesAndNewlines)
+        currentProfile = String(trimmedStyle.prefix(750))
+        enginePlaybook = String(trimmedPlay.prefix(750))
+        // Mark this scrub as active when style still matches the saved record.
+        if let active = savedRecord, trimmedStyle == active.styleDescription {
             activeScrubId = active.id
         } else {
-            // User edited the text before applying — no perfect match,
-            // so don't claim it's an "active" library entry.
             activeScrubId = ""
         }
         HapticManager.shared.playAdded()
@@ -398,13 +538,31 @@ struct ScrubInstagramSheet: View {
     }
 
     private func appendToProfile() {
-        let trimmed = editableResult.trimmingCharacters(in: .whitespacesAndNewlines)
-        let combined = (currentProfile.trimmingCharacters(in: .whitespacesAndNewlines) + "\n\n" + trimmed)
+        let trimmedStyle = editableResult.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPlay  = editablePlaybook.trimmingCharacters(in: .whitespacesAndNewlines)
+        let combinedStyle = (currentProfile.trimmingCharacters(in: .whitespacesAndNewlines) + "\n\n" + trimmedStyle)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        currentProfile = String(combined.prefix(750))
-        // Append means the textbox is now a blend — no single scrub is "active".
+        let combinedPlay = (enginePlaybook.trimmingCharacters(in: .whitespacesAndNewlines) + "\n\n" + trimmedPlay)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        currentProfile = String(combinedStyle.prefix(750))
+        enginePlaybook = String(combinedPlay.prefix(750))
         activeScrubId = ""
         HapticManager.shared.playAdded()
         dismiss()
+    }
+
+    private func engagementSummary(_ p: ScrubService.ScrubResult.TopPost) -> String {
+        var parts: [String] = []
+        if p.likes > 0 { parts.append("\(formatCount(p.likes)) likes") }
+        if p.comments > 0 { parts.append("\(formatCount(p.comments)) comments") }
+        if p.views > 0 { parts.append("\(formatCount(p.views)) views") }
+        if !p.productType.isEmpty { parts.append(p.productType) }
+        return parts.joined(separator: " · ")
+    }
+
+    private func formatCount(_ n: Int) -> String {
+        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
+        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
+        return "\(n)"
     }
 }

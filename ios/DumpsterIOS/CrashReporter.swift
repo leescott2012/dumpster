@@ -26,11 +26,14 @@ final class CrashReporter {
         log.info("CrashReporter started (Sentry disabled)")
 
         // ─── Sentry wire-up — uncomment when SPM package is added ───
+        // Package URL: https://github.com/getsentry/sentry-cocoa
+        // In Xcode: File → Add Package Dependencies → enter URL above → add to DumpsterIOS target
         /*
         import Sentry
 
         SentrySDK.start { options in
-            options.dsn = "https://your-dsn-here@o0.ingest.sentry.io/0"
+            // DSN from NATIVE_PORT.md §9 (same org as web — add a separate iOS project in Sentry dashboard)
+            options.dsn = "https://cac00263ad517cfa1ab22990dff35fc2@o4511424233013248.ingest.us.sentry.io/4511424250576896"
             options.debug = false
             options.tracesSampleRate = 0.2          // 20% perf sampling
             options.profilesSampleRate = 0.2

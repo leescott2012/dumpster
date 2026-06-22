@@ -20,6 +20,18 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- URL scheme for Supabase magic link deep link: dumpster://auth/callback?token_hash=... -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.leescott.dumpster.ios</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>dumpster</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>DUMPSTER needs camera access to capture photos for your dumps.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

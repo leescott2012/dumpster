@@ -56,11 +56,17 @@ struct DumpCardView: View {
     @State private var isGenerating = false
     @State private var captionError: String?
     @State private var showDumpMenu = false
+    @State private var showChatSheet = false
     @State private var draggingPhotoId: String? = nil
 
     private var photos: [DumpPhoto] {
         let byID = Dictionary(uniqueKeysWithValues: allPhotos.map { ($0.id, $0) })
         return dump.photoIDs.compactMap { byID[$0] }
+    }
+
+    private var poolPhotos: [DumpPhoto] {
+        let inDump = Set(dump.photoIDs)
+        return Array(allPhotos.filter { !inDump.contains($0.id) }.prefix(30))
     }
 
     var body: some View {
@@ -87,10 +93,20 @@ struct DumpCardView: View {
                 dump: dump,
                 isGenerating: isGenerating,
                 photosEmpty: photos.isEmpty,
+                onChat: { showChatSheet = true },
                 onCaptions: { Task { await generateCaptions() } },
                 onShare: shareDump,
+                onInstagram: { /* handle instagram */ },
                 onDelete: { showDeleteConfirm = true },
                 onHeart: { recordTasteExample(positive: true) }
+            )
+        }
+        .sheet(isPresented: $showChatSheet) {
+            DumpChatSheet(
+                dump: dump,
+                dumpPhotos: photos,
+                poolPhotos: poolPhotos,
+                tasteExamples: tasteExamples
             )
         }
         .confirmationDialog("Delete this dump?", isPresented: $showDeleteConfirm) {
@@ -489,6 +505,8 @@ struct DumpCardView: View {
         let av = UIActivityViewController(activityItems: images, applicationActivities: nil)
         av.popoverPresentationController?.sourceView = root.view
         root.present(av, animated: true)
+        // Dashboard: a dump's photos were exported/shared.
+        Analytics.track(.dumpExported, metadata: ["photo_count": images.count])
     }
 
     @MainActor

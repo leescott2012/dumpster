@@ -9,8 +9,10 @@ struct DumpMenuSheet: View {
     let dump: PhotoDump
     let isGenerating: Bool
     let photosEmpty: Bool
+    let onChat: () -> Void
     let onCaptions: () -> Void
     let onShare: () -> Void
+    let onInstagram: () -> Void
     let onDelete: () -> Void
     let onHeart: () -> Void
 
@@ -35,6 +37,18 @@ struct DumpMenuSheet: View {
                     .tracking(2)
                     .foregroundColor(gold)
                     .padding(.bottom, 20)
+
+                // Chat with AI
+                menuItem(
+                    icon: "bubble.left.and.text.bubble.right",
+                    label: "Chat with AI",
+                    tint: gold
+                ) {
+                    onChat()
+                    dismiss()
+                }
+
+                Divider().background(Color.white.opacity(0.07))
 
                 // Generate Captions
                 menuItem(
@@ -62,6 +76,19 @@ struct DumpMenuSheet: View {
                     Divider().background(Color.white.opacity(0.07))
                 }
 
+                // Send to Instagram
+                menuItem(
+                    icon: "camera.on.rectangle",
+                    label: "Send to Instagram",
+                    tint: Color(red: 0.83, green: 0.34, blue: 0.65),
+                    disabled: photosEmpty
+                ) {
+                    onInstagram()
+                    dismiss()
+                }
+
+                Divider().background(Color.white.opacity(0.07))
+
                 // Share
                 menuItem(icon: "square.and.arrow.up", label: "Share Dump", tint: .white) {
                     onShare()
@@ -79,7 +106,7 @@ struct DumpMenuSheet: View {
                 Spacer().frame(height: 32)
             }
         }
-        .presentationDetents([dump.isAIGenerated ? .height(320) : .height(260)])
+        .presentationDetents([dump.isAIGenerated ? .height(380) : .height(320)])
         .presentationDragIndicator(.hidden)
     }
 

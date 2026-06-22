@@ -229,55 +229,105 @@ struct AISuggestView: View {
             }
 
             if !isAnalyzing {
-                // Number of dumps stepper
-                VStack(spacing: 8) {
-                    Text("HOW MANY DUMPS?")
-                        .font(.system(size: 10, weight: .heavy))
-                        .tracking(2)
-                        .foregroundColor(.white.opacity(0.35))
+                HStack(spacing: 24) {
+                    // Number of dumps stepper
+                    VStack(spacing: 8) {
+                        Text("DUMPS")
+                            .font(.system(size: 9, weight: .heavy))
+                            .tracking(2)
+                            .foregroundColor(.white.opacity(0.35))
 
-                    HStack(spacing: 20) {
-                        Button {
-                            if requestedDumpCount > 1 { requestedDumpCount -= 1 }
-                        } label: {
-                            Image(systemName: "minus")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(requestedDumpCount > 1 ? .white : .white.opacity(0.2))
-                                .frame(width: 40, height: 40)
-                                .background(Color.white.opacity(0.08))
-                                .clipShape(Circle())
+                        HStack(spacing: 12) {
+                            Button {
+                                if requestedDumpCount > 1 { requestedDumpCount -= 1 }
+                            } label: {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(requestedDumpCount > 1 ? .white : .white.opacity(0.2))
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(Circle())
+                            }
+                            .disabled(requestedDumpCount <= 1)
+
+                            Text("\(requestedDumpCount)")
+                                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                                .foregroundColor(gold)
+                                .frame(width: 44)
+
+                            Button {
+                                if requestedDumpCount < dumpCountMax { requestedDumpCount += 1 }
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(requestedDumpCount < dumpCountMax ? .white : .white.opacity(0.2))
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(Circle())
+                            }
+                            .disabled(requestedDumpCount >= dumpCountMax)
                         }
-                        .disabled(requestedDumpCount <= 1)
 
-                        Text("\(requestedDumpCount)")
-                            .font(.system(size: 36, weight: .bold, design: .monospaced))
-                            .foregroundColor(gold)
-                            .frame(width: 64)
-
-                        Button {
-                            if requestedDumpCount < dumpCountMax { requestedDumpCount += 1 }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(requestedDumpCount < dumpCountMax ? .white : .white.opacity(0.2))
-                                .frame(width: 40, height: 40)
-                                .background(Color.white.opacity(0.08))
-                                .clipShape(Circle())
-                        }
-                        .disabled(requestedDumpCount >= dumpCountMax)
+                        Text("max 3")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.2))
                     }
 
-                    // Pool size hint
-                    VStack(spacing: 4) {
-                        Text("\(availablePhotos.count) photo\(availablePhotos.count == 1 ? "" : "s") in pool")
-                            .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.25))
-                        Text("Max 3 dumps")
-                            .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.25))
+                    // Divider
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(width: 1, height: 80)
+
+                    // Photos per dump stepper
+                    VStack(spacing: 8) {
+                        Text("PHOTOS EACH")
+                            .font(.system(size: 9, weight: .heavy))
+                            .tracking(2)
+                            .foregroundColor(.white.opacity(0.35))
+
+                        HStack(spacing: 12) {
+                            Button {
+                                if maxPhotosPerDump > 3 { maxPhotosPerDump -= 1 }
+                            } label: {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(maxPhotosPerDump > 3 ? .white : .white.opacity(0.2))
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(Circle())
+                            }
+                            .disabled(maxPhotosPerDump <= 3)
+
+                            Text("\(maxPhotosPerDump)")
+                                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                                .foregroundColor(gold)
+                                .frame(width: 44)
+
+                            Button {
+                                if maxPhotosPerDump < 20 { maxPhotosPerDump += 1 }
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(maxPhotosPerDump < 20 ? .white : .white.opacity(0.2))
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(Circle())
+                            }
+                            .disabled(maxPhotosPerDump >= 20)
+                        }
+
+                        Text("max 20")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.2))
                     }
                 }
                 .padding(.horizontal, 32)
+
+                // Pool size hint
+                Text("\(availablePhotos.count) photo\(availablePhotos.count == 1 ? "" : "s") in pool")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.25))
+                    .padding(.top, 4)
 
                 if availablePhotos.isEmpty {
                     VStack(spacing: 8) {

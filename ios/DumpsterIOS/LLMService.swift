@@ -496,6 +496,145 @@ final class LLMService: ObservableObject {
 
     var hasAPIKey: Bool { hasAnyAPIKey }
 
+    // MARK: - Dump Chat
+
+    struct ChatPhoto {
+        let id: String
+        let category: String
+        let labels: [String]
+    }
+
+    struct ChatHistoryMessage {
+        let role: String   // "user" or "assistant"
+        let text: String
+    }
+
+    struct ChatAction: Codable {
+        let type: String
+        var photoIds: [String]?
+        var photoId: String?
+        var position: Int?
+        var index: Int?
+        var vibe: String?
+        var preference: String?
+    }
+
+    struct DumpChatResponse {
+        let reply: String
+        let actions: [ChatAction]
+    }
+
+    func chatWithDump(
+        dumpTitle: String,
+        dumpPhotos: [ChatPhoto],
+        poolPhotos: [ChatPhoto],
+        history: [ChatHistoryMessage],
+        message: String,
+        vibe: String?,
+        tasteBlock: String = ""
+    ) async throws -> DumpChatResponse {
+        guard hasAnyAPIKey else { throw LLMError.noAPIKey }
+
+        let dumpDesc = dumpPhotos.enumerated().map { i, p in
+            "  \(i + 1). [\(p.id)] \(p.category) — \(p.labels.prefix(3).joined(separator: ", "))"
+        }.joined(separator: "\n")
+
+        let poolCapped = Array(poolPhotos.prefix(30))
+        let poolDesc = poolCapped.map { p in
+            "  [\(p.id)] \(p.category) — \(p.labels.prefix(3).joined(separator: ", "))"
+        }.joined(separator: "\n")
+
+        let context = userContextBlock(tasteBlock: tasteBlock)
+        let vibeSection = vibe.map { "\nCurrent vibe tag: \"\($0)\"" } ?? ""
+
+        let systemPrompt = """
+        You are the AI assistant inside Dumpster, an Instagram carousel sequencing app. \
+        The user is chatting with you about a specific dump (carousel). You can:
+        1. REORDER photos in the dump
+        2. SWAP IN photos from the pool into the dump
+        3. SWAP OUT photos from the dump back to the pool
+        4. UPDATE the dump's vibe tag
+        5. REMEMBER taste preferences for future sessions
+
+        CURRENT DUMP: "\(dumpTitle)"\(vibeSection)
+        Photos in dump (in order):
+        \(dumpDesc.isEmpty ? "  (empty)" : dumpDesc)
+
+        AVAILABLE POOL PHOTOS:
+        \(poolDesc.isEmpty ? "  (none)" : poolDesc)
+        \(context)
+
+        RULES:
+        - Be concise and conversational. Sound like a creative director, not a robot.
+        - When you take actions, explain what you did and why in 1-2 sentences.
+        - If the user is just chatting or asking questions, respond naturally — don't force actions.
+        - When you do take actions, ALSO include taste_update actions to remember preferences.
+        - Dump max is 20 photos.
+
+        RESPONSE FORMAT — respond ONLY with valid JSON, no markdown, no code fences:
+        {"reply": "Your conversational response", "actions": [{"type": "reorder", "photoIds": ["id1", "id2", ...]}, {"type": "swap_in", "photoId": "pool-photo-id", "position": 2}, {"type": "swap_out", "index": 3}, {"type": "update_vibe", "vibe": "new vibe text"}, {"type": "taste_update", "preference": "prefers nightlife-heavy openers"}]}
+        "actions" can be empty [] if no changes are needed.
+        """
+
+        var userPrompt = ""
+        for msg in history {
+            userPrompt += "[\(msg.role)]: \(msg.text)\n"
+        }
+        userPrompt += "[user]: \(message)"
+
+        let request = LLMRequest(systemPrompt: systemPrompt, userPrompt: userPrompt, temperature: 0.7, maxTokens: 1024)
+        let raw = try await generate(request: request)
+        return parseChatResponse(raw)
+    }
+
+    private func parseChatResponse(_ content: String) -> DumpChatResponse {
+        let clean = content
+            .replacingOccurrences(of: "```json", with: "")
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let data = clean.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return DumpChatResponse(reply: content.trimmingCharacters(in: .whitespacesAndNewlines), actions: [])
+        }
+
+        let reply = (json["reply"] as? String) ?? content
+        var validActions: [ChatAction] = []
+
+        if let rawActions = json["actions"] as? [[String: Any]] {
+            for raw in rawActions {
+                guard let type = raw["type"] as? String else { continue }
+                switch type {
+                case "reorder":
+                    if let ids = raw["photoIds"] as? [String] {
+                        validActions.append(ChatAction(type: type, photoIds: ids))
+                    }
+                case "swap_in":
+                    if let pid = raw["photoId"] as? String {
+                        let pos = raw["position"] as? Int
+                        validActions.append(ChatAction(type: type, photoId: pid, position: pos))
+                    }
+                case "swap_out":
+                    if let idx = raw["index"] as? Int {
+                        validActions.append(ChatAction(type: type, index: idx))
+                    }
+                case "update_vibe":
+                    if let v = raw["vibe"] as? String {
+                        validActions.append(ChatAction(type: type, vibe: v))
+                    }
+                case "taste_update":
+                    if let pref = raw["preference"] as? String {
+                        validActions.append(ChatAction(type: type, preference: pref))
+                    }
+                default:
+                    break
+                }
+            }
+        }
+
+        return DumpChatResponse(reply: reply, actions: validActions)
+    }
+
     // MARK: - Errors
 
     enum LLMError: LocalizedError {

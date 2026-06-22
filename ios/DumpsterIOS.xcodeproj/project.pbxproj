@@ -24,6 +24,8 @@
 		9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */; };
 		A1A2A3A4B5B6B7B8C9C0D1D2 /* AITasteExample.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E2E3E4F5F6A7A8B9B0C1C2 /* AITasteExample.swift */; };
 		B5B5B5B5C6C6C6C6D7D7D7D7 /* SavedScrub.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E2E2E2F3F3F3F3A4A4A4A4 /* SavedScrub.swift */; };
+		CC11DD22EE33FF44AA55BB66 /* DumpChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC11DD22EE33FF44AA55BB67 /* DumpChatMessage.swift */; };
+		CC22DD33EE44FF55AA66BB77 /* DumpChatSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC22DD33EE44FF55AA66BB78 /* DumpChatSheet.swift */; };
 		AA01BB02CC03DD04EE05FF06 /* PhotoMenuSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01BB02CC03DD04EE05FF07 /* PhotoMenuSheet.swift */; };
 		AA11BB22CC33DD44EE55FF66 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF11EE22DD33CC44BB55AA66 /* HapticManager.swift */; };
 		AA22CC33DD44EE55FF660077 /* ScrubService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55006677AA /* ScrubService.swift */; };
@@ -48,6 +50,15 @@
 		F2690B2D2FA5BC44000AA4F6 /* CaptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2690B2A2FA5BC44000AA4F6 /* CaptionService.swift */; };
 		FD212AA6B74AAD58FC19138E /* PhotoDump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36E61C275F679BEBC565B6B8 /* PhotoDump.swift */; };
 		FF82148B05EDB0CEFD9202E3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */; };
+		B011D0C00000000000000001 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000001 /* AuthManager.swift */; };
+		B011D0C00000000000000002 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000002 /* SupabaseClient.swift */; };
+		B011D0C00000000000000003 /* AIProfileSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000003 /* AIProfileSync.swift */; };
+		B011D0C00000000000000004 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000004 /* Secrets.swift */; };
+		B011D0C00000000000000005 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000005 /* SignInView.swift */; };
+		B011D0C00000000000000006 /* SyncAccountCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000006 /* SyncAccountCard.swift */; };
+		B011D0C00000000000000007 /* BugReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000007 /* BugReportSheet.swift */; };
+		B011D0C00000000000000008 /* InstagramExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000008 /* InstagramExporter.swift */; };
+		B011D0C00000000000000009 /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000009 /* Analytics.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -83,6 +94,8 @@
 		DBEC3288F059A41256981069 /* PhotoCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoCardView.swift; sourceTree = "<group>"; };
 		E1E2E3E4F5F6A7A8B9B0C1C2 /* AITasteExample.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AITasteExample.swift; sourceTree = "<group>"; };
 		E2E2E2E2F3F3F3F3A4A4A4A4 /* SavedScrub.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SavedScrub.swift; sourceTree = "<group>"; };
+		CC11DD22EE33FF44AA55BB67 /* DumpChatMessage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpChatMessage.swift; sourceTree = "<group>"; };
+		CC22DD33EE44FF55AA66BB78 /* DumpChatSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpChatSheet.swift; sourceTree = "<group>"; };
 		E1E2E3E4F5F6A7A8B9B0C1C3 /* CrashReporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CrashReporter.swift; sourceTree = "<group>"; };
 		E2EF2DF6E4FCD33732C83403 /* DumpsterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DumpsterApp.swift; sourceTree = "<group>"; };
 		F2651D252FAA7733009E2389 /* Contentview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Contentview.swift; sourceTree = "<group>"; };
@@ -94,6 +107,15 @@
 		FF11EE22DD33CC44BB55AA66 /* HapticManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 		FF22DD33EE44FF55006677AA /* ScrubService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScrubService.swift; sourceTree = "<group>"; };
 		FF33EE44FF55006677889900 /* ScrubInstagramSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScrubInstagramSheet.swift; sourceTree = "<group>"; };
+		D0C0FFEE0000000000000001 /* AuthManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		D0C0FFEE0000000000000002 /* SupabaseClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
+		D0C0FFEE0000000000000003 /* AIProfileSync.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AIProfileSync.swift; sourceTree = "<group>"; };
+		D0C0FFEE0000000000000004 /* Secrets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
+		D0C0FFEE0000000000000005 /* SignInView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+		D0C0FFEE0000000000000006 /* SyncAccountCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncAccountCard.swift; sourceTree = "<group>"; };
+		D0C0FFEE0000000000000007 /* BugReportSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BugReportSheet.swift; sourceTree = "<group>"; };
+		D0C0FFEE0000000000000008 /* InstagramExporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InstagramExporter.swift; sourceTree = "<group>"; };
+		D0C0FFEE0000000000000009 /* Analytics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,6 +139,7 @@
 				6F80D6842A3F2E2562A0926D /* DumpCaption.swift */,
 				E1E2E3E4F5F6A7A8B9B0C1C2 /* AITasteExample.swift */,
 				E2E2E2E2F3F3F3F3A4A4A4A4 /* SavedScrub.swift */,
+				CC11DD22EE33FF44AA55BB67 /* DumpChatMessage.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -136,6 +159,10 @@
 				702838F65FF68DD79CFE568A /* MainAppView.swift */,
 				6773F78BA7CBCB0A7D7DE45E /* SpotlightTutorialView.swift */,
 				FF33EE44FF55006677889900 /* ScrubInstagramSheet.swift */,
+				CC22DD33EE44FF55AA66BB78 /* DumpChatSheet.swift */,
+				D0C0FFEE0000000000000005 /* SignInView.swift */,
+				D0C0FFEE0000000000000006 /* SyncAccountCard.swift */,
+				D0C0FFEE0000000000000007 /* BugReportSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -149,6 +176,7 @@
 				230A26BB7172434E549C9A9D /* UndoManager.swift */,
 				81E7E5BB2905556C06187290 /* DebugSeeder.swift */,
 				FF11EE22DD33CC44BB55AA66 /* HapticManager.swift */,
+				D0C0FFEE0000000000000008 /* InstagramExporter.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -173,6 +201,11 @@
 				E1E2E3E4F5F6A7A8B9B0C1C3 /* CrashReporter.swift */,
 				942EA7AB9A670BD8CC090DEF /* PaywallView.swift */,
 				976F59813A22C1FE20995D5D /* FileCabinetMenuView.swift */,
+				D0C0FFEE0000000000000001 /* AuthManager.swift */,
+				D0C0FFEE0000000000000002 /* SupabaseClient.swift */,
+				D0C0FFEE0000000000000003 /* AIProfileSync.swift */,
+				D0C0FFEE0000000000000004 /* Secrets.swift */,
+				D0C0FFEE0000000000000009 /* Analytics.swift */,
 				3BEC8A6E8CED6C5D71D1B72C /* Models */,
 				B7092703833006DB08AE3502 /* Utilities */,
 				AA214145C35263E5BD31FE6B /* Views */,
@@ -321,6 +354,17 @@
 				4FA9614A1AC84564DABB074C /* SpotlightTutorialView.swift in Sources */,
 				A1A2A3A4B5B6B7B8C9C0D1D2 /* AITasteExample.swift in Sources */,
 				B5B5B5B5C6C6C6C6D7D7D7D7 /* SavedScrub.swift in Sources */,
+				CC11DD22EE33FF44AA55BB66 /* DumpChatMessage.swift in Sources */,
+				CC22DD33EE44FF55AA66BB77 /* DumpChatSheet.swift in Sources */,
+				B011D0C00000000000000001 /* AuthManager.swift in Sources */,
+				B011D0C00000000000000002 /* SupabaseClient.swift in Sources */,
+				B011D0C00000000000000003 /* AIProfileSync.swift in Sources */,
+				B011D0C00000000000000004 /* Secrets.swift in Sources */,
+				B011D0C00000000000000005 /* SignInView.swift in Sources */,
+				B011D0C00000000000000006 /* SyncAccountCard.swift in Sources */,
+				B011D0C00000000000000007 /* BugReportSheet.swift in Sources */,
+				B011D0C00000000000000008 /* InstagramExporter.swift in Sources */,
+				B011D0C00000000000000009 /* Analytics.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

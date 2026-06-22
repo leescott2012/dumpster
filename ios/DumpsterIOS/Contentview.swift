@@ -139,6 +139,11 @@ struct ContentView: View {
                     .zIndex(40)
                     .transition(.opacity)
             }
+
+            // Floating bug report button (NATIVE_PORT.md §2)
+            BugReportButton()
+                .zIndex(50)
+                .allowsHitTesting(true)
         }
         .background(Color.black)
         .onAppear {

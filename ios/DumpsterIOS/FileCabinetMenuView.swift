@@ -67,8 +67,8 @@ struct FileCabinetMenuView: View {
 
     var body: some View {
         ZStack {
-            // Dimmed backdrop
-            Color.black.opacity(appearAnimation ? 0.85 : 0.0)
+            // Solid backdrop — fully opaque so content behind doesn't bleed through
+            Color.black.opacity(appearAnimation ? 1.0 : 0.0)
                 .ignoresSafeArea()
                 .onTapGesture {
                     if selectedTab != nil {
@@ -125,15 +125,18 @@ struct FileCabinetMenuView: View {
             cabinetHeader
 
             // File Cabinet Body
-            VStack(spacing: 0) {
-                ForEach(Array(CabinetTab.allCases.enumerated()), id: \.element.id) { index, tab in
-                    tabFolder(tab: tab, index: index)
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(CabinetTab.allCases.enumerated()), id: \.element.id) { index, tab in
+                        tabFolder(tab: tab, index: index)
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
 
-            Spacer()
+            Spacer(minLength: 0)
 
             // Bottom branding
             HStack(spacing: 6) {
@@ -150,6 +153,7 @@ struct FileCabinetMenuView: View {
             }
             .padding(.bottom, 40)
         }
+        .background(Color.black)
     }
 
     private var cabinetHeader: some View {
@@ -202,35 +206,35 @@ struct FileCabinetMenuView: View {
 
                 // Tab sticking out
                 HStack(spacing: 0) {
-                    // Spacer to offset each tab
+                    // Spacer to offset each tab — tighter stagger so tabs don't run off screen
                     Spacer()
-                        .frame(width: CGFloat(index) * 52 + 16)
+                        .frame(width: CGFloat(index) * 40 + 16)
 
                     // The tab itself
                     VStack(spacing: 0) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: tab.icon)
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: 9, weight: .semibold))
                             Text(tab.title)
-                                .font(.system(size: 9, weight: .bold))
-                                .tracking(1.5)
+                                .font(.system(size: 8, weight: .bold))
+                                .tracking(1.2)
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundColor(darkBg)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
                         .background(
                             UnevenRoundedRectangle(
-                                topLeadingRadius: 8,
+                                topLeadingRadius: 7,
                                 bottomLeadingRadius: 0,
                                 bottomTrailingRadius: 0,
-                                topTrailingRadius: 8
+                                topTrailingRadius: 7
                             )
                             .fill(tab.tabColor)
                         )
                     }
-                    .offset(y: -26)
+                    .offset(y: -22)
 
                     Spacer()
                 }
@@ -261,8 +265,8 @@ struct FileCabinetMenuView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
             }
-            .frame(height: 80)
-            .padding(.top, 20) // Space for the tab
+            .frame(height: 72)
+            .padding(.top, 24) // Space for the tab (must be >= tab offset of 22)
             .opacity(tabsVisible ? 1 : 0)
             .offset(y: tabsVisible ? 0 : 20)
             .animation(
@@ -469,6 +473,11 @@ struct AISettingsTabView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+
+            // Account & Cloud Sync (NATIVE_PORT.md §1)
+            CabinetSectionHeader("ACCOUNT & SYNC", icon: "icloud.and.arrow.up")
+            SyncAccountCard()
+                .padding(.horizontal, 24)
 
             // AI Style Profile
             CabinetSectionHeader("AI STYLE PROFILE", icon: "person.text.rectangle")

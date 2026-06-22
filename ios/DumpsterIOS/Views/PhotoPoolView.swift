@@ -410,6 +410,7 @@ struct PhotoPoolView: View {
     }
 
     private func importPickedPhotos(_ items: [PhotosPickerItem]) async {
+        var added = 0
         for item in items {
             if let data = try? await item.loadTransferable(type: Data.self),
                let uiImage = UIImage(data: data) {
@@ -420,10 +421,13 @@ struct PhotoPoolView: View {
                     filename: filename
                 )
                 modelContext.insert(photo)
+                added += 1
             }
         }
         try? modelContext.save()
         pickerItems.removeAll()
+        // Dashboard: photos landed in the pool.
+        if added > 0 { Analytics.track(.photoUploaded, metadata: ["count": added]) }
     }
 }
 

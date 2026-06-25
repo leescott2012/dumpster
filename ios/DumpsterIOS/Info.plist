@@ -32,6 +32,12 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Allow canOpenURL() to detect Instagram for the share/export hand-off -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>instagram</string>
+		<string>instagram-stories</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>DUMPSTER needs camera access to capture photos for your dumps.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

@@ -412,10 +412,11 @@ struct PhotoPoolView: View {
     private func importPickedPhotos(_ items: [PhotosPickerItem]) async {
         var added = 0
         for item in items {
+            // Save the ORIGINAL bytes verbatim — full resolution, original
+            // format, and EXIF preserved (no UIImage decode/re-encode).
             if let data = try? await item.loadTransferable(type: Data.self),
-               let uiImage = UIImage(data: data) {
-                let filename = UUID().uuidString + ".jpg"
-                let localPath = PhotoStorageManager.shared.saveImage(uiImage, filename: filename)
+               let localPath = PhotoStorageManager.shared.saveImageData(data) {
+                let filename = (localPath as NSString).lastPathComponent
                 let photo = DumpPhoto(
                     localPath: localPath,
                     filename: filename

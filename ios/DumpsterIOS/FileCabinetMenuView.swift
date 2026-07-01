@@ -581,12 +581,23 @@ struct AISettingsTabView: View {
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
             .onChange(of: styleProfile) { _, newVal in
-                guard !activeScrubId.isEmpty else { return }
+                guard !activeScrubId.isEmpty else {
+                    scheduleCloudSync()
+                    return
+                }
                 if let active = savedScrubs.first(where: { $0.id == activeScrubId }),
                    active.styleDescription != newVal {
                     activeScrubId = ""
                 }
+                scheduleCloudSync()
             }
+    }
+
+    /// Push taste_profile / ai_rules / caption_pool to Supabase so edits made here
+    /// survive across devices. `scheduleSave` no-ops without a signed-in session.
+    private func scheduleCloudSync() {
+        guard let userId = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt else { return }
+        AIProfileSync.shared.scheduleSave(userId: userId, jwt: jwt)
     }
 
     private var generateFromInstagramButton: some View {
@@ -649,6 +660,7 @@ struct AISettingsTabView: View {
     private func writeRules(_ rules: [String]) {
         aiRules = rules.joined(separator: "\n")
         flashSaved()
+        scheduleCloudSync()
     }
 
     private func deleteRule(at index: Int) {

@@ -8,7 +8,8 @@ struct CaptionPoolView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var cs
 
-    @Query(sort: \DumpCaption.createdAt, order: .reverse) private var allCaptions: [DumpCaption]
+    @Query(filter: #Predicate<DumpCaption> { $0.deleted == false },
+           sort: \DumpCaption.createdAt, order: .reverse) private var allCaptions: [DumpCaption]
 
     @State private var selectedStyle: String = "storytelling"
     @State private var customText: String = ""
@@ -218,16 +219,22 @@ struct CaptionPoolView: View {
                     cap.favorited.toggle()
                     if cap.favorited { cap.banned = false }
                     try? modelContext.save()
+                    scheduleCloudSync()
                 }
                 actionButton(cap.banned ? "hand.thumbsdown.fill" : "hand.thumbsdown",
                              tint: cap.banned ? Theme.removeText : nil) {
                     cap.banned.toggle()
                     if cap.banned { cap.favorited = false }
                     try? modelContext.save()
+                    scheduleCloudSync()
                 }
                 actionButton("trash") {
-                    modelContext.delete(cap)
+                    // Tombstone rather than hard-delete: AIProfileSync merges captions by
+                    // id across devices, and a hard-deleted row would just reappear on the
+                    // next sign-in sync pulling the still-live cloud copy.
+                    cap.deleted = true
                     try? modelContext.save()
+                    scheduleCloudSync()
                 }
             }
         }
@@ -243,5 +250,12 @@ struct CaptionPoolView: View {
                 .foregroundColor(tint ?? Theme.text2(appState.colorMode, cs))
                 .frame(width: 26, height: 26)
         }
+    }
+
+    /// Push caption_pool to Supabase so favorite/ban/delete survive across devices.
+    /// No-ops without a signed-in session.
+    private func scheduleCloudSync() {
+        guard let userId = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt else { return }
+        AIProfileSync.shared.scheduleSave(userId: userId, jwt: jwt)
     }
 }

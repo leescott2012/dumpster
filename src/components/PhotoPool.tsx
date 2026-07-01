@@ -12,6 +12,32 @@ const FILTER_OPTIONS: { key: Filter; label: string }[] = [
 
 const POOL_COLS: Record<string, number> = { small: 6, medium: 4, large: 2 };
 
+function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '6px 14px',
+        borderRadius: 20,
+        fontSize: 12,
+        fontWeight: 600,
+        background: active ? 'var(--gold)' : 'var(--bg2)',
+        border: `1px solid ${active ? 'var(--gold)' : 'var(--border2)'}`,
+        color: active ? '#000' : 'var(--text3)',
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+        whiteSpace: 'nowrap',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 32,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function PhotoPool() {
   const {
     photos, dumps, filter, activeFilters, poolSize, poolSearchQuery,
@@ -19,6 +45,9 @@ export default function PhotoPool() {
     setFilter, toggleActiveFilter, setPoolSize, setPoolSearch,
     addingToDumpId, setAddingToDump, rescanPhoto,
   } = useStore();
+
+  // Suppress unused variable warnings for build
+  void toggleStar; void toggleHuji; void removePhoto;
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState({ done: 0, total: 0 });
 
@@ -143,140 +172,148 @@ export default function PhotoPool() {
           onClick={handleRescanAll}
           disabled={scanning}
           style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-            padding: '5px 12px', borderRadius: 6,
+            fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+            padding: '7px 16px', borderRadius: 20,
             background: scanning ? 'var(--gold-dim)' : 'var(--bg2)',
             border: `1px solid ${scanning ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-            color: scanning ? 'var(--gold)' : 'var(--text3)',
+            color: scanning ? 'var(--gold)' : 'var(--text)',
             cursor: scanning ? 'default' : 'pointer',
             transition: 'all 0.15s', whiteSpace: 'nowrap',
+            display: 'flex', alignItems: 'center', gap: 6
           }}
         >
-          {scanning ? `Scanning ${scanProgress.done}/${scanProgress.total}` : 'Rescan All'}
+          {scanning && <span className="spinner" style={{ width: 12, height: 12, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 1s linear infinite' }} />}
+          {scanning ? `SCANNING ${scanProgress.done}/${scanProgress.total}` : 'SCAN PHOTOS'}
         </button>
       </div>
 
       {/* Filter bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-
-        {/* Hamburger menu */}
-        <div ref={menuRef} style={{ position: 'relative' }}>
-          <button
-            onClick={() => setMenuOpen(o => !o)}
-            style={{
-              width: 32, height: 32, borderRadius: 6,
-              background: menuOpen ? 'var(--gold-dim)' : 'var(--bg2)',
-              border: `1px solid ${menuOpen ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-              cursor: 'pointer', display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 3,
-              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-              transform: menuOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-            }}
-          >
-            {[0, 1, 2].map(i => (
-              <div key={i} style={{
-                width: 12, height: 1.5, borderRadius: 1,
-                background: menuOpen ? 'var(--gold)' : 'var(--text3)',
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+        
+        {/* Left Actions: Hamburger + Chips */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, overflow: 'hidden' }}>
+          {/* Hamburger menu */}
+          <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={() => setMenuOpen(o => !o)}
+              style={{
+                width: 32, height: 32, borderRadius: 20,
+                background: menuOpen ? 'var(--gold-dim)' : 'var(--bg2)',
+                border: `1px solid ${menuOpen ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
+                cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 3,
                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-              }} />
-            ))}
-          </button>
+                transform: menuOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}
+            >
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{
+                  width: 12, height: 1.5, borderRadius: 1,
+                  background: menuOpen ? 'var(--gold)' : 'var(--text3)',
+                  transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                }} />
+              ))}
+            </button>
 
-          <div
-            style={{
-              position: 'absolute', top: 0, left: 38, zIndex: 100,
-              background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-              border: '1px solid var(--border2)',
-              borderRadius: 10, padding: '6px 8px',
-              boxShadow: menuOpen ? '0 8px 32px rgba(0,0,0,0.25)' : 'none',
-              opacity: menuOpen ? 1 : 0,
-              transform: menuOpen ? 'translateX(0) scale(1)' : 'translateX(-12px) scale(0.96)',
-              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-              pointerEvents: menuOpen ? 'auto' : 'none',
-              display: 'flex', gap: 4, alignItems: 'center',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {FILTER_OPTIONS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => toggleActiveFilter(key)}
-                style={{
-                  padding: '6px 12px', borderRadius: 16,
-                  fontSize: 11, fontWeight: 600,
-                  background: activeFilters.includes(key) ? 'var(--gold-dim)' : 'transparent',
-                  border: `1px solid ${activeFilters.includes(key) ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-                  color: activeFilters.includes(key) ? 'var(--gold)' : 'var(--text3)',
-                  cursor: 'pointer', transition: 'all 0.15s',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {label}
-              </button>
+            <div
+              style={{
+                position: 'absolute', top: 38, left: 0, zIndex: 100,
+                background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                border: '1px solid var(--border2)',
+                borderRadius: 12, padding: '8px',
+                boxShadow: menuOpen ? '0 8px 32px rgba(0,0,0,0.25)' : 'none',
+                opacity: menuOpen ? 1 : 0,
+                transform: menuOpen ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.96)',
+                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                pointerEvents: menuOpen ? 'auto' : 'none',
+                display: 'flex', flexDirection: 'column', gap: 4,
+                minWidth: 140
+              }}
+            >
+              {FILTER_OPTIONS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => { toggleActiveFilter(key); setMenuOpen(false); }}
+                  style={{
+                    padding: '8px 12px', borderRadius: 8,
+                    fontSize: 12, fontWeight: 600, textAlign: 'left',
+                    background: activeFilters.includes(key) ? 'var(--gold-dim)' : 'transparent',
+                    border: 'none',
+                    color: activeFilters.includes(key) ? 'var(--gold)' : 'var(--text)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Active filter chips (scrollable) */}
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingRight: 10, scrollbarWidth: 'none' }} className="no-scrollbar">
+            <FilterChip label="All" active={activeFilters.length === 0} onClick={() => { setFilter('all'); useStore.setState({ activeFilters: [] }); }} />
+            {activeFilters.map(f => (
+              <FilterChip
+                key={f}
+                label={FILTER_OPTIONS.find(o => o.key === f)?.label ?? f}
+                active={true}
+                onClick={() => toggleActiveFilter(f)}
+              />
             ))}
           </div>
         </div>
 
-        {/* Active filter chips (scrollable) */}
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', flex: 1 }} className="dump-photos-row">
-          <FilterChip label="All" active={activeFilters.length === 0} onClick={() => { setFilter('all'); useStore.getState().activeFilters.length && useStore.setState({ activeFilters: [] }); }} />
-          {activeFilters.map(f => (
-            <FilterChip
-              key={f}
-              label={FILTER_OPTIONS.find(o => o.key === f)?.label ?? f}
-              active={true}
-              onClick={() => toggleActiveFilter(f)}
-            />
-          ))}
-        </div>
-
-        {/* Search button */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => { setSearchOpen(o => !o); if (searchOpen) setPoolSearch(''); }}
-            style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: searchOpen ? 'var(--gold-dim)' : 'var(--bg2)',
-              border: `1px solid ${searchOpen ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-              cursor: 'pointer', fontSize: 14,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: searchOpen ? 'var(--gold)' : 'var(--text3)',
-              transition: 'all 0.15s',
-            }}
-          ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/></svg></button>
-          {searchOpen && (
-            <input
-              autoFocus
-              value={poolSearchQuery}
-              onChange={e => setPoolSearch(e.target.value)}
-              placeholder="Search labels..."
-              className="menu-dropdown"
-              style={{
-                position: 'absolute', top: 0, right: 36,
-                background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-                border: '1px solid var(--border2)',
-                borderRadius: 8, padding: '6px 12px', color: 'var(--text)',
-                fontSize: 12, width: 160, fontFamily: 'var(--font)',
-                outline: 'none',
-              }}
-            />
-          )}
-        </div>
-
-        {/* Size toggle */}
-        <div style={{ display: 'flex', gap: 3 }}>
-          {(['small', 'medium', 'large'] as const).map(s => (
+        {/* Right Actions: Search + Size */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {/* Search button */}
+          <div style={{ position: 'relative' }}>
             <button
-              key={s}
-              onClick={() => setPoolSize(s)}
+              onClick={() => { setSearchOpen(o => !o); if (searchOpen) setPoolSearch(''); }}
               style={{
-                width: 26, height: 26, borderRadius: 4, fontSize: 9, fontWeight: 700,
-                background: poolSize === s ? 'var(--gold-dim)' : 'var(--bg2)',
-                border: `1px solid ${poolSize === s ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
-                color: poolSize === s ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer',
+                width: 32, height: 32, borderRadius: 20,
+                background: searchOpen ? 'var(--gold-dim)' : 'var(--bg2)',
+                border: `1px solid ${searchOpen ? 'rgba(200,169,110,0.4)' : 'var(--border2)'}`,
+                cursor: 'pointer', fontSize: 14,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: searchOpen ? 'var(--gold)' : 'var(--text3)',
+                transition: 'all 0.15s',
               }}
-            >{sizeLabels[s]}</button>
-          ))}
+            ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/></svg></button>
+            {searchOpen && (
+              <input
+                autoFocus
+                value={poolSearchQuery}
+                onChange={e => setPoolSearch(e.target.value)}
+                placeholder="Search..."
+                className="menu-dropdown"
+                style={{
+                  position: 'absolute', top: 38, right: 0, zIndex: 101,
+                  background: 'var(--menu-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                  border: '1px solid var(--border2)',
+                  borderRadius: 12, padding: '8px 12px', color: 'var(--text)',
+                  fontSize: 12, width: 180, fontFamily: 'var(--font)',
+                  outline: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.25)'
+                }}
+              />
+            )}
+          </div>
+
+          {/* Size toggle */}
+          <div style={{ display: 'flex', gap: 4, background: 'var(--bg2)', padding: 3, borderRadius: 20, border: '1px solid var(--border2)' }}>
+            {(['small', 'medium', 'large'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setPoolSize(s)}
+                style={{
+                  width: 26, height: 26, borderRadius: 20, fontSize: 10, fontWeight: 700,
+                  background: poolSize === s ? 'var(--gold)' : 'transparent',
+                  border: 'none',
+                  color: poolSize === s ? '#000' : 'var(--text3)', cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+              >{sizeLabels[s]}</button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -284,27 +321,27 @@ export default function PhotoPool() {
       {addingToDumpId && (
         <div className="menu-dropdown" style={{
           background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.3)',
-          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          borderRadius: 12, padding: '12px 16px', marginBottom: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <p style={{ fontSize: 13, color: '#4CAF50', fontWeight: 600 }}>
-            Tap photos to select · {selectedIds.size} selected
+            {selectedIds.size} selected
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={confirmAddToDump}
               disabled={selectedIds.size === 0}
               style={{
-                padding: '7px 16px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                padding: '7px 16px', borderRadius: 20, fontSize: 11, fontWeight: 700,
                 background: selectedIds.size > 0 ? '#4CAF50' : 'transparent',
                 color: selectedIds.size > 0 ? '#fff' : '#4CAF50',
                 border: '1px solid #4CAF50', cursor: selectedIds.size > 0 ? 'pointer' : 'default',
               }}
-            >Add {selectedIds.size > 0 ? selectedIds.size : ''} Photos</button>
+            >Add Photos</button>
             <button
               onClick={() => setAddingToDump(null)}
               style={{
-                padding: '7px 12px', borderRadius: 6, fontSize: 11,
+                padding: '7px 12px', borderRadius: 20, fontSize: 11,
                 background: 'transparent', border: '1px solid var(--border2)',
                 color: 'var(--text3)', cursor: 'pointer',
               }}
@@ -327,8 +364,9 @@ export default function PhotoPool() {
             onClick={() => fileRef.current?.click()}
             style={{
               border: '1.5px dashed var(--border3)', borderRadius: 12,
-              padding: '40px 24px', textAlign: 'center', cursor: 'pointer',
+              padding: '60px 24px', textAlign: 'center', cursor: 'pointer',
               marginBottom: 16, transition: 'all 0.2s',
+              background: 'var(--bg1)'
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)';
@@ -336,13 +374,24 @@ export default function PhotoPool() {
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)';
-              (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+              (e.currentTarget as HTMLDivElement).style.background = 'var(--bg1)';
             }}
           >
-            <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 4 }}>
-              Drop photos & videos here or <span style={{ color: 'var(--gold)' }}>click to upload</span>
+            <div style={{ fontSize: 32, marginBottom: 16 }}>📸</div>
+            <p style={{ fontSize: 15, color: 'var(--text)', fontWeight: 600, marginBottom: 4 }}>
+              Your pool is empty
             </p>
-            <p style={{ fontSize: 11, color: 'var(--text3)' }}>Supports JPG, PNG, GIF, MOV, MP4</p>
+            <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20 }}>
+              Drop photos here or <span style={{ color: 'var(--gold)' }}>click to upload</span>
+            </p>
+            <input
+              type="file"
+              ref={fileRef}
+              multiple
+              accept="image/*,video/*"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
           </div>
         )}
 
@@ -353,72 +402,35 @@ export default function PhotoPool() {
             gridTemplateColumns: `repeat(${colCount}, 1fr)`,
             gap: 8, marginBottom: 16,
           }}>
-            {(activeFilters.includes('used') ? usedPhotos : poolPhotos).map((photo, idx) => {
-              const used = usedIds.has(photo.id);
-              const isSelected = selectedIds.has(photo.id);
-              return (
-                <PhotoCard
-                  key={photo.id}
-                  photo={photo}
-                  index={idx}
-                  used={used && !addingToDumpId}
-                  selected={isSelected}
-                  width="100%"
-                  poolSize={poolSize}
-                  onClick={used && !addingToDumpId ? undefined : () => handlePhotoClick(photo.id)}
-                  onToggleStar={() => toggleStar(photo.id)}
-                  onToggleHuji={() => toggleHuji(photo.id)}
-                  onRemove={() => removePhoto(photo.id)}
-                />
-              );
-            })}
-
-            {/* Upload tile */}
-            <div
-              onClick={() => fileRef.current?.click()}
-              style={{
-                width: '100%', aspectRatio: '3/4', borderRadius: 10,
-                border: '1.5px dashed var(--border3)', background: 'var(--bg2)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 6, cursor: 'pointer',
-                color: 'var(--text3)', transition: 'all 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--gold)';
-                (e.currentTarget as HTMLDivElement).style.color = 'var(--gold)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border3)';
-                (e.currentTarget as HTMLDivElement).style.color = 'var(--text3)';
-              }}
-            >
-              <span style={{ fontSize: 20 }}>+</span>
-              <span style={{ fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>
-                Add
-              </span>
-            </div>
+            {(activeFilters.includes('used') ? usedPhotos : poolPhotos).map((photo, idx) => (
+              <PhotoCard
+                key={photo.id}
+                photo={photo}
+                index={idx}
+                selected={selectedIds.has(photo.id)}
+                onClick={() => handlePhotoClick(photo.id)}
+                onToggleHuji={() => toggleHuji(photo.id)}
+                onToggleStar={() => toggleStar(photo.id)}
+                onRemove={() => removePhoto(photo.id)}
+                poolSize={poolSize}
+              />
+            ))}
           </div>
         )}
       </div>
 
-      <input ref={fileRef} type="file" multiple accept="image/*,video/*"
-        style={{ display: 'none' }} onChange={handleFileChange} />
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </section>
-  );
-}
-
-function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        flexShrink: 0, padding: '6px 14px', borderRadius: 999, fontSize: 11, fontWeight: 500,
-        letterSpacing: '0.06em', whiteSpace: 'nowrap',
-        border: active ? '1px solid rgba(200,169,110,0.4)' : '1px solid var(--border2)',
-        background: active ? 'var(--gold-dim)' : 'transparent',
-        color: active ? 'var(--gold)' : 'var(--text3)',
-        cursor: 'pointer', transition: 'all 0.15s',
-      }}
-    >{label}</button>
   );
 }

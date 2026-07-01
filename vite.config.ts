@@ -56,6 +56,7 @@ function photosPlugin(): Plugin {
 export default defineConfig({
   plugins: [react(), photosPlugin()],
   server: {
+    allowedHosts: true,
     fs: {
       allow: ['..'],
     },

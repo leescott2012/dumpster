@@ -59,6 +59,8 @@
 		B011D0C00000000000000007 /* BugReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000007 /* BugReportSheet.swift */; };
 		B011D0C00000000000000008 /* InstagramExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000008 /* InstagramExporter.swift */; };
 		B011D0C00000000000000009 /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000009 /* Analytics.swift */; };
+		B011D0C0000000000000000A /* PhotoDupes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE000000000000000A /* PhotoDupes.swift */; };
+		B011D0C0000000000000000B /* PhotoEXIF.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE000000000000000B /* PhotoEXIF.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -116,6 +118,8 @@
 		D0C0FFEE0000000000000007 /* BugReportSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BugReportSheet.swift; sourceTree = "<group>"; };
 		D0C0FFEE0000000000000008 /* InstagramExporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InstagramExporter.swift; sourceTree = "<group>"; };
 		D0C0FFEE0000000000000009 /* Analytics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
+		D0C0FFEE000000000000000A /* PhotoDupes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoDupes.swift; sourceTree = "<group>"; };
+		D0C0FFEE000000000000000B /* PhotoEXIF.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoEXIF.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -177,6 +181,8 @@
 				81E7E5BB2905556C06187290 /* DebugSeeder.swift */,
 				FF11EE22DD33CC44BB55AA66 /* HapticManager.swift */,
 				D0C0FFEE0000000000000008 /* InstagramExporter.swift */,
+				D0C0FFEE000000000000000A /* PhotoDupes.swift */,
+				D0C0FFEE000000000000000B /* PhotoEXIF.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -365,6 +371,8 @@
 				B011D0C00000000000000007 /* BugReportSheet.swift in Sources */,
 				B011D0C00000000000000008 /* InstagramExporter.swift in Sources */,
 				B011D0C00000000000000009 /* Analytics.swift in Sources */,
+				B011D0C0000000000000000A /* PhotoDupes.swift in Sources */,
+				B011D0C0000000000000000B /* PhotoEXIF.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

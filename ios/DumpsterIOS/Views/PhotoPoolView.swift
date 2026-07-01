@@ -52,6 +52,13 @@ struct PhotoPoolView: View {
         return result
     }
 
+    // Possible-duplicate photo ids, computed across the whole workspace (pool +
+    // every dump — allPhotos already covers both since dumps just hold ids into
+    // this same store). Mirrors client/src/pages/Home.tsx's duplicatePhotoIds.
+    private var duplicatePhotoIds: Set<String> {
+        PhotoDupes.findDuplicateIds(allPhotos)
+    }
+
     private func isVideo(_ filename: String) -> Bool {
         let f = filename.lowercased()
         return f.hasSuffix(".mov") || f.hasSuffix(".mp4") || f.hasSuffix(".m4v")
@@ -354,6 +361,7 @@ struct PhotoPoolView: View {
                     photo: photo,
                     context: .pool,
                     isSelected: selectedPhotoIDs.contains(photo.id),
+                    isDuplicate: duplicatePhotoIds.contains(photo.id),
                     slotIndex: 0,
                     totalInDump: 0,
                     size: ResponsiveGrid.photoSize(for: appState.poolSize, screenWidth: UIScreen.main.bounds.width),
@@ -421,6 +429,9 @@ struct PhotoPoolView: View {
                     localPath: localPath,
                     filename: filename
                 )
+                // Extract EXIF from the original bytes we just saved (§B) — order
+                // matters, this must happen before any future downscale step strips it.
+                PhotoEXIF.populate(photo, from: data)
                 modelContext.insert(photo)
                 added += 1
             }

@@ -23,6 +23,7 @@ struct PhotoCardView: View {
     let photo: DumpPhoto
     let context: CardContext
     var isSelected: Bool = false
+    var isDuplicate: Bool = false
     var isUsed: Bool = false
     var slotIndex: Int? = nil
     var totalInDump: Int? = nil
@@ -161,6 +162,18 @@ struct PhotoCardView: View {
                         .padding(7)
                 }
                 Spacer()
+                // Possible-duplicate badge — amber, mirrors web's "Dupe?" chip.
+                if isDuplicate && !isSelected {
+                    Text("DUPE?")
+                        .font(.system(size: 8, weight: .heavy))
+                        .tracking(0.6)
+                        .foregroundColor(Color(red: 0.10, green: 0.07, blue: 0))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color(red: 0.96, green: 0.62, blue: 0.04).opacity(0.92))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .padding(7)
+                }
                 // "..." dots button — dump context only, not in pool
                 if showDotsButton && isDumpContext {
                     Button { showPhotoMenu = true } label: {
@@ -192,6 +205,9 @@ struct PhotoCardView: View {
         } else if isSelected {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .strokeBorder(Color.green, lineWidth: 2)
+        } else if isDuplicate {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .strokeBorder(Color(red: 0.96, green: 0.62, blue: 0.04), lineWidth: 2)
         } else {
             EmptyView()
         }

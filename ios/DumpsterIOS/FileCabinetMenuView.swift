@@ -11,15 +11,24 @@ struct FileCabinetMenuView: View {
     @Binding var isPresented: Bool
     @ObservedObject var appState: AppState
     @StateObject private var llmService = LLMService.shared
+    @Environment(\.colorScheme) private var cs
 
     @State private var selectedTab: CabinetTab? = nil
     @State private var appearAnimation = false
     @State private var tabsVisible = false
 
     private let gold = Color(hex: "#C8A96E")
-    private let darkBg = Color(hex: "#0A0A0A")
-    private let cardBg = Color(hex: "#141414")
-    private let subtleBorder = Color.white.opacity(0.08)
+    // Always-dark, independent of theme — used for text sitting on a light pastel
+    // tab-color pill (tab.tabColor), which needs a fixed dark foreground for contrast
+    // in both Light and Dark mode.
+    private let fixedDarkText = Color(hex: "#0A0A0A")
+    // Theme-aware (were hardcoded dark-only constants — NATIVE_PORT.md §G).
+    private var darkBg: Color { Theme.bg(appState.colorMode, cs) }
+    private var cardBg: Color { Theme.bg2(appState.colorMode, cs) }
+    private var subtleBorder: Color { Theme.border(appState.colorMode, cs) }
+    private var primaryText: Color { Theme.text(appState.colorMode, cs) }
+    private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
+    private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
 
     enum CabinetTab: Int, CaseIterable, Identifiable {
         case aiSettings = 0
@@ -68,7 +77,7 @@ struct FileCabinetMenuView: View {
     var body: some View {
         ZStack {
             // Solid backdrop — fully opaque so content behind doesn't bleed through
-            Color.black.opacity(appearAnimation ? 1.0 : 0.0)
+            darkBg.opacity(appearAnimation ? 1.0 : 0.0)
                 .ignoresSafeArea()
                 .onTapGesture {
                     if selectedTab != nil {
@@ -149,11 +158,11 @@ struct FileCabinetMenuView: View {
                     .foregroundColor(gold.opacity(0.3))
                 Text("v1.0")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.white.opacity(0.15))
+                    .foregroundColor(tertiaryText.opacity(0.5))
             }
             .padding(.bottom, 40)
         }
-        .background(Color.black)
+        .background(darkBg)
     }
 
     private var cabinetHeader: some View {
@@ -162,10 +171,10 @@ struct FileCabinetMenuView: View {
                 Text("MAIN MENU")
                     .font(.system(size: 22, weight: .black))
                     .tracking(4)
-                    .foregroundColor(.white)
+                    .foregroundColor(primaryText)
                 Text("Tap a folder to open")
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(secondaryText)
             }
 
             Spacer()
@@ -175,9 +184,9 @@ struct FileCabinetMenuView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(secondaryText)
                     .frame(width: 40, height: 40)
-                    .background(Circle().fill(Color.white.opacity(0.08)))
+                    .background(Circle().fill(subtleBorder))
             }
         }
         .padding(.horizontal, 24)
@@ -221,7 +230,7 @@ struct FileCabinetMenuView: View {
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
-                        .foregroundColor(darkBg)
+                        .foregroundColor(fixedDarkText)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
@@ -249,17 +258,17 @@ struct FileCabinetMenuView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(tab.title)
                                 .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(primaryText.opacity(0.8))
                             Text(tabSubtitle(for: tab))
                                 .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.3))
+                                .foregroundColor(secondaryText)
                         }
 
                         Spacer()
 
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.2))
+                            .foregroundColor(tertiaryText)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -360,7 +369,7 @@ struct FileCabinetMenuView: View {
                 Text(tab.title)
                     .font(.system(size: 13, weight: .black))
                     .tracking(2)
-                    .foregroundColor(.white)
+                    .foregroundColor(primaryText)
             }
 
             Spacer()
@@ -1790,8 +1799,17 @@ struct FlowLayout: Layout {
 struct AppearanceTabView: View {
     @ObservedObject var appState: AppState
     var onDone: (() -> Void)? = nil
+    @Environment(\.colorScheme) private var cs
 
     private let gold = Color(hex: "#C8A96E")
+    // Theme-aware chrome (NATIVE_PORT.md §G) — the Light/Dark preview swatches inside
+    // each mode's tile intentionally stay fixed white/dark, since they're literal
+    // previews of what that mode looks like, not screen chrome.
+    private var primaryText: Color { Theme.text(appState.colorMode, cs) }
+    private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
+    private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
+    private var cardFill: Color { Theme.bg2(appState.colorMode, cs) }
+    private var cardBorder: Color { Theme.border(appState.colorMode, cs) }
 
     private var selectedTheme: ThemeMode {
         switch appState.colorMode {
@@ -1887,14 +1905,14 @@ struct AppearanceTabView: View {
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                                         .stroke(
-                                            isSelected ? gold : Color.white.opacity(0.1),
+                                            isSelected ? gold : cardBorder,
                                             lineWidth: isSelected ? 2 : 1
                                         )
                                 )
 
                             Text(mode.rawValue)
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(isSelected ? .white : .white.opacity(0.4))
+                                .foregroundColor(isSelected ? primaryText : tertiaryText)
                         }
                     }
                     .buttonStyle(.plain)
@@ -1904,10 +1922,10 @@ struct AppearanceTabView: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
             )
             .padding(.horizontal, 24)
@@ -1939,7 +1957,7 @@ struct AppearanceTabView: View {
 
                                 Text(accent.rawValue)
                                     .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(isSelected ? .white : .white.opacity(0.4))
+                                    .foregroundColor(isSelected ? primaryText : tertiaryText)
                             }
                             .padding(.vertical, 12)
                             .frame(maxWidth: .infinity)
@@ -1957,7 +1975,7 @@ struct AppearanceTabView: View {
                     Text("PREVIEW")
                         .font(.system(size: 9, weight: .bold))
                         .tracking(1.5)
-                        .foregroundColor(.white.opacity(0.25))
+                        .foregroundColor(tertiaryText)
                     Spacer()
                 }
 
@@ -1996,10 +2014,10 @@ struct AppearanceTabView: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
             )
             .padding(.horizontal, 24)

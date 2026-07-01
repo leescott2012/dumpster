@@ -31,7 +31,6 @@ struct PhotoCardView: View {
     var showDotsButton: Bool = true
 
     var onTap: (() -> Void)? = nil
-    var onDoubleTap: (() -> Void)? = nil
     var onRemoveFromDump: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
     var onOpenLightbox: (() -> Void)? = nil
@@ -61,11 +60,10 @@ struct PhotoCardView: View {
         .overlay(borderOverlay)
         .scaleEffect(isDragging ? 1.05 : 1.0)
         .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isDragging)
-        // Order matters: double-tap first so SwiftUI can disambiguate.
-        .onTapGesture(count: 2) {
-            if let onDoubleTap { onDoubleTap() }
-            else { appState.lightboxPhotoId = photo.id }
-        }
+        // Single recognizer only — a count:2 sibling here previously forced SwiftUI's
+        // double-tap disambiguation wait on every tap (~300-400ms perceived lag) even
+        // though nothing ever passed a distinct onDoubleTap handler, so double-tap and
+        // single-tap always did the exact same thing anyway (NATIVE_PORT.md §G).
         .onTapGesture(count: 1) {
             if appState.addingToDumpId != nil && !isDumpContext {
                 onTap?()

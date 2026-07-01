@@ -28,9 +28,16 @@ struct LightboxView: View {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 30))
                                 .foregroundColor(.white.opacity(0.75))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
-                        .padding(20)
+                        .padding(.trailing, 20)
                     }
+                    // 70pt clears the Dynamic Island / status bar reliably — matches
+                    // FileCabinetMenuView's cabinetHeader, which uses the same value.
+                    // The prior `.padding(20)` (20pt top) left the button underneath
+                    // that safe-area band, where taps don't reach the app.
+                    .padding(.top, 70)
 
                     Spacer()
 

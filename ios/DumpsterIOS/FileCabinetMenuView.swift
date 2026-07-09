@@ -321,7 +321,7 @@ struct FileCabinetMenuView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         switch tab {
                         case .aiSettings:
-                            AISettingsTabView(llmService: llmService)
+                            AISettingsTabView(llmService: llmService, appState: appState)
                         case .myDumps:
                             MyDumpsTabView(appState: appState)
                         case .photoPool:
@@ -335,7 +335,7 @@ struct FileCabinetMenuView: View {
                         case .aboutHelp:
                             AboutHelpTabView(llmService: llmService, appState: appState, onDismiss: { dismissMenu() })
                         case .socialMedia:
-                            SocialMediaTabView()
+                            SocialMediaTabView(appState: appState)
                         }
                     }
                     .padding(.bottom, 60)
@@ -458,6 +458,8 @@ struct CabinetSectionHeader: View {
 
 struct AISettingsTabView: View {
     @ObservedObject var llmService: LLMService
+    @ObservedObject var appState: AppState
+    @Environment(\.colorScheme) private var cs
     @State private var expandedProvider: LLMService.LLMProvider? = nil
     @State private var apiKeyInputs: [LLMService.LLMProvider: String] = [:]
     @State private var keyVisibility: [LLMService.LLMProvider: Bool] = [:]
@@ -479,6 +481,12 @@ struct AISettingsTabView: View {
     @State private var savedToast: Bool = false
 
     private let gold = Color(hex: "#C8A96E")
+    // Theme-aware chrome (NATIVE_PORT.md §G — was hardcoded dark-only white-alpha).
+    private var primaryText: Color { Theme.text(appState.colorMode, cs) }
+    private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
+    private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
+    private var cardFill: Color { Theme.bg2(appState.colorMode, cs) }
+    private var cardBorder: Color { Theme.border(appState.colorMode, cs) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -552,7 +560,7 @@ struct AISettingsTabView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Describe your aesthetic. The AI uses this when generating dumps and captions.")
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(tertiaryText)
                 .lineSpacing(3)
 
             styleProfileEditor
@@ -562,7 +570,7 @@ struct AISettingsTabView: View {
                 Spacer()
                 Text("\(styleProfile.count)/750")
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.2))
+                    .foregroundColor(tertiaryText)
             }
         }
         .padding(16)
@@ -583,12 +591,12 @@ struct AISettingsTabView: View {
     private var styleProfileEditor: some View {
         TextEditor(text: $styleProfile)
             .font(.system(size: 13))
-            .foregroundColor(.white)
+            .foregroundColor(primaryText)
             .scrollContentBackground(.hidden)
             .frame(minHeight: 80, maxHeight: 120)
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 10).fill(cardFill))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(cardBorder, lineWidth: 1))
             .onChange(of: styleProfile) { _, newVal in
                 guard !activeScrubId.isEmpty else {
                     scheduleCloudSync()
@@ -636,7 +644,7 @@ struct AISettingsTabView: View {
         VStack(spacing: 8) {
             Text("Past scrubs — tap to re-apply without paying.")
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(tertiaryText)
                 .lineSpacing(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -650,10 +658,10 @@ struct AISettingsTabView: View {
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(Color.white.opacity(0.03))
+            .fill(cardFill)
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    .stroke(cardBorder, lineWidth: 1)
             )
     }
 
@@ -701,7 +709,7 @@ struct AISettingsTabView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Rules the AI MUST follow when generating dumps and captions. Add one rule per line.")
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(tertiaryText)
                 .lineSpacing(3)
 
             // Existing rules
@@ -720,19 +728,19 @@ struct AISettingsTabView: View {
                 TextField("Add a rule — e.g. \"no emojis\"", text: $draftRule)
                     .focused($newRuleFocused)
                     .font(.system(size: 13))
-                    .foregroundColor(.white)
+                    .foregroundColor(primaryText)
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .background(RoundedRectangle(cornerRadius: 10).fill(cardFill))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(cardBorder, lineWidth: 1))
                     .submitLabel(.done)
                     .onSubmit { addDraftRule() }
 
                 Button { addDraftRule() } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(draftRule.isEmpty ? .white.opacity(0.25) : .black)
+                        .foregroundColor(draftRule.isEmpty ? tertiaryText : .black)
                         .frame(width: 36, height: 36)
-                        .background(Circle().fill(draftRule.isEmpty ? Color.white.opacity(0.08) : gold))
+                        .background(Circle().fill(draftRule.isEmpty ? cardFill : gold))
                 }
                 .buttonStyle(.plain)
                 .disabled(draftRule.isEmpty)
@@ -754,7 +762,7 @@ struct AISettingsTabView: View {
                 Text("\(rulesList.count) RULE\(rulesList.count == 1 ? "" : "S")")
                     .font(.system(size: 10, weight: .heavy, design: .monospaced))
                     .tracking(1.2)
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(tertiaryText)
             }
         }
         .padding(16)
@@ -765,10 +773,10 @@ struct AISettingsTabView: View {
         VStack(spacing: 6) {
             Image(systemName: "list.bullet.rectangle")
                 .font(.system(size: 18, weight: .light))
-                .foregroundColor(.white.opacity(0.2))
+                .foregroundColor(tertiaryText)
             Text("No rules yet — add your first rule below")
                 .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundColor(tertiaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
@@ -783,23 +791,23 @@ struct AISettingsTabView: View {
 
             Text(text)
                 .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundColor(primaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
 
             Button { deleteRule(at: index) } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(tertiaryText)
                     .frame(width: 22, height: 22)
-                    .background(Circle().fill(Color.white.opacity(0.06)))
+                    .background(Circle().fill(cardBorder))
             }
             .buttonStyle(.plain)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.05), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 8).fill(cardFill))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(cardBorder, lineWidth: 1))
     }
 
     // MARK: - Scrub Library Row
@@ -824,7 +832,7 @@ struct AISettingsTabView: View {
                     HStack(spacing: 6) {
                         Text("@\(scrub.handle)")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(primaryText)
                             .lineLimit(1)
                         if isActive {
                             Text("ACTIVE")
@@ -839,7 +847,7 @@ struct AISettingsTabView: View {
                     }
                     Text("\(scrub.postsAnalyzed) posts · \(Self.relativeDate(scrub.createdAt))")
                         .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(tertiaryText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -850,7 +858,7 @@ struct AISettingsTabView: View {
             Button { reapplyingScrub = scrub } label: {
                 Image(systemName: "eye")
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(tertiaryText)
                     .padding(6)
             }
             .buttonStyle(.plain)
@@ -859,7 +867,7 @@ struct AISettingsTabView: View {
             Button { deleteScrub(scrub) } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(tertiaryText)
                     .padding(6)
             }
             .buttonStyle(.plain)
@@ -868,11 +876,11 @@ struct AISettingsTabView: View {
         .padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isActive ? Color.green.opacity(0.06) : Color.white.opacity(0.04))
+                .fill(isActive ? Color.green.opacity(0.06) : cardFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(isActive ? Color.green.opacity(0.35) : Color.white.opacity(0.06), lineWidth: 1)
+                .stroke(isActive ? Color.green.opacity(0.35) : cardBorder, lineWidth: 1)
         )
     }
 
@@ -919,11 +927,11 @@ struct AISettingsTabView: View {
 
                 Text("Bring Your Own AI Keys")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(primaryText)
 
                 Text("Subscribe to DUMPSTER Pro to plug in your own OpenAI, Claude, Gemini, Manus, or Perplexity keys for unlimited captions and full control.")
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.55))
+                    .foregroundColor(secondaryText)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
                     .padding(.horizontal, 8)
@@ -972,10 +980,10 @@ struct AISettingsTabView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Active: \(provider.displayName)")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(primaryText)
                     Text("Model: \(llmService.selectedModel(for: provider))")
                         .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(tertiaryText)
                 }
             } else {
                 Circle()
@@ -984,10 +992,10 @@ struct AISettingsTabView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("No AI Provider Active")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(primaryText)
                     Text("Add an API key below to enable AI features")
                         .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(tertiaryText)
                 }
             }
             Spacer()
@@ -995,10 +1003,10 @@ struct AISettingsTabView: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.04))
+                .fill(cardFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(cardBorder, lineWidth: 1)
                 )
         )
         .padding(.horizontal, 24)
@@ -1019,11 +1027,11 @@ struct AISettingsTabView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.03))
+                .fill(cardFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(
-                            hasKey ? gold.opacity(0.2) : Color.white.opacity(0.06),
+                            hasKey ? gold.opacity(0.2) : cardBorder,
                             lineWidth: 1
                         )
                 )
@@ -1042,16 +1050,16 @@ struct AISettingsTabView: View {
             HStack(spacing: 12) {
                 Image(systemName: provider.iconName)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(hasKey ? gold : .white.opacity(0.3))
+                    .foregroundColor(hasKey ? gold : tertiaryText)
                     .frame(width: 32)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(provider.displayName)
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(primaryText)
                     Text(hasKey ? "Key configured" : "Not configured")
                         .font(.system(size: 11))
-                        .foregroundColor(hasKey ? .green.opacity(0.7) : .white.opacity(0.3))
+                        .foregroundColor(hasKey ? .green.opacity(0.7) : tertiaryText)
                 }
 
                 Spacer()
@@ -1064,7 +1072,7 @@ struct AISettingsTabView: View {
 
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(tertiaryText)
             }
             .padding(16)
         }
@@ -1084,13 +1092,13 @@ struct AISettingsTabView: View {
                             }
                         }
                         .font(.system(size: 13, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(primaryText)
                         .padding(12)
-                        .background(Color.white.opacity(0.05))
+                        .background(cardFill)
                         .cornerRadius(10)
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                .stroke(cardBorder, lineWidth: 1)
                         )
 
                         Button {
@@ -1098,9 +1106,9 @@ struct AISettingsTabView: View {
                         } label: {
                             Image(systemName: keyVisibility[provider] == true ? "eye.slash" : "eye")
                                 .font(.system(size: 13))
-                                .foregroundColor(.white.opacity(0.4))
+                                .foregroundColor(tertiaryText)
                                 .frame(width: 40, height: 40)
-                                .background(Color.white.opacity(0.05))
+                                .background(cardFill)
                                 .cornerRadius(10)
                         }
                     }
@@ -1152,7 +1160,7 @@ struct AISettingsTabView: View {
                         Text("MODEL")
                             .font(.system(size: 9, weight: .bold))
                             .tracking(1.5)
-                            .foregroundColor(.white.opacity(0.25))
+                            .foregroundColor(tertiaryText)
 
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -1164,19 +1172,19 @@ struct AISettingsTabView: View {
                                     } label: {
                                         Text(model)
                                             .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                            .foregroundColor(isSelected ? .black : .white.opacity(0.5))
+                                            .foregroundColor(isSelected ? .black : secondaryText)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
                                             .background(
                                                 isSelected
                                                     ? gold
-                                                    : Color.white.opacity(0.05)
+                                                    : cardFill
                                             )
                                             .cornerRadius(8)
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: 8)
                                                     .stroke(
-                                                        isSelected ? gold : Color.white.opacity(0.08),
+                                                        isSelected ? gold : cardBorder,
                                                         lineWidth: 1
                                                     )
                                             )
@@ -1205,7 +1213,7 @@ struct AISettingsTabView: View {
             HStack {
                 Text("Permissive")
                     .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(tertiaryText)
                 Spacer()
                 Text(String(format: "%.0f%%", llmService.labelingSensitivity * 100))
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
@@ -1213,7 +1221,7 @@ struct AISettingsTabView: View {
                 Spacer()
                 Text("Strict")
                     .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(tertiaryText)
             }
 
             Slider(value: Binding(
@@ -1224,16 +1232,16 @@ struct AISettingsTabView: View {
 
             Text("Controls the confidence threshold for AI photo auto-labeling. Higher values require more confidence before applying a label.")
                 .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.25))
+                .foregroundColor(tertiaryText)
                 .lineSpacing(3)
         }
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.03))
+                .fill(cardFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(cardBorder, lineWidth: 1)
                 )
         )
         .padding(.horizontal, 24)
@@ -1253,15 +1261,15 @@ struct AISettingsTabView: View {
                         } label: {
                             Text(style.rawValue)
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(isSelected ? .black : .white.opacity(0.5))
+                                .foregroundColor(isSelected ? .black : secondaryText)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 10)
-                                .background(isSelected ? gold : Color.white.opacity(0.05))
+                                .background(isSelected ? gold : cardFill)
                                 .cornerRadius(10)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 10)
                                         .stroke(
-                                            isSelected ? gold : Color.white.opacity(0.08),
+                                            isSelected ? gold : cardBorder,
                                             lineWidth: 1
                                         )
                                 )
@@ -1272,16 +1280,16 @@ struct AISettingsTabView: View {
 
             Text(llmService.captionStyle.promptModifier)
                 .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.25))
+                .foregroundColor(tertiaryText)
                 .lineSpacing(3)
         }
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.03))
+                .fill(cardFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(cardBorder, lineWidth: 1)
                 )
         )
         .padding(.horizontal, 24)
@@ -1300,15 +1308,15 @@ struct AISettingsTabView: View {
                     HStack(spacing: 12) {
                         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: 16))
-                            .foregroundColor(isSelected ? gold : .white.opacity(0.2))
+                            .foregroundColor(isSelected ? gold : tertiaryText)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(level.rawValue)
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(primaryText)
                             Text(level.description)
                                 .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.35))
+                                .foregroundColor(tertiaryText)
                         }
 
                         Spacer()
@@ -1316,11 +1324,11 @@ struct AISettingsTabView: View {
                     .padding(14)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(isSelected ? gold.opacity(0.08) : Color.white.opacity(0.03))
+                            .fill(isSelected ? gold.opacity(0.08) : cardFill)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     .stroke(
-                                        isSelected ? gold.opacity(0.3) : Color.white.opacity(0.06),
+                                        isSelected ? gold.opacity(0.3) : cardBorder,
                                         lineWidth: 1
                                     )
                             )
@@ -1332,10 +1340,10 @@ struct AISettingsTabView: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.03))
+                .fill(cardFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(cardBorder, lineWidth: 1)
                 )
         )
         .padding(.horizontal, 24)
@@ -2038,8 +2046,15 @@ struct AboutHelpTabView: View {
     @ObservedObject var llmService: LLMService
     @ObservedObject var appState: AppState
     var onDismiss: () -> Void = {}
+    @Environment(\.colorScheme) private var cs
 
     private let gold = Color(hex: "#C8A96E")
+    // Theme-aware chrome (NATIVE_PORT.md §G — was hardcoded dark-only white-alpha).
+    private var primaryText: Color { Theme.text(appState.colorMode, cs) }
+    private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
+    private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
+    private var cardFill: Color { Theme.bg2(appState.colorMode, cs) }
+    private var cardBorder: Color { Theme.border(appState.colorMode, cs) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -2053,11 +2068,11 @@ struct AboutHelpTabView: View {
                 Text("DUMPSTER")
                     .font(.system(size: 20, weight: .black))
                     .tracking(6)
-                    .foregroundColor(.white)
+                    .foregroundColor(primaryText)
 
                 Text("Photo Carousel Curation Tool")
                     .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(tertiaryText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 32)
@@ -2067,13 +2082,13 @@ struct AboutHelpTabView: View {
 
             VStack(spacing: 0) {
                 infoRow("Version", value: "1.0.0")
-                Divider().background(Color.white.opacity(0.06))
+                Divider().background(cardBorder)
                 infoRow("Build", value: "2025.05")
-                Divider().background(Color.white.opacity(0.06))
+                Divider().background(cardBorder)
                 infoRow("Vision AI", value: "VNClassifyImageRequest")
-                Divider().background(Color.white.opacity(0.06))
+                Divider().background(cardBorder)
                 infoRow("AI Provider", value: llmService.preferredProvider()?.displayName ?? "None")
-                Divider().background(Color.white.opacity(0.06))
+                Divider().background(cardBorder)
                 infoRow("Active Model", value: {
                     if let p = llmService.preferredProvider() {
                         return llmService.selectedModel(for: p)
@@ -2083,10 +2098,10 @@ struct AboutHelpTabView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
             )
             .padding(.horizontal, 24)
@@ -2099,12 +2114,12 @@ struct AboutHelpTabView: View {
                     HStack(spacing: 10) {
                         Image(systemName: provider.iconName)
                             .font(.system(size: 12))
-                            .foregroundColor(llmService.hasAPIKey(for: provider) ? gold : .white.opacity(0.2))
+                            .foregroundColor(llmService.hasAPIKey(for: provider) ? gold : tertiaryText)
                             .frame(width: 24)
 
                         Text(provider.displayName)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(secondaryText)
 
                         Spacer()
 
@@ -2120,7 +2135,7 @@ struct AboutHelpTabView: View {
                         } else {
                             Text("Not connected")
                                 .font(.system(size: 10))
-                                .foregroundColor(.white.opacity(0.2))
+                                .foregroundColor(tertiaryText)
                         }
                     }
                     .padding(.vertical, 8)
@@ -2130,10 +2145,10 @@ struct AboutHelpTabView: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
             )
             .padding(.horizontal, 24)
@@ -2164,7 +2179,7 @@ struct AboutHelpTabView: View {
                 }
                 Text("For production, migrate API key storage to iOS Keychain and consider using a server-side proxy to avoid embedding keys in the app.")
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(tertiaryText)
                     .lineSpacing(4)
             }
             .padding(16)
@@ -2194,20 +2209,20 @@ struct AboutHelpTabView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Replay Tutorial")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(secondaryText)
                         Text("Walk through the onboarding guide again")
                             .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.3))
+                            .foregroundColor(tertiaryText)
                     }
                     Spacer()
                 }
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.03))
+                        .fill(cardFill)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                                .stroke(cardBorder, lineWidth: 1)
                         )
                 )
             }
@@ -2230,20 +2245,20 @@ struct AboutHelpTabView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Clear AI Cache")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(secondaryText)
                         Text("Remove temporary analysis files")
                             .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.3))
+                            .foregroundColor(tertiaryText)
                     }
                     Spacer()
                 }
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.03))
+                        .fill(cardFill)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                                .stroke(cardBorder, lineWidth: 1)
                         )
                 )
             }
@@ -2256,11 +2271,11 @@ struct AboutHelpTabView: View {
         HStack {
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(tertiaryText)
             Spacer()
             Text(value)
                 .font(.system(size: 13, design: .monospaced))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(secondaryText)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -2274,20 +2289,20 @@ struct AboutHelpTabView: View {
                     .foregroundColor(gold.opacity(0.5))
                 Text(title)
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(secondaryText)
             }
             Text(text)
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundColor(tertiaryText)
                 .lineSpacing(3)
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.03))
+                .fill(cardFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(cardBorder, lineWidth: 1)
                 )
         )
     }
@@ -2298,12 +2313,20 @@ struct AboutHelpTabView: View {
 // MARK: - ═══════════════════════════════════════════
 
 struct SocialMediaTabView: View {
+    @ObservedObject var appState: AppState
     @AppStorage("apify_api_key") private var apifyKey = ""
     @AppStorage("instagram_handle") private var instagramHandle = ""
     @AppStorage("tiktok_handle") private var tiktokHandle = ""
     @State private var showApifyKey = false
+    @Environment(\.colorScheme) private var cs
 
     private let gold = Color(hex: "#C8A96E")
+    // Theme-aware chrome (NATIVE_PORT.md §G — was hardcoded dark-only white-alpha).
+    private var primaryText: Color { Theme.text(appState.colorMode, cs) }
+    private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
+    private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
+    private var cardFill: Color { Theme.bg2(appState.colorMode, cs) }
+    private var cardBorder: Color { Theme.border(appState.colorMode, cs) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -2314,7 +2337,7 @@ struct SocialMediaTabView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Connect to Apify to enable social media scraping and data import.")
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.35))
+                    .foregroundColor(tertiaryText)
                     .lineSpacing(3)
 
                 HStack(spacing: 10) {
@@ -2326,13 +2349,13 @@ struct SocialMediaTabView: View {
                         }
                     }
                     .font(.system(size: 13, design: .monospaced))
-                    .foregroundColor(.white)
+                    .foregroundColor(primaryText)
                     .padding(12)
-                    .background(Color.white.opacity(0.05))
+                    .background(cardFill)
                     .cornerRadius(10)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
 
                     Button {
@@ -2340,9 +2363,9 @@ struct SocialMediaTabView: View {
                     } label: {
                         Image(systemName: showApifyKey ? "eye.slash" : "eye")
                             .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(tertiaryText)
                             .frame(width: 40, height: 40)
-                            .background(Color.white.opacity(0.05))
+                            .background(cardFill)
                             .cornerRadius(10)
                     }
                 }
@@ -2353,16 +2376,16 @@ struct SocialMediaTabView: View {
                         .frame(width: 6, height: 6)
                     Text(apifyKey.isEmpty ? "Not connected" : "Connected")
                         .font(.system(size: 11))
-                        .foregroundColor(apifyKey.isEmpty ? .white.opacity(0.3) : .green.opacity(0.7))
+                        .foregroundColor(apifyKey.isEmpty ? tertiaryText : .green.opacity(0.7))
                 }
             }
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
             )
             .padding(.horizontal, 24)
@@ -2377,13 +2400,13 @@ struct SocialMediaTabView: View {
                         .foregroundColor(gold.opacity(0.6))
                     TextField("your_handle", text: $instagramHandle)
                         .font(.system(size: 13))
-                        .foregroundColor(.white)
+                        .foregroundColor(primaryText)
                         .padding(12)
-                        .background(Color.white.opacity(0.05))
+                        .background(cardFill)
                         .cornerRadius(10)
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                .stroke(cardBorder, lineWidth: 1)
                         )
                 }
 
@@ -2404,7 +2427,7 @@ struct SocialMediaTabView: View {
                             .padding(.vertical, 3)
                             .background(Capsule().fill(gold))
                     }
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(secondaryText)
                     .padding(14)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -2420,10 +2443,10 @@ struct SocialMediaTabView: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
             )
             .padding(.horizontal, 24)
@@ -2438,13 +2461,13 @@ struct SocialMediaTabView: View {
                         .foregroundColor(gold.opacity(0.6))
                     TextField("your_handle", text: $tiktokHandle)
                         .font(.system(size: 13))
-                        .foregroundColor(.white)
+                        .foregroundColor(primaryText)
                         .padding(12)
-                        .background(Color.white.opacity(0.05))
+                        .background(cardFill)
                         .cornerRadius(10)
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                .stroke(cardBorder, lineWidth: 1)
                         )
                 }
 
@@ -2458,16 +2481,16 @@ struct SocialMediaTabView: View {
                         .background(Capsule().fill(gold))
                     Text("TikTok scraping requires a premium subscription")
                         .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.3))
+                        .foregroundColor(tertiaryText)
                 }
             }
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
             )
             .padding(.horizontal, 24)
@@ -2478,7 +2501,7 @@ struct SocialMediaTabView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Export your dump to the camera roll with AI-generated captions copied to your clipboard, ready to paste into Instagram.")
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.35))
+                    .foregroundColor(tertiaryText)
                     .lineSpacing(3)
 
                 Button {
@@ -2501,10 +2524,10 @@ struct SocialMediaTabView: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
             )
             .padding(.horizontal, 24)
@@ -2515,7 +2538,7 @@ struct SocialMediaTabView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Post directly to Instagram without background music. This uses the Instagram Graph API and requires a connected business account.")
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.35))
+                    .foregroundColor(tertiaryText)
                     .lineSpacing(3)
 
                 HStack(spacing: 8) {
@@ -2528,16 +2551,16 @@ struct SocialMediaTabView: View {
                         .background(Capsule().fill(gold))
                     Text("Coming soon")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.3))
+                        .foregroundColor(tertiaryText)
                 }
             }
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(cardBorder, lineWidth: 1)
                     )
             )
             .padding(.horizontal, 24)

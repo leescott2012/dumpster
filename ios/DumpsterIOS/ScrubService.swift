@@ -15,7 +15,7 @@ final class ScrubService {
            let u = URL(string: override) {
             return u
         }
-        return URL(string: "https://dumpster-omega.vercel.app")!
+        return URL(string: "https://dumpster-web-manus.vercel.app")!
     }()
 
     /// Free Pro users get this many scrubs per rolling 30 days.
@@ -71,10 +71,16 @@ final class ScrubService {
     func scrub(profileURL: String, resultsLimit: Int = 12) async throws -> ScrubResult {
         try ensureUnderQuota()
 
+        // The production endpoint sits behind the credit gate — needs a signed-in session.
+        guard let jwt = await AuthManager.shared.jwt else {
+            throw ScrubError(message: "Sign in to your Dumpster account to use Instagram scrub.")
+        }
+
         let url = baseURL.appendingPathComponent("api/scrub-instagram")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
         req.httpBody = try JSONSerialization.data(withJSONObject: [
             "profileURL": profileURL,
             "resultsLimit": resultsLimit

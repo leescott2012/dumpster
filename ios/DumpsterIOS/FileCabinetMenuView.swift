@@ -2320,6 +2320,12 @@ struct SocialMediaTabView: View {
     @State private var showApifyKey = false
     @Environment(\.colorScheme) private var cs
 
+    // "Scrape My Data" opens the same IG scrub flow as AI Settings.
+    @AppStorage("ai_style_profile") private var styleProfile = ""
+    @AppStorage("active_scrub_id") private var activeScrubId = ""
+    @State private var showScrubSheet = false
+    @State private var showScrubPaywall = false
+
     private let gold = Color(hex: "#C8A96E")
     // Theme-aware chrome (NATIVE_PORT.md §G — was hardcoded dark-only white-alpha).
     private var primaryText: Color { Theme.text(appState.colorMode, cs) }
@@ -2412,6 +2418,11 @@ struct SocialMediaTabView: View {
 
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    if SubscriptionManager.shared.isPro {
+                        showScrubSheet = true
+                    } else {
+                        showScrubPaywall = true
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.down.circle")
@@ -2450,6 +2461,13 @@ struct SocialMediaTabView: View {
                     )
             )
             .padding(.horizontal, 24)
+            .sheet(isPresented: $showScrubSheet) {
+                ScrubInstagramSheet(currentProfile: $styleProfile, activeScrubId: $activeScrubId)
+                    .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showScrubPaywall) {
+                PaywallView().presentationDetents([.large])
+            }
 
             // TikTok
             CabinetSectionHeader("TIKTOK", icon: "play.rectangle")

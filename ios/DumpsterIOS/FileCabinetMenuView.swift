@@ -36,7 +36,6 @@ struct FileCabinetMenuView: View {
         case photoPool = 2
         case appearance = 3
         case aboutHelp = 4
-        case socialMedia = 5
 
         var id: Int { rawValue }
 
@@ -47,7 +46,6 @@ struct FileCabinetMenuView: View {
             case .photoPool:  return "PHOTO POOL"
             case .appearance: return "APPEARANCE"
             case .aboutHelp:  return "ABOUT / HELP"
-            case .socialMedia: return "SOCIAL MEDIA"
             }
         }
 
@@ -58,7 +56,6 @@ struct FileCabinetMenuView: View {
             case .photoPool:  return "photo.on.rectangle.angled"
             case .appearance: return "paintbrush"
             case .aboutHelp:  return "questionmark.circle"
-            case .socialMedia: return "person.2.wave.2"
             }
         }
 
@@ -69,7 +66,6 @@ struct FileCabinetMenuView: View {
             case .photoPool:  return Color(hex: "#A0B8C8")
             case .appearance: return Color(hex: "#C8A0C0")
             case .aboutHelp:  return Color(hex: "#C8B8A0")
-            case .socialMedia: return Color(hex: "#C8B0A0")
             }
         }
     }
@@ -302,8 +298,6 @@ struct FileCabinetMenuView: View {
             return "Theme & colors"
         case .aboutHelp:
             return "Version 1.0.0"
-        case .socialMedia:
-            return "Connect & export"
         }
     }
 
@@ -334,8 +328,6 @@ struct FileCabinetMenuView: View {
                             })
                         case .aboutHelp:
                             AboutHelpTabView(llmService: llmService, appState: appState, onDismiss: { dismissMenu() })
-                        case .socialMedia:
-                            SocialMediaTabView(appState: appState)
                         }
                     }
                     .padding(.bottom, 60)
@@ -2305,283 +2297,5 @@ struct AboutHelpTabView: View {
                         .stroke(cardBorder, lineWidth: 1)
                 )
         )
-    }
-}
-
-// MARK: - ═══════════════════════════════════════════
-// MARK: Tab 6 — Social Media
-// MARK: - ═══════════════════════════════════════════
-
-struct SocialMediaTabView: View {
-    @ObservedObject var appState: AppState
-    @AppStorage("apify_api_key") private var apifyKey = ""
-    @AppStorage("instagram_handle") private var instagramHandle = ""
-    @AppStorage("tiktok_handle") private var tiktokHandle = ""
-    @State private var showApifyKey = false
-    @Environment(\.colorScheme) private var cs
-
-    // "Scrape My Data" opens the same IG scrub flow as AI Settings.
-    @AppStorage("ai_style_profile") private var styleProfile = ""
-    @AppStorage("active_scrub_id") private var activeScrubId = ""
-    @State private var showScrubSheet = false
-    @State private var showScrubPaywall = false
-
-    private let gold = Color(hex: "#C8A96E")
-    // Theme-aware chrome (NATIVE_PORT.md §G — was hardcoded dark-only white-alpha).
-    private var primaryText: Color { Theme.text(appState.colorMode, cs) }
-    private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
-    private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
-    private var cardFill: Color { Theme.bg2(appState.colorMode, cs) }
-    private var cardBorder: Color { Theme.border(appState.colorMode, cs) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-
-            // Apify Connection
-            CabinetSectionHeader("APIFY CONNECTION", icon: "link")
-
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Connect to Apify to enable social media scraping and data import.")
-                    .font(.system(size: 12))
-                    .foregroundColor(tertiaryText)
-                    .lineSpacing(3)
-
-                HStack(spacing: 10) {
-                    Group {
-                        if showApifyKey {
-                            TextField("apify_api_...", text: $apifyKey)
-                        } else {
-                            SecureField("apify_api_...", text: $apifyKey)
-                        }
-                    }
-                    .font(.system(size: 13, design: .monospaced))
-                    .foregroundColor(primaryText)
-                    .padding(12)
-                    .background(cardFill)
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
-
-                    Button {
-                        showApifyKey.toggle()
-                    } label: {
-                        Image(systemName: showApifyKey ? "eye.slash" : "eye")
-                            .font(.system(size: 13))
-                            .foregroundColor(tertiaryText)
-                            .frame(width: 40, height: 40)
-                            .background(cardFill)
-                            .cornerRadius(10)
-                    }
-                }
-
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(apifyKey.isEmpty ? Color.orange : Color.green)
-                        .frame(width: 6, height: 6)
-                    Text(apifyKey.isEmpty ? "Not connected" : "Connected")
-                        .font(.system(size: 11))
-                        .foregroundColor(apifyKey.isEmpty ? tertiaryText : .green.opacity(0.7))
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-
-            // Instagram
-            CabinetSectionHeader("INSTAGRAM", icon: "camera")
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    Text("@")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(gold.opacity(0.6))
-                    TextField("your_handle", text: $instagramHandle)
-                        .font(.system(size: 13))
-                        .foregroundColor(primaryText)
-                        .padding(12)
-                        .background(cardFill)
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(cardBorder, lineWidth: 1)
-                        )
-                }
-
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    if SubscriptionManager.shared.isPro {
-                        showScrubSheet = true
-                    } else {
-                        showScrubPaywall = true
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.down.circle")
-                            .font(.system(size: 13))
-                        Text("Scrape My Data")
-                            .font(.system(size: 12, weight: .bold))
-                        Spacer()
-                        Text("PREMIUM")
-                            .font(.system(size: 8, weight: .heavy))
-                            .tracking(1.5)
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(gold))
-                    }
-                    .foregroundColor(secondaryText)
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(gold.opacity(0.08))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(gold.opacity(0.2), lineWidth: 1)
-                            )
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-            .sheet(isPresented: $showScrubSheet) {
-                ScrubInstagramSheet(currentProfile: $styleProfile, activeScrubId: $activeScrubId)
-                    .presentationDetents([.medium, .large])
-            }
-            .sheet(isPresented: $showScrubPaywall) {
-                PaywallView().presentationDetents([.large])
-            }
-
-            // TikTok
-            CabinetSectionHeader("TIKTOK", icon: "play.rectangle")
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    Text("@")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(gold.opacity(0.6))
-                    TextField("your_handle", text: $tiktokHandle)
-                        .font(.system(size: 13))
-                        .foregroundColor(primaryText)
-                        .padding(12)
-                        .background(cardFill)
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(cardBorder, lineWidth: 1)
-                        )
-                }
-
-                HStack(spacing: 8) {
-                    Text("PREMIUM")
-                        .font(.system(size: 8, weight: .heavy))
-                        .tracking(1.5)
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(gold))
-                    Text("TikTok scraping requires a premium subscription")
-                        .font(.system(size: 11))
-                        .foregroundColor(tertiaryText)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-
-            // Smart Export
-            CabinetSectionHeader("SMART EXPORT", icon: "square.and.arrow.up")
-
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Export your dump to the camera roll with AI-generated captions copied to your clipboard, ready to paste into Instagram.")
-                    .font(.system(size: 12))
-                    .foregroundColor(tertiaryText)
-                    .lineSpacing(3)
-
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("Export to Camera Roll + Copy Caption")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(gold)
-                    .cornerRadius(12)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-
-            // Direct Post
-            CabinetSectionHeader("DIRECT POST", icon: "paperplane")
-
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Post directly to Instagram without background music. This uses the Instagram Graph API and requires a connected business account.")
-                    .font(.system(size: 12))
-                    .foregroundColor(tertiaryText)
-                    .lineSpacing(3)
-
-                HStack(spacing: 8) {
-                    Text("PREMIUM")
-                        .font(.system(size: 8, weight: .heavy))
-                        .tracking(1.5)
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(gold))
-                    Text("Coming soon")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(tertiaryText)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-        }
     }
 }

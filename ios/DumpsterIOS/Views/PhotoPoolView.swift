@@ -16,6 +16,9 @@ struct PhotoPoolView: View {
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var selectedPhotoIDs: Set<String> = []
     @State private var pinchScale: CGFloat = 1.0
+    // Bumped when background perceptual hashing lands new hashes, so the body
+    // (and duplicatePhotoIds with it) re-evaluates. See PhotoDupes.
+    @State private var dupHashVersion = 0
 
     // MARK: - Derived
 
@@ -55,8 +58,11 @@ struct PhotoPoolView: View {
     // Possible-duplicate photo ids, computed across the whole workspace (pool +
     // every dump — allPhotos already covers both since dumps just hold ids into
     // this same store). Mirrors client/src/pages/Home.tsx's duplicatePhotoIds.
+    // Byte-signature matches are instant; perceptual (aHash) matches land once
+    // the background hashing task below has run (dupHashVersion bump).
     private var duplicatePhotoIds: Set<String> {
-        PhotoDupes.findDuplicateIds(allPhotos)
+        _ = dupHashVersion
+        return PhotoDupes.findDuplicateIds(allPhotos)
     }
 
     private func isVideo(_ filename: String) -> Bool {
@@ -81,6 +87,14 @@ struct PhotoPoolView: View {
         .background(Theme.bg(appState.colorMode, cs).ignoresSafeArea())
         .onChange(of: pickerItems) { _, newItems in
             Task { await importPickedPhotos(newItems) }
+        }
+        .task(id: allPhotos.count) {
+            // Perceptual-hash any unhashed photos off-main; bump the version so
+            // duplicatePhotoIds picks up the new hash groups.
+            let items = allPhotos.map { (id: $0.id, relativePath: $0.localPath) }
+            if await PhotoDupes.hashMissingPhotos(items) {
+                dupHashVersion += 1
+            }
         }
     }
 

@@ -1,4 +1,6 @@
 import Foundation
+import UIKit
+import ImageIO
 
 /// Calls the Vercel /api/scrub-instagram endpoint to distill an IG profile into
 /// a style-profile description. Pro-gated on the UI side; this service is
@@ -147,5 +149,87 @@ final class ScrubService {
             return err
         }
         return nil
+    }
+}
+
+// MARK: - LabelService
+
+/// Calls /api/ai-label (Claude Vision, credit-gated) for specific photo labels —
+/// same classifier and prompt the web Scan uses. Callers fall back to on-device
+/// Apple Vision (PhotoAnalyzer) when this throws: signed out, offline, or out
+/// of credits. Lives in this file to avoid a project.pbxproj registration.
+final class LabelService {
+
+    static let shared = LabelService()
+
+    private let baseURL: URL = {
+        if let override = Bundle.main.object(forInfoDictionaryKey: "DumpsterAPIBaseURL") as? String,
+           let u = URL(string: override) {
+            return u
+        }
+        return URL(string: "https://dumpster-web-manus.vercel.app")!
+    }()
+
+    /// Server chunk limit — /api/ai-label caps at 12 photos per request.
+    private static let batchSize = 12
+
+    struct LabelResult: Codable {
+        let id: String
+        let category: String
+        let label: String
+    }
+    private struct LabelResponse: Codable { let labels: [LabelResult] }
+
+    struct LabelError: Error, LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
+    }
+
+    /// Label photos by Documents-relative path. Throws on any failure —
+    /// caller handles fallback. Photos that fail local thumbnailing are skipped.
+    func label(photos: [(id: String, relativePath: String)], jwt: String) async throws -> [LabelResult] {
+        var results: [LabelResult] = []
+        var batch: [[String: String]] = []
+
+        func flush() async throws {
+            guard !batch.isEmpty else { return }
+            let url = baseURL.appendingPathComponent("api/ai-label")
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+            req.httpBody = try JSONSerialization.data(withJSONObject: ["photos": batch])
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw LabelError(message: "AI labeling failed (HTTP \(code)).")
+            }
+            results.append(contentsOf: try JSONDecoder().decode(LabelResponse.self, from: data).labels)
+            batch.removeAll()
+        }
+
+        for photo in photos {
+            guard let dataUrl = Self.jpegDataURL(relativePath: photo.relativePath) else { continue }
+            batch.append(["id": photo.id, "url": dataUrl])
+            if batch.count == Self.batchSize { try await flush() }
+        }
+        try await flush()
+        return results
+    }
+
+    /// Downscaled JPEG data URL straight off the file via CGImageSource —
+    /// the full image is never decoded into memory.
+    private static func jpegDataURL(relativePath: String, maxDim: Int = 1024, quality: CGFloat = 0.65) -> String? {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = docs.appendingPathComponent(relativePath)
+        let opts = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDim,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ] as CFDictionary
+        guard let src = CGImageSourceCreateWithURL(fileURL as CFURL, nil),
+              let thumb = CGImageSourceCreateThumbnailAtIndex(src, 0, opts),
+              let jpeg = UIImage(cgImage: thumb).jpegData(compressionQuality: quality) else { return nil }
+        return "data:image/jpeg;base64," + jpeg.base64EncodedString()
     }
 }

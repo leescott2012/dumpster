@@ -230,15 +230,50 @@ struct PhotoPoolView: View {
         }
     }
 
+    /// Re-label every photo. Primary: /api/ai-label (Claude — same specific
+    /// labels as web Scan; costs credits, needs sign-in). Fallback when signed
+    /// out, offline, or out of credits: on-device Apple Vision.
     private func rescanAll() {
-        guard !allPhotos.isEmpty else { return }
+        guard !allPhotos.isEmpty, !isRescanning else { return }
         isRescanning = true
-        Task { @MainActor in
-            for photo in allPhotos {
-                photo.category = FormulaEngine.guessCategory(filename: photo.filename)
+        let items = allPhotos.map { (id: $0.id, relativePath: $0.localPath) }
+        let jwt = AuthManager.shared.jwt
+
+        Task {
+            var results: [String: (category: String, labels: [String])] = [:]
+            var useFallback = jwt == nil
+
+            if let jwt {
+                do {
+                    for r in try await LabelService.shared.label(photos: items, jwt: jwt) {
+                        results[r.id] = (r.category, [r.label])
+                    }
+                } catch {
+                    // Offline, out of credits, server error — fall back below.
+                    results.removeAll()
+                    useFallback = true
+                }
             }
-            try? modelContext.save()
-            isRescanning = false
+
+            if useFallback {
+                for item in items {
+                    if let img = PhotoStorageManager.shared.loadImage(relativePath: item.relativePath) {
+                        let c = PhotoAnalyzer.classifySingle(image: img)
+                        results[item.id] = (c.category, c.labels)
+                    }
+                }
+            }
+
+            await MainActor.run {
+                for photo in allPhotos {
+                    if let r = results[photo.id] {
+                        photo.category = r.category
+                        photo.labels = r.labels
+                    }
+                }
+                try? modelContext.save()
+                isRescanning = false
+            }
         }
     }
 

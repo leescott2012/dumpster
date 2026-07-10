@@ -135,6 +135,18 @@ class PhotoAnalyzer {
 
     // MARK: - Single Image Analysis
 
+    /// Classify one image on-device — the offline / no-credits fallback for the
+    /// server AI labeler (LabelService). `analyzeImage`'s completion fires
+    /// synchronously (VNImageRequestHandler.perform is blocking), so this
+    /// returns directly.
+    static func classifySingle(image: UIImage) -> (category: String, labels: [String]) {
+        var result: (category: String, labels: [String]) = ("LIFESTYLE", [])
+        analyzeImage(image: image, url: URL(fileURLWithPath: "/inline")) { analyzed in
+            result = (analyzed.category, analyzed.labels)
+        }
+        return result
+    }
+
     private static func analyzeImage(image: UIImage, url: URL, completion: @escaping (AnalyzedPhoto) -> Void) {
         // Use CGImage-based handler as fallback if URL fails (temp files can be tricky)
         guard let cgImage = image.cgImage else {

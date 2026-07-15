@@ -15,6 +15,7 @@ struct PhotoPoolView: View {
     @State private var showSearchField = false
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var selectedPhotoIDs: Set<String> = []
+    @State private var highlightedPhotoId: String? = nil
     @State private var pinchScale: CGFloat = 1.0
     // Bumped when background perceptual hashing lands new hashes, so the body
     // (and duplicatePhotoIds with it) re-evaluates. See PhotoDupes.
@@ -87,6 +88,9 @@ struct PhotoPoolView: View {
         .background(Theme.bg(appState.colorMode, cs).ignoresSafeArea())
         .onChange(of: pickerItems) { _, newItems in
             Task { await importPickedPhotos(newItems) }
+        }
+        .onChange(of: appState.lightboxPhotoId) { _, newValue in
+            if newValue != nil { highlightedPhotoId = nil }
         }
         .task(id: allPhotos.count) {
             // Perceptual-hash any unhashed photos off-main; bump the version so
@@ -410,12 +414,15 @@ struct PhotoPoolView: View {
                     photo: photo,
                     context: .pool,
                     isSelected: selectedPhotoIDs.contains(photo.id),
+                    isHighlighted: highlightedPhotoId == photo.id,
                     isDuplicate: duplicatePhotoIds.contains(photo.id),
                     slotIndex: 0,
                     totalInDump: 0,
                     size: ResponsiveGrid.photoSize(for: appState.poolSize, screenWidth: UIScreen.main.bounds.width),
                     onTap: {
-                        // Selection mode: toggle; otherwise PhotoCardView opens lightbox itself
+                        // Add-to-dump mode: toggle multi-select. Otherwise: toggle the
+                        // single-photo highlight — PhotoCardView opens the lightbox
+                        // itself on a detected double-tap.
                         if appState.addingToDumpId != nil {
                             HapticManager.shared.playTick()
                             if selectedPhotoIDs.contains(photo.id) {
@@ -423,6 +430,8 @@ struct PhotoPoolView: View {
                             } else {
                                 selectedPhotoIDs.insert(photo.id)
                             }
+                        } else {
+                            highlightedPhotoId = (highlightedPhotoId == photo.id) ? nil : photo.id
                         }
                     },
                     onRemoveFromDump: nil,

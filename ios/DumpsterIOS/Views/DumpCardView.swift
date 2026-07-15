@@ -58,6 +58,7 @@ struct DumpCardView: View {
     @State private var showDumpMenu = false
     @State private var showChatSheet = false
     @State private var draggingPhotoId: String? = nil
+    @State private var highlightedPhotoId: String? = nil
 
     private var photos: [DumpPhoto] {
         let byID = Dictionary(uniqueKeysWithValues: allPhotos.map { ($0.id, $0) })
@@ -88,6 +89,9 @@ struct DumpCardView: View {
                 )
         )
         .padding(.horizontal, 12)
+        .onChange(of: appState.lightboxPhotoId) { _, newValue in
+            if newValue != nil { highlightedPhotoId = nil }
+        }
         .sheet(isPresented: $showDumpMenu) {
             DumpMenuSheet(
                 dump: dump,
@@ -286,9 +290,13 @@ struct DumpCardView: View {
                     PhotoCardView(
                         photo: photo,
                         context: .dump(dumpId: dump.id),
+                        isHighlighted: highlightedPhotoId == photo.id,
                         slotIndex: index,
                         totalInDump: photos.count,
                         size: CGSize(width: 145, height: 195),
+                        onTap: {
+                            highlightedPhotoId = (highlightedPhotoId == photo.id) ? nil : photo.id
+                        },
                         onRemoveFromDump: { removePhoto(photo) }
                     )
                     .onDrag {

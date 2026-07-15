@@ -23,6 +23,7 @@ struct PhotoCardView: View {
     let photo: DumpPhoto
     let context: CardContext
     var isSelected: Bool = false
+    var isHighlighted: Bool = false
     var isDuplicate: Bool = false
     var isUsed: Bool = false
     var slotIndex: Int? = nil
@@ -33,7 +34,6 @@ struct PhotoCardView: View {
     var onTap: (() -> Void)? = nil
     var onRemoveFromDump: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
-    var onOpenLightbox: (() -> Void)? = nil
     var onSaveToPhotos: (() -> Void)? = nil
     var onCrop: (() -> Void)? = nil
 
@@ -41,6 +41,7 @@ struct PhotoCardView: View {
     @State private var showMenu = false
     @State private var showPhotoMenu = false
     @State private var isDragging = false
+    @State private var lastTapTime: Date = .distantPast
 
     private var isDumpContext: Bool {
         if case .dump = context { return true }
@@ -61,14 +62,22 @@ struct PhotoCardView: View {
         .scaleEffect(isDragging ? 1.05 : 1.0)
         .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isDragging)
         // Single recognizer only — a count:2 sibling here previously forced SwiftUI's
-        // double-tap disambiguation wait on every tap (~300-400ms perceived lag) even
-        // though nothing ever passed a distinct onDoubleTap handler, so double-tap and
-        // single-tap always did the exact same thing anyway (NATIVE_PORT.md §G).
+        // double-tap disambiguation wait on every tap (~300-400ms perceived lag), so
+        // double-tap is detected manually via timestamp instead (mirrors web's
+        // PhotoCard.tsx handleTouchEnd), matching web parity: single tap selects/
+        // highlights, double tap (within 300ms) opens the lightbox (NATIVE_PORT.md §I).
         .onTapGesture(count: 1) {
             if appState.addingToDumpId != nil && !isDumpContext {
                 onTap?()
             } else {
-                appState.lightboxPhotoId = photo.id
+                let now = Date()
+                if now.timeIntervalSince(lastTapTime) < 0.3 {
+                    lastTapTime = .distantPast
+                    appState.lightboxPhotoId = photo.id
+                } else {
+                    lastTapTime = now
+                    onTap?()
+                }
             }
         }
         .sheet(isPresented: $showPhotoMenu) {
@@ -203,6 +212,9 @@ struct PhotoCardView: View {
         } else if isSelected {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .strokeBorder(Color.green, lineWidth: 2)
+        } else if isHighlighted {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .strokeBorder(appState.accentColor, lineWidth: 2)
         } else if isDuplicate {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .strokeBorder(Color(red: 0.96, green: 0.62, blue: 0.04), lineWidth: 2)

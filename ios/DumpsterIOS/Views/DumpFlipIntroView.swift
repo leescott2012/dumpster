@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// "Marvel intro" style flip-through: photos hard-cut past rapidly with a
-/// scale-punch, building to the 3D carousel ring settling in behind it.
-/// A fixed, non-interactive flourish (unlike the ring) — plays once, then
-/// hands off via onComplete.
+/// "Marvel intro" style flip-through: the user's own pool photos hard-cut
+/// past rapidly with a scale-punch, veiled under a dark scrim carrying the
+/// Dumpster logo + a kinetic letter-slam "DUMPSTER" wordmark (same per-letter
+/// spring treatment as the web "Kinetic Text / Word Slam" effect in the
+/// Motion Library — ported here rather than reinvented). Plays once on app
+/// launch, then hands off via onComplete.
 struct DumpFlipIntroView: View {
     let photos: [DumpPhoto]
     let onComplete: () -> Void
@@ -28,6 +30,25 @@ struct DumpFlipIntroView: View {
                         removal: .opacity
                     ))
             }
+
+            // Shadowed overlay carrying the brand mark, so the wordmark and
+            // logo stay legible over whatever photo happens to be flipping.
+            LinearGradient(
+                colors: [Color.black.opacity(0.35), Color.black.opacity(0.62)],
+                startPoint: .top, endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                Image("DumpsterLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 84, height: 84)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .shadow(color: .black.opacity(0.6), radius: 24, y: 10)
+
+                KineticSlamText(text: "DUMPSTER")
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
@@ -45,5 +66,35 @@ struct DumpFlipIntroView: View {
                 index += 1
             }
         }
+    }
+}
+
+/// Letter-by-letter spring slam-in — native port of the Motion Library's
+/// "Kinetic Text / Word Slam" (already live on web as the Draft 2 headlines).
+private struct KineticSlamText: View {
+    let text: String
+    var font: Font = .system(size: 32, weight: .heavy, design: .rounded)
+    var color: Color = Color(hex: "#C8A96E")
+    var letterDelay: Double = 0.045
+
+    @State private var appeared = false
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(Array(text.enumerated()), id: \.offset) { i, ch in
+                Text(String(ch))
+                    .font(font)
+                    .tracking(1)
+                    .foregroundColor(color)
+                    .rotationEffect(.degrees(appeared ? 0 : -10))
+                    .offset(y: appeared ? 0 : 46)
+                    .opacity(appeared ? 1 : 0)
+                    .animation(
+                        .spring(response: 0.5, dampingFraction: 0.62).delay(Double(i) * letterDelay),
+                        value: appeared
+                    )
+            }
+        }
+        .onAppear { appeared = true }
     }
 }

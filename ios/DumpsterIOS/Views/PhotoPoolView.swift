@@ -410,7 +410,7 @@ struct PhotoPoolView: View {
     private var grid: some View {
         let columns = ResponsiveGrid.columns(for: appState.poolSize, screenWidth: UIScreen.main.bounds.width)
         return LazyVGrid(columns: columns, spacing: 4) {
-            ForEach(filteredPhotos) { photo in
+            ForEach(Array(filteredPhotos.enumerated()), id: \.element.id) { index, photo in
                 PhotoCardView(
                     photo: photo,
                     context: .pool,
@@ -459,6 +459,10 @@ struct PhotoPoolView: View {
                         }
                     }
                 )
+                // "pull blur-fade from Magic UI" — Lee's pick from the Motion Library.
+                // Each tile fades in from a blur as it scrolls into the lazy grid's
+                // render window (mirrors the web card's IntersectionObserver replay).
+                .blurFadeIn(delay: Double(index % columns.count) * 0.05)
             }
             let cellSize = ResponsiveGrid.photoSize(for: appState.poolSize, screenWidth: UIScreen.main.bounds.width)
             let cellBg = Theme.bg2(appState.colorMode, cs)
@@ -503,6 +507,31 @@ struct PhotoPoolView: View {
         pickerItems.removeAll()
         // Dashboard: photos landed in the pool.
         if added > 0 { Analytics.track(.photoUploaded, metadata: ["count": added]) }
+    }
+}
+
+/// Blur/opacity/upward-offset entrance, replayed each time the view re-appears —
+/// port of the web library's ".bfwrap" blur-fade demo (client/src's blur-fade-on-view).
+private struct BlurFadeIn: ViewModifier {
+    @State private var appeared = false
+    var delay: Double = 0
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(appeared ? 1 : 0)
+            .blur(radius: appeared ? 0 : 8)
+            .offset(y: appeared ? 0 : 14)
+            .onAppear {
+                appeared = false
+                withAnimation(.easeOut(duration: 0.45).delay(delay)) { appeared = true }
+            }
+            .onDisappear { appeared = false }
+    }
+}
+
+private extension View {
+    func blurFadeIn(delay: Double = 0) -> some View {
+        modifier(BlurFadeIn(delay: delay))
     }
 }
 

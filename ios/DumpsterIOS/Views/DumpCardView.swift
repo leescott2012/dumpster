@@ -57,6 +57,7 @@ struct DumpCardView: View {
     @State private var captionError: String?
     @State private var showDumpMenu = false
     @State private var showChatSheet = false
+    @State private var show3DPreview = false
     @State private var draggingPhotoId: String? = nil
     @State private var highlightedPhotoId: String? = nil
 
@@ -101,6 +102,7 @@ struct DumpCardView: View {
                 onChat: { showChatSheet = true },
                 onCaptions: { Task { await generateCaptions() } },
                 onShare: shareDump,
+                onPreview3D: { show3DPreview = true },
                 onInstagram: { /* handle instagram */ },
                 onDelete: { showDeleteConfirm = true },
                 onHeart: toggleDumpFavorite,
@@ -115,6 +117,10 @@ struct DumpCardView: View {
                 poolPhotos: poolPhotos,
                 tasteExamples: tasteExamples
             )
+        }
+        .fullScreenCover(isPresented: $show3DPreview) {
+            Dump3DCarouselView(dump: dump, photos: photos)
+                .environmentObject(appState)
         }
         .confirmationDialog("Delete this dump?", isPresented: $showDeleteConfirm) {
             Button("Delete Dump", role: .destructive) { deleteDump() }

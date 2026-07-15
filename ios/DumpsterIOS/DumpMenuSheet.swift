@@ -15,6 +15,7 @@ struct DumpMenuSheet: View {
     let onChat: () -> Void
     let onCaptions: () -> Void
     let onShare: () -> Void
+    let onPreview3D: () -> Void
     let onInstagram: () -> Void
     let onDelete: () -> Void
     let onHeart: () -> Void
@@ -105,6 +106,19 @@ struct DumpMenuSheet: View {
                     disabled: photosEmpty
                 ) {
                     onShare()
+                    dismiss()
+                }
+
+                Divider().background(Color.white.opacity(0.07))
+
+                // Preview in 3D — Motion Library pick (Cult UI three-d-carousel)
+                menuItem(
+                    icon: "cube",
+                    label: "Preview in 3D",
+                    tint: .white,
+                    disabled: photosEmpty
+                ) {
+                    onPreview3D()
                     dismiss()
                 }
 

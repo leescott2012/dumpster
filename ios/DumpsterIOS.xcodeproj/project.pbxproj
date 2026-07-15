@@ -41,6 +41,7 @@
 		E0A7AAA1E3B6AAA770B95DF1 /* LightboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202A316C5E1892E09EBE6F49 /* LightboxView.swift */; };
 		925E6F2365D0473D98F167C5 /* ConfettiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA341A66087474A8CB27607 /* ConfettiView.swift */; };
 		E23526264EAF4A65A1FB719B /* Dump3DCarouselView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3115232C67E460CA16F1007 /* Dump3DCarouselView.swift */; };
+		9E2EED52E28C46B9AE8D816E /* DumpFlipIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */; };
 		EB0D5748896835B99BE96D18 /* PhotoStorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F40CA50033B8B07FFAC959 /* PhotoStorageManager.swift */; };
 		EC83CE521C6FFA186F28F215 /* AppEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1EFF72D39C18BA5DBDEF2 /* AppEnums.swift */; };
 		F09412A62E2FB43EFB3E4BF4 /* CaptionPoolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61564A55124AA0946A46F09 /* CaptionPoolView.swift */; };
@@ -70,6 +71,7 @@
 		202A316C5E1892E09EBE6F49 /* LightboxView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LightboxView.swift; sourceTree = "<group>"; };
 		7FA341A66087474A8CB27607 /* ConfettiView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfettiView.swift; sourceTree = "<group>"; };
 		F3115232C67E460CA16F1007 /* Dump3DCarouselView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Dump3DCarouselView.swift; sourceTree = "<group>"; };
+		AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpFlipIntroView.swift; sourceTree = "<group>"; };
 		223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCaptionBubble.swift; sourceTree = "<group>"; };
 		230A26BB7172434E549C9A9D /* UndoManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UndoManager.swift; sourceTree = "<group>"; };
 		23A5101A689318A2375DE509 /* PoolFilterMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PoolFilterMenu.swift; sourceTree = "<group>"; };
@@ -165,6 +167,7 @@
 				202A316C5E1892E09EBE6F49 /* LightboxView.swift */,
 				7FA341A66087474A8CB27607 /* ConfettiView.swift */,
 				F3115232C67E460CA16F1007 /* Dump3DCarouselView.swift */,
+				AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */,
 				223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */,
 				702838F65FF68DD79CFE568A /* MainAppView.swift */,
 				6773F78BA7CBCB0A7D7DE45E /* SpotlightTutorialView.swift */,
@@ -362,6 +365,7 @@
 				E0A7AAA1E3B6AAA770B95DF1 /* LightboxView.swift in Sources */,
 				925E6F2365D0473D98F167C5 /* ConfettiView.swift in Sources */,
 				E23526264EAF4A65A1FB719B /* Dump3DCarouselView.swift in Sources */,
+				9E2EED52E28C46B9AE8D816E /* DumpFlipIntroView.swift in Sources */,
 				9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */,
 				710B8108FF1ED0318E925C2D /* MainAppView.swift in Sources */,
 				0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */,

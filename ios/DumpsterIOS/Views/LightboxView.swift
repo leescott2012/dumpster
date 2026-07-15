@@ -60,6 +60,19 @@ struct LightboxView: View {
                             .scaledToFit()
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .padding(.horizontal, 16)
+                            // Swipe up to reveal metadata, swipe down to hide it —
+                            // matches Apple Photos' lightbox gesture; the (i) button
+                            // above remains as an equivalent tap target.
+                            .gesture(
+                                DragGesture(minimumDistance: 24)
+                                    .onEnded { value in
+                                        if value.translation.height < -60 && !showInfo {
+                                            withAnimation(.easeInOut(duration: 0.2)) { showInfo = true }
+                                        } else if value.translation.height > 60 && showInfo {
+                                            withAnimation(.easeInOut(duration: 0.2)) { showInfo = false }
+                                        }
+                                    }
+                            )
                     } else {
                         Image(systemName: "photo")
                             .font(.system(size: 80))

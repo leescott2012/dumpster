@@ -5,9 +5,11 @@ import Photos
 struct PhotoMenuSheet: View {
     let photo: DumpPhoto           // the DumpPhoto model
     let isDumpContext: Bool
+    var isDuplicate: Bool = false
     var onLightbox: () -> Void = {}
     var onCrop: () -> Void = {}
     var onSaveToPhotos: () -> Void = {}
+    var onDismissDuplicate: () -> Void = {}
     var onRemove: () -> Void = {}     // remove from dump OR delete from pool
     @Environment(\.dismiss) private var dismiss
 
@@ -35,6 +37,12 @@ struct PhotoMenuSheet: View {
                 Divider().background(Color.white.opacity(0.07))
                 menuItem(icon: "square.and.arrow.down", label: "Save to Photos", tint: .white) {
                     onSaveToPhotos(); dismiss()
+                }
+                if isDuplicate {
+                    Divider().background(Color.white.opacity(0.07))
+                    menuItem(icon: "checkmark.circle", label: "Not a duplicate", tint: .white) {
+                        onDismissDuplicate(); dismiss()
+                    }
                 }
                 Divider().background(Color.white.opacity(0.07))
                 // Rescan AI Labels — greyed out (premium)
@@ -79,7 +87,7 @@ struct PhotoMenuSheet: View {
                 Spacer()
             }
         }
-        .presentationDetents([.height(280)])
+        .presentationDetents([.height(isDuplicate ? 328 : 280)])
         .presentationDragIndicator(.hidden)
         .preferredColorScheme(.dark)
     }

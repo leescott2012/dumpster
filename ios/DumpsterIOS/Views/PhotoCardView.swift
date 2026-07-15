@@ -36,6 +36,7 @@ struct PhotoCardView: View {
     var onDelete: (() -> Void)? = nil
     var onSaveToPhotos: (() -> Void)? = nil
     var onCrop: (() -> Void)? = nil
+    var onDismissDuplicate: (() -> Void)? = nil
 
     @EnvironmentObject var appState: AppState
     @State private var showMenu = false
@@ -84,9 +85,11 @@ struct PhotoCardView: View {
             PhotoMenuSheet(
                 photo: photo,
                 isDumpContext: isDumpContext,
+                isDuplicate: isDuplicate,
                 onLightbox: { appState.lightboxPhotoId = photo.id },
                 onCrop: { onCrop?() },
                 onSaveToPhotos: { if let cb = onSaveToPhotos { cb() } else { saveToPhotoLibrary() } },
+                onDismissDuplicate: { onDismissDuplicate?() },
                 onRemove: { isDumpContext ? onRemoveFromDump?() : onDelete?() }
             )
         }
@@ -181,8 +184,9 @@ struct PhotoCardView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .padding(7)
                 }
-                // "..." dots button — dump context only, not in pool
-                if showDotsButton && isDumpContext {
+                // "..." dots button — pool and dump both (was dump-only, blocking
+                // pool-context access to Delete Photo / Not a duplicate)
+                if showDotsButton {
                     Button { showPhotoMenu = true } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 11, weight: .bold))

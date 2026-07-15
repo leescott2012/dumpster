@@ -63,7 +63,8 @@ struct PhotoPoolView: View {
     // the background hashing task below has run (dupHashVersion bump).
     private var duplicatePhotoIds: Set<String> {
         _ = dupHashVersion
-        return PhotoDupes.findDuplicateIds(allPhotos)
+        let dismissed = Set(allPhotos.filter { $0.dupeDismissed }.map { $0.id })
+        return PhotoDupes.findDuplicateIds(allPhotos).subtracting(dismissed)
     }
 
     private func isVideo(_ filename: String) -> Bool {
@@ -438,6 +439,10 @@ struct PhotoPoolView: View {
                     onDelete: {
                         HapticManager.shared.playRemove()
                         modelContext.delete(photo)
+                        try? modelContext.save()
+                    },
+                    onDismissDuplicate: {
+                        photo.dupeDismissed = true
                         try? modelContext.save()
                     }
                 )

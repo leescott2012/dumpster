@@ -515,6 +515,10 @@ struct DumpCardView: View {
               let root = scene.windows.first?.rootViewController else { return }
         let av = UIActivityViewController(activityItems: images, applicationActivities: nil)
         av.popoverPresentationController?.sourceView = root.view
+        av.completionWithItemsHandler = { _, completed, _, _ in
+            guard completed else { return }
+            DispatchQueue.main.async { appState.confettiTrigger += 1 }
+        }
         root.present(av, animated: true)
         // Dashboard: a dump's photos were exported/shared.
         Analytics.track(.dumpExported, metadata: ["photo_count": images.count])

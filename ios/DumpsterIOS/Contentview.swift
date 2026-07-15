@@ -37,6 +37,8 @@ final class AppState: ObservableObject {
     @Published var poolSearchQuery: String = ""
     @Published var lightboxPhotoId: String?
     @Published var addingToDumpId: String?
+    /// Bumped whenever a dump export/share completes — ConfettiView observes this.
+    @Published var confettiTrigger: Int = 0
     @Published var activePoolTab: PoolTab = .photos
 
     // ── Accent color ──
@@ -139,6 +141,10 @@ struct ContentView: View {
                     .zIndex(40)
                     .transition(.opacity)
             }
+
+            ConfettiView(trigger: appState.confettiTrigger)
+                .allowsHitTesting(false)
+                .zIndex(45)
 
             // Floating bug report button (NATIVE_PORT.md §2)
             BugReportButton()

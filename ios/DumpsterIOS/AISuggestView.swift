@@ -55,7 +55,6 @@ struct AISuggestView: View {
     @State private var statusMessage: String = ""
     @State private var isCreating = false
     @State private var maxPhotosPerDump: Int = 10
-    @State private var requestedDumpCount: Int = 3
     // Maps AnalyzedPhoto.filename → existing DumpPhoto.id (pool source)
     @State private var poolPhotoMap: [String: String] = [:]
 
@@ -76,10 +75,6 @@ struct AISuggestView: View {
         min(20, availablePhotos.count)
     }
 
-    private var dumpCountMax: Int {
-        3
-    }
-
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
@@ -87,7 +82,7 @@ struct AISuggestView: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
-                    Text(phase == .picker ? "AI BUILDER" : "SUGGESTED DUMPS")
+                    Text(phase == .picker ? "AI BUILDER" : "SUGGESTED DUMP")
                         .font(.system(size: 12, weight: .black))
                         .tracking(3)
                         .foregroundColor(gold)
@@ -146,9 +141,7 @@ struct AISuggestView: View {
                                     .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                     .scaleEffect(0.7)
                             }
-                            Text(isCreating
-                                 ? "CREATING..."
-                                 : "CREATE \(selectedClusters.count) DUMP\(selectedClusters.count == 1 ? "" : "S")")
+                            Text(isCreating ? "CREATING..." : "CREATE DUMP")
                                 .font(.system(size: 13, weight: .bold))
                                 .tracking(3)
                                 .foregroundColor(.black)
@@ -190,7 +183,7 @@ struct AISuggestView: View {
                     .font(.system(size: 18, weight: .black))
                     .tracking(4)
                     .foregroundColor(.white)
-                Text("Vision AI will analyze your pool and\nbuild dumps automatically.")
+                Text("Vision AI will analyze your pool and\nbuild one dump automatically.")
                     .font(.system(size: 15))
                     .multilineTextAlignment(.center)
                     .foregroundColor(.white.opacity(0.4))
@@ -230,73 +223,25 @@ struct AISuggestView: View {
 
             if !isAnalyzing {
                 HStack(spacing: 24) {
-                    // Number of dumps stepper
+                    // Photos in dump stepper — web parity: 2–20 photos, one dump per run
                     VStack(spacing: 8) {
-                        Text("DUMPS")
+                        Text("PHOTOS IN DUMP")
                             .font(.system(size: 9, weight: .heavy))
                             .tracking(2)
                             .foregroundColor(.white.opacity(0.35))
 
                         HStack(spacing: 12) {
                             Button {
-                                if requestedDumpCount > 1 { requestedDumpCount -= 1 }
+                                if maxPhotosPerDump > 2 { maxPhotosPerDump -= 1 }
                             } label: {
                                 Image(systemName: "minus")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(requestedDumpCount > 1 ? .white : .white.opacity(0.2))
+                                    .foregroundColor(maxPhotosPerDump > 2 ? .white : .white.opacity(0.2))
                                     .frame(width: 36, height: 36)
                                     .background(Color.white.opacity(0.08))
                                     .clipShape(Circle())
                             }
-                            .disabled(requestedDumpCount <= 1)
-
-                            Text("\(requestedDumpCount)")
-                                .font(.system(size: 32, weight: .bold, design: .monospaced))
-                                .foregroundColor(gold)
-                                .frame(width: 44)
-
-                            Button {
-                                if requestedDumpCount < dumpCountMax { requestedDumpCount += 1 }
-                            } label: {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(requestedDumpCount < dumpCountMax ? .white : .white.opacity(0.2))
-                                    .frame(width: 36, height: 36)
-                                    .background(Color.white.opacity(0.08))
-                                    .clipShape(Circle())
-                            }
-                            .disabled(requestedDumpCount >= dumpCountMax)
-                        }
-
-                        Text("max 3")
-                            .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.2))
-                    }
-
-                    // Divider
-                    Rectangle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 1, height: 80)
-
-                    // Photos per dump stepper
-                    VStack(spacing: 8) {
-                        Text("PHOTOS EACH")
-                            .font(.system(size: 9, weight: .heavy))
-                            .tracking(2)
-                            .foregroundColor(.white.opacity(0.35))
-
-                        HStack(spacing: 12) {
-                            Button {
-                                if maxPhotosPerDump > 3 { maxPhotosPerDump -= 1 }
-                            } label: {
-                                Image(systemName: "minus")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(maxPhotosPerDump > 3 ? .white : .white.opacity(0.2))
-                                    .frame(width: 36, height: 36)
-                                    .background(Color.white.opacity(0.08))
-                                    .clipShape(Circle())
-                            }
-                            .disabled(maxPhotosPerDump <= 3)
+                            .disabled(maxPhotosPerDump <= 2)
 
                             Text("\(maxPhotosPerDump)")
                                 .font(.system(size: 32, weight: .bold, design: .monospaced))
@@ -384,7 +329,7 @@ struct AISuggestView: View {
     private var resultsPhase: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Tap to select which dumps to create")
+                Text("Review your dump before creating")
                     .font(.system(size: 13))
                     .foregroundColor(.white.opacity(0.35))
                     .padding(.horizontal, 24)
@@ -467,14 +412,14 @@ struct AISuggestView: View {
             let safeMap = map
             lock.unlock()
 
-            PhotoAnalyzer.analyze(images: safeLoaded, limit: requestedDumpCount) { result in
+            PhotoAnalyzer.analyze(images: safeLoaded, targetCount: maxPhotosPerDump) { result in
                 Task { @MainActor in
                     self.poolPhotoMap = safeMap
                     self.clusters = result
                     self.selectedClusters = Set(result.indices)
                     self.isAnalyzing = false
                     self.appState.isAnalyzing = false
-                    self.appState.showStatus("Found \(result.count) dumps", duration: 3)
+                    self.appState.showStatus(result.isEmpty ? "No dump found" : "Dump ready", duration: 3)
                     self.statusMessage = ""
                     withAnimation { self.phase = .results }
                     self.generateCaptionsForClusters(result)
@@ -529,11 +474,14 @@ struct AISuggestView: View {
 
     private func createDumps() {
         isCreating = true
-        appState.showStatus("Creating dumps...", duration: 10)
+        appState.showStatus("Creating dump...", duration: 10)
 
+        // Web parity: one dump per run (web uses only clusters[0]). analyze()
+        // already returns at most one cluster; prefix(1) keeps the invariant local.
         let selectedGroups = clusters.enumerated()
             .filter { selectedClusters.contains($0.offset) }
             .map { $0.element }
+            .prefix(1)
 
         var nextNum = (existingDumps.map { $0.num }.max() ?? 0) + 1
         // Build a quick lookup for existing pool photos by ID
@@ -601,7 +549,7 @@ struct AISuggestView: View {
         do {
             try modelContext.save()
             isCreating = false
-            appState.showStatus("Dumps created!", duration: 3)
+            appState.showStatus("Dump created!", duration: 3)
             appState.dumpCount = existingDumps.count
             isPresented = false
         } catch {

@@ -25,6 +25,7 @@ struct MainAppView: View {
     @State private var poolTabSegmentWidth: CGFloat = 0
     @State private var pillDragOffset: CGFloat = 0
     @State private var isDraggingPill: Bool = false
+    @State private var showArchived: Bool = false
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -247,11 +248,41 @@ struct MainAppView: View {
     // MARK: - Dumps list
 
     private var dumpsSection: some View {
-        LazyVStack(spacing: 14) {
-            ForEach(dumps) { dump in
+        let active = dumps.filter { !$0.archived }
+        let archived = dumps.filter { $0.archived }
+        return LazyVStack(spacing: 14) {
+            ForEach(active) { dump in
                 DumpCardView(dump: dump, isActive: dump.id == appState.activeDumpId, allPhotos: allPhotos, tasteExamples: tasteExamples)
                     .onTapGesture { appState.activeDumpId = dump.id }
                     .id(dump.id) // FIX: Stabilize view identity for LazyVStack reuse
+            }
+
+            // Archived dumps — collapsed by default so saved dumps stay out of
+            // the way (parity with web Home.tsx archived section).
+            if !archived.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showArchived.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: showArchived ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("ARCHIVED (\(archived.count))")
+                            .font(.system(size: 11, weight: .heavy))
+                            .tracking(1.4)
+                        Spacer()
+                    }
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 6)
+                }
+                if showArchived {
+                    ForEach(archived) { dump in
+                        DumpCardView(dump: dump, isActive: dump.id == appState.activeDumpId, allPhotos: allPhotos, tasteExamples: tasteExamples)
+                            .onTapGesture { appState.activeDumpId = dump.id }
+                            .id(dump.id)
+                            .opacity(0.75)
+                    }
+                }
             }
         }
     }

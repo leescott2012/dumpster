@@ -93,12 +93,15 @@ struct DumpCardView: View {
                 dump: dump,
                 isGenerating: isGenerating,
                 photosEmpty: photos.isEmpty,
+                hasCaptions: dumpHasCaptions,
                 onChat: { showChatSheet = true },
                 onCaptions: { Task { await generateCaptions() } },
                 onShare: shareDump,
                 onInstagram: { /* handle instagram */ },
                 onDelete: { showDeleteConfirm = true },
-                onHeart: { recordTasteExample(positive: true) }
+                onHeart: toggleDumpFavorite,
+                onRate: rateDump,
+                onArchive: toggleArchive
             )
         }
         .sheet(isPresented: $showChatSheet) {
@@ -543,6 +546,35 @@ struct DumpCardView: View {
         if positive {
             dump.liked = true
         }
+        try? modelContext.save()
+    }
+
+    /// True when this dump already has saved captions — flips the menu label
+    /// to "Regenerate Captions" (parity with web DumpActionSheet).
+    private var dumpHasCaptions: Bool {
+        let id: String? = dump.id
+        let d = FetchDescriptor<DumpCaption>(predicate: #Predicate { $0.dumpId == id && !$0.deleted })
+        return ((try? modelContext.fetchCount(d)) ?? 0) > 0
+    }
+
+    private func toggleDumpFavorite() {
+        if dump.liked {
+            dump.liked = false
+            try? modelContext.save()
+        } else {
+            recordTasteExample(positive: true) // sets liked + saves
+        }
+    }
+
+    private func rateDump(_ rating: String?) {
+        dump.rating = rating
+        try? modelContext.save()
+        // Thumbs-down opens Valet to ask why (parity with web onThumbsDown).
+        if rating == "down" { showChatSheet = true }
+    }
+
+    private func toggleArchive() {
+        dump.archived.toggle()
         try? modelContext.save()
     }
 }

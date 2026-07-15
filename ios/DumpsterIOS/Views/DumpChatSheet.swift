@@ -65,7 +65,7 @@ struct DumpChatSheet: View {
                 .frame(width: 34, height: 34)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Chat · \(dump.title)")
+                Text("Valet · \(dump.title)")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
@@ -168,7 +168,7 @@ struct DumpChatSheet: View {
             Text("✨")
                 .font(.system(size: 28))
                 .padding(.top, 32)
-            Text("Talk to me about this dump")
+            Text("Ask the Valet about this dump")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(Color(white: 0.9))
             Text("Tell me what vibe you want, which photos to lead with, what to swap out. I learn your taste over time.")
@@ -418,6 +418,13 @@ private struct MessageBubble: View {
                     .foregroundColor(isUser ? Color(white: 0.9) : Color(white: 0.8))
                     .lineSpacing(4)
 
+                if !missingItems.isEmpty {
+                    Divider()
+                        .background(Color.white.opacity(0.06))
+                        .padding(.vertical, 8)
+                    missingItemsCard
+                }
+
                 if let chips = actionChips, !chips.isEmpty {
                     Divider()
                         .background(Color.white.opacity(0.06))
@@ -466,13 +473,57 @@ private struct MessageBubble: View {
         let color: Color
     }
 
-    private var actionChips: [ActionChip]? {
+    private var decodedActions: [LLMService.ChatAction] {
         guard let json = message.actionsJSON,
               let data = json.data(using: .utf8),
               let actions = try? JSONDecoder().decode([LLMService.ChatAction].self, from: data) else {
-            return nil
+            return []
         }
-        return actions.compactMap { action in
+        return actions
+    }
+
+    private var missingItems: [LLMService.ChatAction.MissingItem] {
+        decodedActions.filter { $0.type == "suggest_missing" }.flatMap { $0.items ?? [] }
+    }
+
+    private var missingItemsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("TO COMPLETE THIS VIBE")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.2)
+                .foregroundColor(accentColor)
+
+            ForEach(Array(missingItems.enumerated()), id: \.offset) { _, item in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: item.inPool ? "photo.on.rectangle" : "camera")
+                        .font(.system(size: 11))
+                        .foregroundColor(accentColor.opacity(0.8))
+                        .frame(width: 16)
+                        .padding(.top, 1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.description)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Color(white: 0.85))
+                        Text(item.reason)
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(white: 0.45))
+                            .lineSpacing(3)
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(accentColor.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(accentColor.opacity(0.15), lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    private var actionChips: [ActionChip]? {
+        return decodedActions.compactMap { action in
             switch action.type {
             case "reorder":      return ActionChip(icon: "arrow.up.arrow.down", label: "Reordered", color: Color(hex: "#C8A96E"))
             case "swap_in":      return ActionChip(icon: "arrow.down.to.line", label: "Added from pool", color: Color(hex: "#4ADE80"))

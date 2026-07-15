@@ -14,6 +14,8 @@ final class PhotoDump {
     var liked: Bool
     var isAIGenerated: Bool       // true = created by AUTO-GENERATE
     var titleApproved: Bool?      // true = kept, false = rejected, nil = untouched
+    var rating: String?           // "up" | "down" | nil — mirrors web Dump.rating
+    var archived: Bool = false    // hidden from the main list, restorable (mirrors web archive)
     var createdAt: Date
 
     init(
@@ -24,7 +26,9 @@ final class PhotoDump {
         vibeBadge: String? = nil,
         liked: Bool = false,
         isAIGenerated: Bool = false,
-        titleApproved: Bool? = nil
+        titleApproved: Bool? = nil,
+        rating: String? = nil,
+        archived: Bool = false
     ) {
         self.id = id
         self.num = num
@@ -34,6 +38,8 @@ final class PhotoDump {
         self.liked = liked
         self.isAIGenerated = isAIGenerated
         self.titleApproved = titleApproved
+        self.rating = rating
+        self.archived = archived
         self.createdAt = Date()
     }
 }

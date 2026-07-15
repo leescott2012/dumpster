@@ -876,7 +876,8 @@ struct AISettingsTabView: View {
         )
     }
 
-    /// Tap-row-to-apply: replace the style profile text + mark this scrub as active.
+    /// Tap-row-to-apply: replace the style profile + engagement playbook, mark this scrub as active.
+    /// Mirrors ScrubInstagramSheet.replaceProfile (750-char caps).
     private func applyScrub(_ scrub: SavedScrub) {
         guard activeScrubId != scrub.id else {
             // Already active — small haptic so the tap still feels acknowledged.
@@ -885,6 +886,7 @@ struct AISettingsTabView: View {
         }
         HapticManager.shared.playSuccess()
         styleProfile = String(scrub.styleDescription.prefix(750))
+        engagementPlaybook = String(scrub.engagementPlaybook.prefix(750))
         activeScrubId = scrub.id
     }
 

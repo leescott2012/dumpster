@@ -517,6 +517,13 @@ final class LLMService: ObservableObject {
         var index: Int?
         var vibe: String?
         var preference: String?
+        var items: [MissingItem]?
+
+        struct MissingItem: Codable {
+            let description: String
+            let reason: String
+            let inPool: Bool
+        }
     }
 
     struct DumpChatResponse {
@@ -548,13 +555,14 @@ final class LLMService: ObservableObject {
         let vibeSection = vibe.map { "\nCurrent vibe tag: \"\($0)\"" } ?? ""
 
         let systemPrompt = """
-        You are the AI assistant inside Dumpster, an Instagram carousel sequencing app. \
+        You are the Valet, the AI assistant inside Dumpster, an Instagram carousel sequencing app. \
         The user is chatting with you about a specific dump (carousel). You can:
         1. REORDER photos in the dump
         2. SWAP IN photos from the pool into the dump
         3. SWAP OUT photos from the dump back to the pool
         4. UPDATE the dump's vibe tag
         5. REMEMBER taste preferences for future sessions
+        6. SUGGEST MISSING shots the dump needs to complete its aesthetic
 
         CURRENT DUMP: "\(dumpTitle)"\(vibeSection)
         Photos in dump (in order):
@@ -570,9 +578,15 @@ final class LLMService: ObservableObject {
         - If the user is just chatting or asking questions, respond naturally — don't force actions.
         - When you do take actions, ALSO include taste_update actions to remember preferences.
         - Dump max is 20 photos.
+        - When the dump's aesthetic has gaps, use ONE suggest_missing action listing the shots it \
+        still needs (e.g. a wide establishing shot, a golden-hour closer). Check the pool first: \
+        if a shot that fills the gap ALREADY EXISTS in the pool, use swap_in for it instead of \
+        listing it — suggest_missing with "inPool": false is for shots the user doesn't have \
+        anywhere and should shoot or find. Give each item a short description and a one-line \
+        reason tied to the dump's vibe.
 
         RESPONSE FORMAT — respond ONLY with valid JSON, no markdown, no code fences:
-        {"reply": "Your conversational response", "actions": [{"type": "reorder", "photoIds": ["id1", "id2", ...]}, {"type": "swap_in", "photoId": "pool-photo-id", "position": 2}, {"type": "swap_out", "index": 3}, {"type": "update_vibe", "vibe": "new vibe text"}, {"type": "taste_update", "preference": "prefers nightlife-heavy openers"}]}
+        {"reply": "Your conversational response", "actions": [{"type": "reorder", "photoIds": ["id1", "id2", ...]}, {"type": "swap_in", "photoId": "pool-photo-id", "position": 2}, {"type": "swap_out", "index": 3}, {"type": "update_vibe", "vibe": "new vibe text"}, {"type": "taste_update", "preference": "prefers nightlife-heavy openers"}, {"type": "suggest_missing", "items": [{"description": "wide establishing shot of the venue", "reason": "grounds the nightlife story before the close-ups", "inPool": false}]}]}
         "actions" can be empty [] if no changes are needed.
         """
 
@@ -625,6 +639,21 @@ final class LLMService: ObservableObject {
                 case "taste_update":
                     if let pref = raw["preference"] as? String {
                         validActions.append(ChatAction(type: type, preference: pref))
+                    }
+                case "suggest_missing":
+                    if let rawItems = raw["items"] as? [[String: Any]] {
+                        let items = rawItems.compactMap { item -> ChatAction.MissingItem? in
+                            guard let desc = item["description"] as? String,
+                                  let reason = item["reason"] as? String else { return nil }
+                            return ChatAction.MissingItem(
+                                description: desc,
+                                reason: reason,
+                                inPool: (item["inPool"] as? Bool) ?? false
+                            )
+                        }
+                        if !items.isEmpty {
+                            validActions.append(ChatAction(type: type, items: items))
+                        }
                     }
                 default:
                     break

@@ -84,7 +84,11 @@ class PhotoAnalyzer {
 
     // MARK: - Analyze
 
-    static func analyze(images: [(UIImage, URL)], limit: Int = 5, completion: @escaping ([PhotoCluster]) -> Void) {
+    /// Analyze the pool and return AT MOST ONE cluster — web parity: auto-gen
+    /// builds a single dump per run (web uses only clusters[0] and its offline
+    /// fallback fills from the second-biggest category bucket to reach the
+    /// target count; see dumpster-web offlineAutoGen.ts).
+    static func analyze(images: [(UIImage, URL)], targetCount: Int, completion: @escaping ([PhotoCluster]) -> Void) {
         DispatchQueue.global(qos: .utility).async {
             var analyzed: [AnalyzedPhoto] = []
             let group = DispatchGroup()
@@ -112,24 +116,28 @@ class PhotoAnalyzer {
                 clusters[photo.clusterKey, default: []].append(photo)
             }
 
-            var result: [PhotoCluster] = clusters.compactMap { key, photos in
-                guard !photos.isEmpty else { return nil }
-                let category = photos[0].category
-                let title = dumpTitle(for: key, photos: photos)
-                return PhotoCluster(title: title, category: category, photos: photos)
+            // Largest category bucket = primary; fill from next-biggest
+            // buckets if the primary is short of targetCount.
+            let sorted = clusters.values.sorted { $0.count > $1.count }
+            guard let primary = sorted.first, !primary.isEmpty else {
+                DispatchQueue.main.async { completion([]) }
+                return
             }
 
-            // Sort by photo count (largest clusters first), limit to requested clusters / 20 photos each
-            result.sort { $0.photos.count > $1.photos.count }
-            result = result.prefix(limit).map { cluster in
-                PhotoCluster(
-                    title: cluster.title,
-                    category: cluster.category,
-                    photos: Array(cluster.photos.prefix(20))
-                )
+            let cap = min(max(targetCount, 2), 20)
+            var picked: [AnalyzedPhoto] = []
+            for bucket in sorted {
+                if picked.count >= cap { break }
+                picked.append(contentsOf: bucket.prefix(cap - picked.count))
             }
 
-            DispatchQueue.main.async { completion(result) }
+            let single = PhotoCluster(
+                title: dumpTitle(for: primary[0].clusterKey, photos: picked),
+                category: primary[0].category,
+                photos: picked
+            )
+
+            DispatchQueue.main.async { completion([single]) }
         }
     }
 

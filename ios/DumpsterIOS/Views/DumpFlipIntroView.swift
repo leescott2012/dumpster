@@ -1,11 +1,12 @@
 import SwiftUI
 
 /// "Marvel intro" style flip-through: the user's own pool photos hard-cut
-/// past rapidly with a scale-punch, veiled under a dark scrim carrying the
-/// Dumpster logo + a kinetic letter-slam "DUMPSTER" wordmark (same per-letter
-/// spring treatment as the web "Kinetic Text / Word Slam" effect in the
-/// Motion Library — ported here rather than reinvented). Plays once on app
-/// launch, then hands off via onComplete.
+/// past rapidly, punching in then shrinking/collapsing toward the logo as
+/// they cut away — like each one gets swept into the bin — under a dark
+/// scrim carrying the Dumpster logo + a kinetic letter-slam "DUMPSTER"
+/// wordmark (same per-letter spring treatment as the web "Kinetic Text /
+/// Word Slam" effect in the Motion Library — ported here rather than
+/// reinvented). Plays once on app launch, then hands off via onComplete.
 struct DumpFlipIntroView: View {
     let photos: [DumpPhoto]
     let onComplete: () -> Void
@@ -16,6 +17,10 @@ struct DumpFlipIntroView: View {
 
     private let totalFlips = 16
     private let interval = 0.11
+    // ponytail: fractional anchor tuned by hand to where the logo actually
+    // sits in the VStack below (84pt logo + 16pt spacing above the
+    // wordmark) — re-tune if that layout changes.
+    private let binAnchor = UnitPoint(x: 0.5, y: 0.47)
 
     var body: some View {
         ZStack {
@@ -27,7 +32,7 @@ struct DumpFlipIntroView: View {
                     .id(index)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 1.2).combined(with: .opacity),
-                        removal: .opacity
+                        removal: .scale(scale: 0.04, anchor: binAnchor).combined(with: .opacity)
                     ))
             }
 

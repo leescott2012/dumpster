@@ -545,13 +545,24 @@ struct DumpCardView: View {
             .reduce(into: [String: Int]()) { acc, c in acc[c, default: 0] += 1 }
             .max { $0.value < $1.value }?.key ?? "LIFESTYLE"
 
+        // Detailed per-photo AI descriptions (from LabelService/Claude, or Vision
+        // fallback) -- captions were previously grounded only in the coarse
+        // category bucket, ignoring what's actually pictured. Capped so a large
+        // dump doesn't blow up the prompt.
+        var seenLabels = Set<String>()
+        let labels = photos.flatMap { $0.labels }
+            .filter { seenLabels.insert($0).inserted }
+            .prefix(20)
+            .map { $0 }
+
         let taste = AITasteExample.promptBlock(from: tasteExamples)
 
         do {
             let result = try await LLMService.shared.generateCaption(
                 for: dump.title,
                 category: topCategory,
-                tasteBlock: taste
+                tasteBlock: taste,
+                labels: labels
             )
             HapticManager.shared.playSuccess()
             withAnimation(.spring()) { captionResult = result }

@@ -156,6 +156,38 @@ final class SupabaseClient {
                                userId: userId, email: email)
     }
 
+    /// Exchange the 6-digit code the user typed in from the email for a session.
+    /// Same endpoint as verifyOTP, but by `token` (the short code) + `email` instead
+    /// of `token_hash` — this is what lets sign-in work without the deep link firing.
+    func verifyEmailOTP(email: String, token: String) async throws -> SupabaseSession {
+        let urlStr = "\(Self.url)/auth/v1/verify"
+        guard let url = URL(string: urlStr) else { throw SupabaseError.decodeFailed("bad url") }
+        let body: [String: Any] = ["email": email, "token": token, "type": "email"]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
+            throw SupabaseError.decodeFailed("encode fail")
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        anonHeaders.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+        req.httpBody = bodyData
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let msg = String(data: data, encoding: .utf8) ?? "unknown"
+            throw SupabaseError.httpError((resp as? HTTPURLResponse)?.statusCode ?? 0, msg)
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let accessToken = json["access_token"] as? String,
+              let refreshToken = json["refresh_token"] as? String,
+              let user = json["user"] as? [String: Any],
+              let userId = user["id"] as? String,
+              let userEmail = user["email"] as? String
+        else {
+            throw SupabaseError.decodeFailed("session parse failed")
+        }
+        return SupabaseSession(accessToken: accessToken, refreshToken: refreshToken,
+                               userId: userId, email: userEmail)
+    }
+
     /// Refresh an expired access token using the refresh token.
     func refreshSession(refreshToken: String) async throws -> SupabaseSession {
         let urlStr = "\(Self.url)/auth/v1/token?grant_type=refresh_token"
@@ -184,6 +216,62 @@ final class SupabaseClient {
         }
         return SupabaseSession(accessToken: accessToken, refreshToken: newRefresh,
                                userId: userId, email: email)
+    }
+
+    // MARK: - Auth: OAuth (Google, etc.)
+
+    /// Builds the Supabase OAuth authorize URL for `provider`. Open this in an
+    /// ASWebAuthenticationSession; Supabase redirects back to
+    /// dumpster://auth/callback#access_token=...&refresh_token=...
+    func oauthAuthorizeURL(provider: String, redirectTo: String = "dumpster://auth/callback") -> URL? {
+        var components = URLComponents(string: "\(Self.url)/auth/v1/authorize")
+        components?.queryItems = [
+            URLQueryItem(name: "provider", value: provider),
+            URLQueryItem(name: "redirect_to", value: redirectTo),
+        ]
+        return components?.url
+    }
+
+    /// Parses the access/refresh tokens out of an OAuth callback URL's fragment
+    /// and resolves the signed-in user, producing the same session shape as verifyOTP.
+    func session(fromOAuthCallback url: URL) async throws -> SupabaseSession {
+        guard let fragment = url.fragment else {
+            throw SupabaseError.decodeFailed("no fragment in OAuth callback")
+        }
+        let params = URLComponents(string: "?\(fragment)")?.queryItems ?? []
+        guard let accessToken = params.first(where: { $0.name == "access_token" })?.value,
+              let refreshToken = params.first(where: { $0.name == "refresh_token" })?.value
+        else {
+            let errorDesc = params.first(where: { $0.name == "error_description" })?.value
+            throw SupabaseError.httpError(0, errorDesc ?? "OAuth callback missing tokens")
+        }
+        let (userId, email) = try await fetchUser(accessToken: accessToken)
+        return SupabaseSession(accessToken: accessToken, refreshToken: refreshToken,
+                               userId: userId, email: email)
+    }
+
+    /// GET /auth/v1/user — resolves id/email for an access token (OAuth callbacks
+    /// don't include the user object inline the way verify/token responses do).
+    private func fetchUser(accessToken: String) async throws -> (id: String, email: String) {
+        guard let url = URL(string: "\(Self.url)/auth/v1/user") else {
+            throw SupabaseError.decodeFailed("bad url")
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let msg = String(data: data, encoding: .utf8) ?? "unknown"
+            throw SupabaseError.httpError((resp as? HTTPURLResponse)?.statusCode ?? 0, msg)
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = json["id"] as? String,
+              let email = json["email"] as? String
+        else {
+            throw SupabaseError.decodeFailed("user parse failed")
+        }
+        return (id, email)
     }
 
     /// Sign out — invalidates the server session.

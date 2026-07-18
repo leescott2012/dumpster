@@ -164,8 +164,15 @@ struct SettingsView: View {
                     // Connected Providers
                     sectionHeader("CONNECTED PROVIDERS")
 
+                    Text("Only one provider is used at a time — whichever connected one ranks highest below.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.35))
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 8)
+
                     VStack(spacing: 6) {
                         ForEach(LLMService.LLMProvider.allCases) { provider in
+                            let isActive = llmService.preferredProvider() == provider
                             HStack(spacing: 10) {
                                 Image(systemName: provider.iconName)
                                     .font(.system(size: 12))
@@ -175,6 +182,16 @@ struct SettingsView: View {
                                 Text(provider.displayName)
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundColor(.white.opacity(0.6))
+
+                                if isActive {
+                                    Text("IN USE")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(gold)
+                                        .clipShape(Capsule())
+                                }
 
                                 Spacer()
 

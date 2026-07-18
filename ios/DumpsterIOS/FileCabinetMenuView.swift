@@ -1844,6 +1844,7 @@ struct AppearanceTabView: View {
     enum AccentOption: String, CaseIterable, Identifiable {
         case gold = "Gold"
         case silver = "Silver"
+        case grey = "Grey"
         case rose = "Rose"
         case emerald = "Emerald"
         case sapphire = "Sapphire"
@@ -1855,6 +1856,7 @@ struct AppearanceTabView: View {
             switch self {
             case .gold:      return Color(hex: "#C8A96E")
             case .silver:    return Color(hex: "#B0B0B0")
+            case .grey:      return Color(hex: "#7A7A7A")
             case .rose:      return Color(hex: "#C8787E")
             case .emerald:   return Color(hex: "#6EC8A0")
             case .sapphire:  return Color(hex: "#6E8EC8")

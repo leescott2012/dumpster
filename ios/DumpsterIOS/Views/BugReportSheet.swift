@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 // MARK: - Bug Report Sheet (NATIVE_PORT.md §2)
 //
@@ -58,13 +59,17 @@ struct BugReportSheet: View {
     @State private var isSending = false
     @State private var sent = false
     @State private var sendError: String?
+    @State private var screenshotItem: PhotosPickerItem?
+    @State private var screenshotData: Data?
 
     private let maxMessage = 1000
+    private let maxScreenshotBytes = 5 * 1024 * 1024
     private var isSignedIn: Bool { auth.isSignedIn }
     private var userId: String? { auth.userId }
 
     var body: some View {
         NavigationStack {
+            ZStack {
             VStack(alignment: .leading, spacing: 16) {
                 Text("What's going wrong?")
                     .font(.headline)
@@ -87,6 +92,38 @@ struct BugReportSheet: View {
                         },
                         alignment: .topLeading
                     )
+
+                PhotosPicker(selection: $screenshotItem, matching: .images) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "paperclip")
+                        Text(screenshotData == nil ? "Attach a screenshot" : "Screenshot attached")
+                        if screenshotData != nil {
+                            Spacer()
+                            Button {
+                                screenshotItem = nil
+                                screenshotData = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(screenshotData == nil ? .secondary : .primary)
+                    .padding(10)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .onChange(of: screenshotItem) { _, item in
+                    Task {
+                        guard let item, let data = try? await item.loadTransferable(type: Data.self),
+                              data.count <= maxScreenshotBytes else {
+                            await MainActor.run { screenshotData = nil }
+                            return
+                        }
+                        await MainActor.run { screenshotData = data }
+                    }
+                }
 
                 if !auth.isSignedIn {
                     TextField("Email (optional — for follow-up)", text: $email)
@@ -131,7 +168,26 @@ struct BugReportSheet: View {
                     Button("Cancel") { isPresented = false }
                 }
             }
+
+            // Centered confirmation — the "Sent ✓" button label alone was easy
+            // to miss before the sheet auto-dismissed a moment later.
+            if sent {
+                VStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.green)
+                    Text("Sent")
+                        .font(.headline)
+                }
+                .padding(24)
+                .background(.thickMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(radius: 12)
+                .transition(.scale.combined(with: .opacity))
+            }
+            }
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: sent)
     }
 
     private func submit() {
@@ -151,7 +207,8 @@ struct BugReportSheet: View {
                         "signed_in": isSignedIn ? "true" : "false",
                         "platform": "ios",
                         "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
-                    ]
+                    ],
+                    screenshot: screenshotData
                 )
                 await MainActor.run {
                     isSending = false
@@ -185,7 +242,8 @@ enum SentryFeedback {
         message: String,
         email: String = "",
         userId: String? = nil,
-        tags: [String: String] = [:]
+        tags: [String: String] = [:],
+        screenshot: Data? = nil
     ) async throws {
         let eventId = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -231,6 +289,25 @@ enum SentryFeedback {
         envelope.append(Data("\n".utf8))
         envelope.append(feedbackData)
 
+        // Optional screenshot — a second envelope item, per
+        // https://develop.sentry.dev/sdk/envelopes/#attachment
+        // PhotosPicker's Data transferable returns whatever format the source
+        // asset actually is (JPEG/PNG/HEIC) — sniff it rather than guessing,
+        // same lesson as the web MIME-mismatch bug (JAVASCRIPT-REACT-X).
+        if let screenshot {
+            let (ext, contentType) = sniffImageFormat(screenshot)
+            let attachmentHeader: [String: Any] = [
+                "type": "attachment", "length": screenshot.count,
+                "filename": "screenshot.\(ext)", "content_type": contentType,
+            ]
+            if let attachmentHeaderData = try? JSONSerialization.data(withJSONObject: attachmentHeader) {
+                envelope.append(Data("\n".utf8))
+                envelope.append(attachmentHeaderData)
+                envelope.append(Data("\n".utf8))
+                envelope.append(screenshot)
+            }
+        }
+
         let endpoint = "https://o4511424233013248.ingest.us.sentry.io/api/\(projectId)/envelope/"
         guard let url = URL(string: endpoint) else { throw URLError(.badURL) }
         var req = URLRequest(url: url)
@@ -243,5 +320,14 @@ enum SentryFeedback {
         if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw URLError(.badServerResponse)
         }
+    }
+
+    private static func sniffImageFormat(_ data: Data) -> (ext: String, contentType: String) {
+        var bytes = [UInt8](repeating: 0, count: min(12, data.count))
+        data.copyBytes(to: &bytes, count: bytes.count)
+        if bytes.count >= 3, bytes[0] == 0xFF, bytes[1] == 0xD8, bytes[2] == 0xFF { return ("jpg", "image/jpeg") }
+        if bytes.count >= 8, bytes[0] == 0x89, bytes[1] == 0x50, bytes[2] == 0x4E, bytes[3] == 0x47 { return ("png", "image/png") }
+        if bytes.count >= 12, bytes[4] == 0x66, bytes[5] == 0x74, bytes[6] == 0x79, bytes[7] == 0x70 { return ("heic", "image/heic") }
+        return ("bin", "application/octet-stream")
     }
 }

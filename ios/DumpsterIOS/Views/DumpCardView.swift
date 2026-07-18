@@ -303,7 +303,10 @@ struct DumpCardView: View {
                         onTap: {
                             highlightedPhotoId = (highlightedPhotoId == photo.id) ? nil : photo.id
                         },
-                        onRemoveFromDump: { removePhoto(photo) }
+                        onRemoveFromDump: { removePhoto(photo) },
+                        onCrop: {
+                            appState.cropPhotoId = photo.id
+                        }
                     )
                     .onDrag {
                         draggingPhotoId = photo.id

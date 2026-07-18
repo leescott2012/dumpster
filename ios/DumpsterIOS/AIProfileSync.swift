@@ -206,7 +206,7 @@ final class AIProfileSync {
                 if tombstone {
                     local.deleted = true
                     local.favorited = false
-                    local.banned = false
+                    local.banned = true // delete implies never-use, see removeCaption
                 } else if let cloud {
                     // Cloud's flag state wins for favorited/banned
                     local.favorited = cloud.favorited
@@ -220,7 +220,7 @@ final class AIProfileSync {
                     style: cloud.style,
                     dumpId: cloud.dumpId,
                     favorited: tombstone ? false : cloud.favorited,
-                    banned: tombstone ? false : cloud.banned,
+                    banned: tombstone ? true : cloud.banned,
                     deleted: tombstone
                 )
                 cap.createdAt = Date(timeIntervalSince1970: cloud.createdAt / 1000)
@@ -286,7 +286,8 @@ final class AIProfileSync {
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    /// Tombstone-delete a caption. Mirror of removeCaption(id) on web.
+    /// Tombstone-delete a caption. Mirror of removeCaption(id) on web — also
+    /// bans it (delete implies never-use, see CaptionPoolView's trash button).
     func removeCaption(id: String, context: ModelContext) {
         let descriptor = FetchDescriptor<DumpCaption>(
             predicate: #Predicate { $0.id == id }
@@ -294,7 +295,7 @@ final class AIProfileSync {
         guard let cap = (try? context.fetch(descriptor))?.first else { return }
         cap.deleted = true
         cap.favorited = false
-        cap.banned = false
+        cap.banned = true
         try? context.save()
     }
 

@@ -232,7 +232,12 @@ struct CaptionPoolView: View {
                     // Tombstone rather than hard-delete: AIProfileSync merges captions by
                     // id across devices, and a hard-deleted row would just reappear on the
                     // next sign-in sync pulling the still-live cloud copy.
+                    // Also mark banned — deleting a caption you didn't like IS a
+                    // "never write like this again" signal, not just hide-from-view
+                    // (feedback: delete and never-use should do the same thing).
                     cap.deleted = true
+                    cap.banned = true
+                    cap.favorited = false
                     try? modelContext.save()
                     scheduleCloudSync()
                 }

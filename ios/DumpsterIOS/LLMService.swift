@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 // MARK: - Unified Multi-Provider LLM Service
 
@@ -114,6 +115,9 @@ final class LLMService: ObservableObject {
         let userPrompt: String
         let temperature: Double
         let maxTokens: Int
+        /// Base64 JPEG + media type — set for vision requests (photo classification).
+        var imageBase64: String? = nil
+        var imageMediaType: String = "image/jpeg"
     }
 
     struct CaptionResult: Identifiable, Codable {
@@ -278,6 +282,76 @@ final class LLMService: ObservableObject {
         }
     }
 
+    // MARK: - Photo Classification (vision) — user's own configured provider
+    //
+    // Priority for photo scanning is: 1) LabelService (signed-in → Dumpster's
+    // server, Claude Vision, server-side key — see PhotoPoolView.rescanAll),
+    // 2) this — the user's OWN configured provider, when LabelService is
+    // unavailable (signed out / offline / out of credits / server error),
+    // 3) on-device Apple Vision (PhotoAnalyzer) as the last resort only when
+    // neither of the above is available. Taxonomy mirrors server/aiLabel.ts
+    // exactly so `photo.category` stays consistent regardless of which tier
+    // actually answered.
+
+    private static let classificationCategories = [
+        "AUTOMOTIVE", "SELFIE", "NIGHTLIFE", "DINING", "FITNESS", "TRAVEL",
+        "ARCHITECTURE", "ART", "FASHION", "STUDIO", "CULTURE", "LIFESTYLE",
+    ]
+
+    struct PhotoClassification { let category: String; let label: String }
+
+    /// Classify one photo via the user's configured provider. Throws if no
+    /// key is configured or the call/parse fails — caller falls back to Vision.
+    func classifyPhoto(image: UIImage, sensitivity: Double = 0.5) async throws -> PhotoClassification {
+        guard hasAnyAPIKey else { throw LLMError.noAPIKey }
+        guard let jpeg = image.jpegData(compressionQuality: 0.7) else { throw LLMError.encodingFailed }
+
+        // Same sensitivity scale as PhotoAnalyzer's Vision threshold and
+        // server/aiLabel.ts's prompt-scaled instruction (see JAVASCRIPT-REACT-12):
+        // higher sensitivity = more willing to commit to a specific/niche
+        // category over the LIFESTYLE fallback.
+        let commitInstruction = sensitivity > 0.66
+            ? "Commit to a specific category even on a weak/ambiguous signal — avoid LIFESTYLE unless nothing else is even plausible."
+            : sensitivity < 0.33
+            ? "Only pick a specific category when clearly confident — default to LIFESTYLE more readily when uncertain."
+            : "Only use LIFESTYLE when it genuinely doesn't fit any specific category — don't default to it out of uncertainty."
+
+        let system = """
+        You are an expert photo classifier. Look at the photo, decide what it is PRIMARILY about, \
+        then pick the single best category and write a precise 2-5 word label naming the specific subject.
+
+        Categories (use the UPPERCASE name exactly): \(Self.classificationCategories.joined(separator: ", "))
+
+        \(commitInstruction)
+
+        Label rules: name the actual subject with identifying detail (make/model, dish name, landmark, \
+        color + object). Banned as labels: "photo", "image", "picture", "scene", generic one-word nouns.
+
+        Respond ONLY with valid JSON, no markdown: {"category":"<CATEGORY>","label":"<short label>"}
+        """
+
+        let request = LLMRequest(
+            systemPrompt: system,
+            userPrompt: "Classify this photo.",
+            temperature: 0.3,
+            maxTokens: 150,
+            imageBase64: jpeg.base64EncodedString(),
+            imageMediaType: "image/jpeg"
+        )
+        let raw = try await generate(request: request)
+
+        let clean = raw.replacingOccurrences(of: "```json", with: "")
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = clean.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let label = json["label"] as? String
+        else { throw LLMError.parseFailed }
+        let category = (json["category"] as? String)?.uppercased() ?? "LIFESTYLE"
+        let validCategory = Self.classificationCategories.contains(category) ? category : "LIFESTYLE"
+        return PhotoClassification(category: validCategory, label: label)
+    }
+
     // MARK: - Generate Caption for a single dump (called from DumpCardView)
     //
     // Accepts an array of DumpPhoto objects and derives the title/category from them.
@@ -316,14 +390,17 @@ final class LLMService: ObservableObject {
 
     // MARK: - Generate Caption by title + category
 
-    func generateCaption(for dumpTitle: String, category: String, tasteBlock: String = "") async throws -> CaptionResult {
+    func generateCaption(for dumpTitle: String, category: String, tasteBlock: String = "", labels: [String] = []) async throws -> CaptionResult {
         guard hasAnyAPIKey else {
             return LLMService.fallbackCaptions(for: category, title: dumpTitle)
         }
 
         let context = userContextBlock(tasteBlock: tasteBlock)
         let system = "You are an AI photo dump curator. Write 3 aesthetic captions for a photo dump. Respond with JSON: {\"captions\":[\"...\",\"...\",\"...\"],\"vibe\":\"...\"}\(context)"
-        let user = "Title: \(dumpTitle)\nCategory: \(category)\nStyle: \(captionStyle.rawValue)\n\(captionStyle.promptModifier)"
+        var user = "Title: \(dumpTitle)\nCategory: \(category)\nStyle: \(captionStyle.rawValue)\n\(captionStyle.promptModifier)"
+        if !labels.isEmpty {
+            user += "\nWhat's actually in these photos (use this, not just the category, to make captions specific): \(labels.joined(separator: "; "))"
+        }
 
         let request = LLMRequest(systemPrompt: system, userPrompt: user, temperature: 0.8, maxTokens: 500)
         let response = try await generate(request: request)
@@ -348,11 +425,23 @@ final class LLMService: ObservableObject {
     // MARK: - OpenAI Compatible API
 
     private func callOpenAICompatible(endpoint: String, apiKey: String, model: String, request: LLMRequest) async throws -> String {
+        // Vision (OpenAI-compatible format): user content becomes an array of
+        // text + image_url parts instead of a plain string.
+        let userContent: Any
+        if let b64 = request.imageBase64 {
+            userContent = [
+                ["type": "text", "text": request.userPrompt],
+                ["type": "image_url", "image_url": ["url": "data:\(request.imageMediaType);base64,\(b64)"]],
+            ]
+        } else {
+            userContent = request.userPrompt
+        }
+
         let body: [String: Any] = [
             "model": model,
             "messages": [
                 ["role": "system", "content": request.systemPrompt],
-                ["role": "user", "content": request.userPrompt]
+                ["role": "user", "content": userContent]
             ],
             "temperature": request.temperature,
             "max_tokens": request.maxTokens
@@ -387,11 +476,21 @@ final class LLMService: ObservableObject {
     // MARK: - Claude (Anthropic) API
 
     private func callClaude(apiKey: String, model: String, request: LLMRequest) async throws -> String {
+        let userContent: Any
+        if let b64 = request.imageBase64 {
+            userContent = [
+                ["type": "image", "source": ["type": "base64", "media_type": request.imageMediaType, "data": b64]],
+                ["type": "text", "text": request.userPrompt],
+            ]
+        } else {
+            userContent = request.userPrompt
+        }
+
         let body: [String: Any] = [
             "model": model,
             "max_tokens": request.maxTokens,
             "system": request.systemPrompt,
-            "messages": [["role": "user", "content": request.userPrompt]]
+            "messages": [["role": "user", "content": userContent]]
         ]
 
         guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else { throw LLMError.encodingFailed }
@@ -424,8 +523,12 @@ final class LLMService: ObservableObject {
 
     private func callGemini(apiKey: String, model: String, request: LLMRequest) async throws -> String {
         let endpoint = "\(LLMProvider.gemini.apiEndpoint)/models/\(model):generateContent?key=\(apiKey)"
+        var parts: [[String: Any]] = [["text": "\(request.systemPrompt)\n\n\(request.userPrompt)"]]
+        if let b64 = request.imageBase64 {
+            parts.append(["inline_data": ["mime_type": request.imageMediaType, "data": b64]])
+        }
         let body: [String: Any] = [
-            "contents": [["parts": [["text": "\(request.systemPrompt)\n\n\(request.userPrompt)"]]]],
+            "contents": [["parts": parts]],
             "generationConfig": ["temperature": request.temperature, "maxOutputTokens": request.maxTokens]
         ]
 
@@ -682,7 +785,15 @@ final class LLMService: ObservableObject {
             case .encodingFailed:            return "Failed to encode the request."
             case .invalidResponse:           return "Received an invalid response from the API."
             case .parseFailed:               return "Failed to parse the AI response."
-            case .apiError(let code, let m): return "API error (\(code)): \(m)"
+            case .apiError(let code, let m):
+                // 400/401/403 from a provider is almost always a bad/missing/expired
+                // key, not a transient failure — surface that plainly instead of the
+                // raw provider error text (feedback: users hit this and had no idea
+                // what to do next). Other codes keep the raw message for debugging.
+                if code == 400 || code == 401 || code == 403 {
+                    return "Your AI provider rejected the request — check the API key in Settings (brain icon)."
+                }
+                return "API error (\(code)): \(m)"
             case .providerUnavailable(let n):return "\(n) is not available. Check your API key."
             }
         }

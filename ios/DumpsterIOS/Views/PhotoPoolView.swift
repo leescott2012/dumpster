@@ -260,9 +260,18 @@ struct PhotoPoolView: View {
                 }
             }
 
+            // Priority when LabelService is unavailable: the user's OWN configured
+            // provider (LLMService) before on-device Vision — an LLM the user set
+            // up should always be preferred over the offline fallback.
             if useFallback {
+                let hasOwnKey = await LLMService.shared.hasAnyAPIKey
                 for item in items {
-                    if let img = PhotoStorageManager.shared.loadImage(relativePath: item.relativePath) {
+                    guard let img = PhotoStorageManager.shared.loadImage(relativePath: item.relativePath) else { continue }
+                    if hasOwnKey, let c = try? await LLMService.shared.classifyPhoto(
+                        image: img, sensitivity: LLMService.shared.labelingSensitivity
+                    ) {
+                        results[item.id] = (c.category, [c.label])
+                    } else {
                         let c = PhotoAnalyzer.classifySingle(image: img)
                         results[item.id] = (c.category, c.labels)
                     }
@@ -440,6 +449,9 @@ struct PhotoPoolView: View {
                         HapticManager.shared.playRemove()
                         modelContext.delete(photo)
                         try? modelContext.save()
+                    },
+                    onCrop: {
+                        appState.cropPhotoId = photo.id
                     },
                     onDismissDuplicate: {
                         photo.dupeDismissed = true

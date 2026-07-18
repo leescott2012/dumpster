@@ -45,7 +45,6 @@ struct AISuggestView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var existingDumps: [PhotoDump]
     @Query private var allPhotos: [DumpPhoto]
-    @Query(sort: \AITasteExample.createdAt, order: .reverse) private var tasteExamples: [AITasteExample]
 
     @State private var phase: Phase = .picker
     @State private var isAnalyzing = false
@@ -415,58 +414,35 @@ struct AISuggestView: View {
             PhotoAnalyzer.analyze(images: safeLoaded, targetCount: maxPhotosPerDump) { result in
                 Task { @MainActor in
                     self.poolPhotoMap = safeMap
-                    self.clusters = result
+                    // Metadata now factors into dump-building: order the cluster
+                    // chronologically (EXIF takenAt) instead of arbitrary Vision
+                    // order — the natural narrative order for photos from one
+                    // outing. Undated photos (no EXIF) sort after dated ones,
+                    // keeping their relative order.
+                    self.clusters = result.map { cluster in
+                        let sortedPhotos = cluster.photos.sorted { a, b in
+                            let aDate = safeMap[a.filename].flatMap { id in self.allPhotos.first { $0.id == id }?.takenAt }
+                            let bDate = safeMap[b.filename].flatMap { id in self.allPhotos.first { $0.id == id }?.takenAt }
+                            switch (aDate, bDate) {
+                            case let (a?, b?): return a < b
+                            case (.some, nil): return true
+                            default: return false
+                            }
+                        }
+                        return PhotoCluster(title: cluster.title, category: cluster.category, photos: sortedPhotos)
+                    }
                     self.selectedClusters = Set(result.indices)
                     self.isAnalyzing = false
                     self.appState.isAnalyzing = false
                     self.appState.showStatus(result.isEmpty ? "No dump found" : "Dump ready", duration: 3)
                     self.statusMessage = ""
                     withAnimation { self.phase = .results }
-                    self.generateCaptionsForClusters(result)
+                    // Captions are opt-in only (explicit "Generate Captions" tool,
+                    // CaptionService/DumpMenuSheet) — auto-arrange must not spend
+                    // API calls/credits the user never asked for. Matches web's
+                    // handleAICreateDumps, which also leaves captions untouched.
                 }
             }
-        }
-    }
-
-    // MARK: - Caption Generation
-
-    private func generateCaptionsForClusters(_ clusters: [PhotoCluster]) {
-        let requests = clusters.map { cluster in
-            LLMService.CaptionRequest(
-                dumpTitle: cluster.title,
-                category: cluster.category,
-                labels: cluster.allLabels,
-                photoCount: cluster.photos.count
-            )
-        }
-
-        if llmService.hasAnyAPIKey {
-            let providerName = llmService.preferredProvider()?.displayName ?? "AI"
-            appState.showStatus("Generating captions via \(providerName)...", duration: 30)
-            let tasteBlock = AITasteExample.promptBlock(from: Array(tasteExamples.prefix(10)))
-            Task {
-                do {
-                    let results = try await llmService.generateCaptions(for: requests, tasteBlock: tasteBlock)
-                    await MainActor.run {
-                        appState.captionResults = results
-                        appState.showStatus("Captions ready", duration: 3)
-                    }
-                } catch {
-                    print("[AISuggest] Caption generation failed: \(error)")
-                    await MainActor.run {
-                        let fallbacks = requests.map {
-                            LLMService.fallbackCaptions(for: $0.category, title: $0.dumpTitle)
-                        }
-                        appState.captionResults = fallbacks
-                        appState.showStatus("Using local captions", duration: 3)
-                    }
-                }
-            }
-        } else {
-            let fallbacks = requests.map {
-                LLMService.fallbackCaptions(for: $0.category, title: $0.dumpTitle)
-            }
-            appState.captionResults = fallbacks
         }
     }
 

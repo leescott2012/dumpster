@@ -179,10 +179,16 @@ class PhotoAnalyzer {
             }
             guard let observations = request.results as? [VNClassificationObservation] else { return }
 
-            // FIX: Raised confidence threshold from 0.01 to 0.10 for meaningful filtering.
-            // At 0.01, nearly every label passes — producing noisy, unreliable classifications.
-            // 0.10 strikes a balance between catching relevant labels and filtering noise.
-            let filtered = observations.filter { $0.confidence > 0.10 }
+            // Confidence threshold now driven by the user's sensitivity setting
+            // (Settings > AI > Labeling Sensitivity) — it was a slider that changed
+            // a stored value nothing downstream ever read, so dragging it did
+            // literally nothing to classification behavior. Higher sensitivity =
+            // lower threshold = more labels pass. At the default 0.5 this lands on
+            // 0.10, preserving the previously-hardcoded behavior; 0.01 at max
+            // (nearly everything passes, noisy) to 0.20 at min (strict, fewer labels).
+            let sensitivity = LLMService.shared.labelingSensitivity
+            let threshold = max(0.01, 0.20 - sensitivity * 0.19)
+            let filtered = observations.filter { $0.confidence > Float(threshold) }
             let topLabels = filtered.prefix(15).map { $0.identifier.lowercased() }
             collectedLabels = Array(topLabels)
 

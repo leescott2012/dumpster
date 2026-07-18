@@ -54,7 +54,7 @@ struct PhotoCardView: View {
             imageLayer
             if isUsed { usedOverlay }
             if isSelected { selectedOverlay }
-            if isDumpContext { categoryGradient }
+            descriptionGradient
             badgeLayer
         }
         .frame(width: size.width, height: size.height)
@@ -136,22 +136,30 @@ struct PhotoCardView: View {
     }
 
     /// Category label gradient — only shown in dump context.
-    private var categoryGradient: some View {
-        VStack {
-            Spacer()
-            ZStack(alignment: .bottomLeading) {
-                LinearGradient(
-                    colors: [Color.black.opacity(0.7), Color.clear],
-                    startPoint: .bottom,
-                    endPoint: .top
-                )
-                .frame(height: 36)
-                Text(photo.category.uppercased())
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1.2)
-                    .foregroundColor(.white.opacity(0.85))
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 6)
+    /// Specific AI description (e.g. "Matte black G-Wagon") — matches web's
+    /// PhotoCard.tsx: category is an internal filter bucket, not user-facing
+    /// copy, so it doesn't render here (moved to the lightbox metadata panel
+    /// instead). Shown in both pool and dump context now, not dump-only.
+    @ViewBuilder
+    private var descriptionGradient: some View {
+        if let label = photo.labels.first, !label.isEmpty {
+            VStack {
+                Spacer()
+                ZStack(alignment: .bottomLeading) {
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.85), Color.clear],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                    .frame(height: 36)
+                    Text(label)
+                        .font(.system(size: 9, weight: .medium))
+                        .tracking(0.4)
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 6)
+                }
             }
         }
     }

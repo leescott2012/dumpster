@@ -37,6 +37,7 @@ final class AppState: ObservableObject {
     @Published var activeFilters: Set<FilterType> = []
     @Published var poolSearchQuery: String = ""
     @Published var lightboxPhotoId: String?
+    @Published var cropPhotoId: String?
     @Published var addingToDumpId: String?
     /// Bumped whenever a dump export/share completes — ConfettiView observes this.
     @Published var confettiTrigger: Int = 0
@@ -50,6 +51,7 @@ final class AppState: ObservableObject {
     var accentColor: Color {
         switch accentColorName {
         case "silver":   return Color(hex: "#B0B0B0")
+        case "grey":     return Color(hex: "#7A7A7A")
         case "rose":     return Color(hex: "#C8787E")
         case "emerald":  return Color(hex: "#6EC8A0")
         case "sapphire": return Color(hex: "#6E8EC8")
@@ -139,6 +141,12 @@ struct ContentView: View {
                     .zIndex(30)
             }
 
+            if appState.cropPhotoId != nil {
+                PhotoCropView()
+                    .environmentObject(appState)
+                    .zIndex(31)
+            }
+
             if appState.showOnboarding {
                 SpotlightTutorialView(isPresented: $appState.showOnboarding)
                     .zIndex(40)
@@ -159,7 +167,7 @@ struct ContentView: View {
             // it finishes initializing.
             if showAppIntro {
                 DumpFlipIntroView(photos: allPhotos) {
-                    withAnimation(.easeOut(duration: 0.3)) { showAppIntro = false }
+                    withAnimation(.easeOut(duration: 0.5)) { showAppIntro = false }
                 }
                 .zIndex(60)
                 .transition(.opacity)

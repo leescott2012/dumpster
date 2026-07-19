@@ -185,35 +185,42 @@ final class LabelService {
         var errorDescription: String? { message }
     }
 
-    /// Label photos by Documents-relative path. Throws on any failure —
-    /// caller handles fallback. Photos that fail local thumbnailing are skipped.
-    func label(photos: [(id: String, relativePath: String)], jwt: String) async throws -> [LabelResult] {
+    /// Label photos by Documents-relative path. Per-batch failures (network
+    /// blip, rate limit, one bad image) are swallowed rather than thrown —
+    /// a failure in batch 2 of 3 must not discard batch 1's already-succeeded
+    /// results and force every photo in the pool back to the Vision fallback.
+    /// Missing ids in the returned array (skipped thumbnail, or a batch that
+    /// failed outright) are the caller's signal to fall back for just those.
+    func label(photos: [(id: String, relativePath: String)], jwt: String) async -> [LabelResult] {
         var results: [LabelResult] = []
         var batch: [[String: String]] = []
 
-        func flush() async throws {
+        func flush() async {
             guard !batch.isEmpty else { return }
+            defer { batch.removeAll() }
             let url = baseURL.appendingPathComponent("api/ai-label")
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-            req.httpBody = try JSONSerialization.data(withJSONObject: ["photos": batch])
-            let (data, response) = try await URLSession.shared.data(for: req)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                throw LabelError(message: "AI labeling failed (HTTP \(code)).")
+            do {
+                req.httpBody = try JSONSerialization.data(withJSONObject: ["photos": batch])
+                let (data, response) = try await URLSession.shared.data(for: req)
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                    return // this batch's photos stay unresolved -- caller falls back for them
+                }
+                results.append(contentsOf: try JSONDecoder().decode(LabelResponse.self, from: data).labels)
+            } catch {
+                return // network/encode/decode failure -- same, only this batch is affected
             }
-            results.append(contentsOf: try JSONDecoder().decode(LabelResponse.self, from: data).labels)
-            batch.removeAll()
         }
 
         for photo in photos {
             guard let dataUrl = Self.jpegDataURL(relativePath: photo.relativePath) else { continue }
             batch.append(["id": photo.id, "url": dataUrl])
-            if batch.count == Self.batchSize { try await flush() }
+            if batch.count == Self.batchSize { await flush() }
         }
-        try await flush()
+        await flush()
         return results
     }
 

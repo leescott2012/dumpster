@@ -246,26 +246,23 @@ struct PhotoPoolView: View {
 
         Task {
             var results: [String: (category: String, labels: [String])] = [:]
-            var useFallback = jwt == nil
 
             if let jwt {
-                do {
-                    for r in try await LabelService.shared.label(photos: items, jwt: jwt) {
-                        results[r.id] = (r.category, [r.label])
-                    }
-                } catch {
-                    // Offline, out of credits, server error — fall back below.
-                    results.removeAll()
-                    useFallback = true
+                for r in await LabelService.shared.label(photos: items, jwt: jwt) {
+                    results[r.id] = (r.category, [r.label])
                 }
             }
 
-            // Priority when LabelService is unavailable: the user's OWN configured
-            // provider (LLMService) before on-device Vision — an LLM the user set
-            // up should always be preferred over the offline fallback.
-            if useFallback {
+            // Fallback only for photos LabelService didn't resolve (offline,
+            // no jwt, or a batch failure) -- NOT the whole pool. A network
+            // blip on one batch used to wipe every already-succeeded result
+            // and silently degrade the entire pool to on-device Vision.
+            // Priority when falling back: the user's OWN configured provider
+            // (LLMService) before on-device Vision.
+            let unresolved = items.filter { results[$0.id] == nil }
+            if !unresolved.isEmpty {
                 let hasOwnKey = await LLMService.shared.hasAnyAPIKey
-                for item in items {
+                for item in unresolved {
                     guard let img = PhotoStorageManager.shared.loadImage(relativePath: item.relativePath) else { continue }
                     if hasOwnKey, let c = try? await LLMService.shared.classifyPhoto(
                         image: img, sensitivity: LLMService.shared.labelingSensitivity

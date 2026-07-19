@@ -252,7 +252,7 @@ final class LLMService: ObservableObject {
 
     // MARK: - Unified Generation
 
-    func generate(request: LLMRequest, provider: LLMProvider? = nil) async throws -> String {
+    func generate(request: LLMRequest, provider: LLMProvider? = nil, modelOverride: String? = nil) async throws -> String {
         let selectedProvider = provider ?? preferredProvider()
         guard let provider = selectedProvider else { throw LLMError.noAPIKey }
         guard hasAPIKey(for: provider) else { throw LLMError.noAPIKey }
@@ -270,7 +270,7 @@ final class LLMService: ObservableObject {
         }
 
         let key = apiKey(for: provider)
-        let model = selectedModel(for: provider)
+        let model = modelOverride ?? selectedModel(for: provider)
 
         switch provider {
         case .openai, .manus, .perplexity:
@@ -338,7 +338,13 @@ final class LLMService: ObservableObject {
             imageBase64: jpeg.base64EncodedString(),
             imageMediaType: "image/jpeg"
         )
-        let raw = try await generate(request: request)
+        // Scanning/classification always uses Sonnet when Claude is the active
+        // provider -- cheaper and plenty capable for labeling, independent of
+        // whatever model the user picked for chat/captions in Settings. Matches
+        // server/aiLabel.ts (the primary, server-side scanning path).
+        guard let activeProvider = preferredProvider() else { throw LLMError.noAPIKey }
+        let modelOverride = activeProvider == .claude ? "claude-sonnet-4-5" : nil
+        let raw = try await generate(request: request, provider: activeProvider, modelOverride: modelOverride)
 
         let clean = raw.replacingOccurrences(of: "```json", with: "")
             .replacingOccurrences(of: "```", with: "")

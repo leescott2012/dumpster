@@ -10,6 +10,7 @@ struct PhotoMenuSheet: View {
     var onCrop: () -> Void = {}
     var onSaveToPhotos: () -> Void = {}
     var onDismissDuplicate: () -> Void = {}
+    var onRescan: () -> Void = {}
     var onRemove: () -> Void = {}     // remove from dump OR delete from pool
     @Environment(\.dismiss) private var dismiss
 

@@ -52,6 +52,17 @@ final class CreditManager: ObservableObject {
         Task { await fetchProducts() }
     }
 
+    // MARK: - Server verification
+
+    /// Production backend. Update if your Vercel project URL is different.
+    private let baseURL: URL = {
+        if let override = Bundle.main.object(forInfoDictionaryKey: "DumpsterAPIBaseURL") as? String,
+           let u = URL(string: override) {
+            return u
+        }
+        return URL(string: "https://dumpster-web-manus.vercel.app")!
+    }()
+
     // MARK: - Balance Management
 
     private func loadBalance() {
@@ -120,6 +131,15 @@ final class CreditManager: ObservableObject {
             case .success(let verification):
                 switch verification {
                 case .verified(let transaction):
+                    // On-device StoreKit verification only proves Apple *signed* a
+                    // transaction — it doesn't tell our server anything happened. Report
+                    // it server-side so Supabase's credit ledger (the one AI-call gating
+                    // actually reads from on web) reflects the purchase too, and so a
+                    // forged/replayed transaction can't be waved through by a client that
+                    // skips this call — the server independently re-verifies the JWS.
+                    // (The signed JWS lives on the VerificationResult, not the unwrapped
+                    // Transaction — that's what re-verifying the signature needs.)
+                    await reportPurchaseToServer(jws: verification.jwsRepresentation)
                     addCredits(pack.credits)
                     lastPurchaseSuccess = pack
                     await transaction.finish()
@@ -138,6 +158,33 @@ final class CreditManager: ObservableObject {
         }
 
         isPurchasing = false
+    }
+
+    /// Best-effort: tells our server about a verified StoreKit transaction so it's
+    /// recorded (and re-verified independently) in Supabase. Never blocks or fails the
+    /// purchase — the user already paid Apple, so a network hiccup here shouldn't cost
+    /// them credits they're owed. Failures are logged, not surfaced to the UI.
+    private func reportPurchaseToServer(jws: String) async {
+        guard let jwt = AuthManager.shared.jwt else { return }
+
+        var req = URLRequest(url: baseURL.appendingPathComponent("api/iap-verify"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        do {
+            req.httpBody = try JSONSerialization.data(withJSONObject: [
+                "signedTransaction": jws
+            ])
+            let (_, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                CrashReporter.shared.capture(
+                    NSError(domain: "CreditManager", code: http.statusCode),
+                    tags: ["op": "iap_verify", "status": String(http.statusCode)]
+                )
+            }
+        } catch {
+            CrashReporter.shared.capture(error, tags: ["op": "iap_verify"])
+        }
     }
 
     func restorePurchases() async {

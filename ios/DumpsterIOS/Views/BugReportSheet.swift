@@ -210,6 +210,16 @@ struct BugReportSheet: View {
                     ],
                     screenshot: screenshotData
                 )
+                // Also mirror to Supabase bug_reports so it shows up in /admin's
+                // Bug Inventory -- Sentry alone leaves native reports invisible
+                // there, same gap web's BugReportButton.tsx closed. Fire-and-forget:
+                // the sheet's confirmation doesn't depend on this succeeding.
+                SupabaseBugMirror.mirror(
+                    message: trimmed,
+                    email: auth.isSignedIn ? auth.userEmail : (email.isEmpty ? nil : email),
+                    jwt: auth.jwt,
+                    screenshot: screenshotData
+                )
                 await MainActor.run {
                     isSending = false
                     sent = true
@@ -322,12 +332,56 @@ enum SentryFeedback {
         }
     }
 
-    private static func sniffImageFormat(_ data: Data) -> (ext: String, contentType: String) {
+    static func sniffImageFormat(_ data: Data) -> (ext: String, contentType: String) {
         var bytes = [UInt8](repeating: 0, count: min(12, data.count))
         data.copyBytes(to: &bytes, count: bytes.count)
         if bytes.count >= 3, bytes[0] == 0xFF, bytes[1] == 0xD8, bytes[2] == 0xFF { return ("jpg", "image/jpeg") }
         if bytes.count >= 8, bytes[0] == 0x89, bytes[1] == 0x50, bytes[2] == 0x4E, bytes[3] == 0x47 { return ("png", "image/png") }
         if bytes.count >= 12, bytes[4] == 0x66, bytes[5] == 0x74, bytes[6] == 0x79, bytes[7] == 0x70 { return ("heic", "image/heic") }
         return ("bin", "application/octet-stream")
+    }
+}
+
+// MARK: - Supabase bug_reports mirror
+//
+// iOS equivalent of BugReportButton.tsx's "also mirror to Supabase" call.
+// Sentry has its own attachment storage; this is what makes a native bug
+// report show up in /admin's Bug Inventory at all.
+
+enum SupabaseBugMirror {
+
+    private static let baseURL: URL = {
+        if let override = Bundle.main.object(forInfoDictionaryKey: "DumpsterAPIBaseURL") as? String,
+           let u = URL(string: override) {
+            return u
+        }
+        return URL(string: "https://dumpster-web-manus.vercel.app")!
+    }()
+
+    static func mirror(message: String, email: String?, jwt: String?, screenshot: Data?) {
+        Task {
+            let context: [String: Any] = [
+                "reporter_email": email ?? NSNull(),
+                "platform": "ios",
+                "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
+            ]
+            var body: [String: Any] = [
+                "source": "user-bug-button",
+                "message": message,
+                "context": context,
+            ]
+            if let screenshot {
+                body["screenshot_base64"] = screenshot.base64EncodedString()
+                body["screenshot_content_type"] = SentryFeedback.sniffImageFormat(screenshot).contentType
+            }
+            guard let payload = try? JSONSerialization.data(withJSONObject: body) else { return }
+
+            var req = URLRequest(url: baseURL.appendingPathComponent("api/bug-report"))
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let jwt { req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization") }
+            req.httpBody = payload
+            _ = try? await URLSession.shared.data(for: req)
+        }
     }
 }

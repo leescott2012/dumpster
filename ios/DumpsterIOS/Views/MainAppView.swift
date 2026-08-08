@@ -52,8 +52,15 @@ struct MainAppView: View {
                 }
             }
             .background(Theme.bg(appState.colorMode, cs).ignoresSafeArea())
-            .preferredColorScheme(appState.colorMode == .day ? .light :
-                                  appState.colorMode == .dark ? .dark : nil)
+            // The always-black "Dynamic Island" pill in ContentView (Contentview.swift)
+            // sits directly behind the status bar and never changes with the theme, so a
+            // light-theme (dark-content) status bar goes invisible against it. Only follow
+            // the theme when the File Cabinet menu is up — its own opaque background fully
+            // covers that pill, so dark-content icons contrast correctly there. Otherwise
+            // force dark scheme (light-content icons) so the status bar stays readable.
+            .preferredColorScheme(appState.showFileCabinet
+                ? (appState.colorMode == .day ? .light : appState.colorMode == .dark ? .dark : nil)
+                : .dark)
             .onAppear {
                 appState.dumpCount = dumps.count
                 #if DEBUG

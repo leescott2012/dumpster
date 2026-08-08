@@ -14,7 +14,10 @@ struct PhotoPoolView: View {
 
     @State private var showSearchField = false
     @State private var pickerItems: [PhotosPickerItem] = []
-    @State private var selectedPhotoIDs: Set<String> = []
+    // Ordered (not a Set) so pick order is preserved for the ordinal badge —
+    // matches web's `selectedIds: string[]` + `selectedIds.indexOf(photo.id)`
+    // (client/src/components/PhotoPool.tsx / PhotoCard.tsx selectionIndex).
+    @State private var selectedPhotoIDs: [String] = []
     @State private var highlightedPhotoId: String? = nil
     @State private var pinchScale: CGFloat = 1.0
     // Bumped when background perceptual hashing lands new hashes, so the body
@@ -344,7 +347,7 @@ struct PhotoPoolView: View {
     private func addSelectedPhotosToDump() {
         guard let dumpId = appState.addingToDumpId else { return }
         if let dump = allDumps.first(where: { $0.id == dumpId }) {
-            dump.photoIDs.append(contentsOf: Array(selectedPhotoIDs))
+            dump.photoIDs.append(contentsOf: selectedPhotoIDs)
             try? modelContext.save()
             // Peak zone reached?
             let newCount = dump.photoIDs.count
@@ -433,9 +436,9 @@ struct PhotoPoolView: View {
                         if appState.addingToDumpId != nil {
                             HapticManager.shared.playTick()
                             if selectedPhotoIDs.contains(photo.id) {
-                                selectedPhotoIDs.remove(photo.id)
+                                selectedPhotoIDs.removeAll { $0 == photo.id }
                             } else {
-                                selectedPhotoIDs.insert(photo.id)
+                                selectedPhotoIDs.append(photo.id)
                             }
                         } else {
                             highlightedPhotoId = (highlightedPhotoId == photo.id) ? nil : photo.id
@@ -457,17 +460,29 @@ struct PhotoPoolView: View {
                 )
                 .overlay(
                     Group {
-                        if appState.addingToDumpId != nil && selectedPhotoIDs.contains(photo.id) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.green)
-                        } else if usedPhotoIDs.contains(photo.id) && appState.addingToDumpId == nil && !appState.activeFilters.contains(.used) {
+                        // PhotoCardView already renders its own centered
+                        // checkmark+tint for isSelected — the add-to-dump
+                        // case is handled below by the ordinal badge instead,
+                        // so it isn't duplicated here.
+                        if usedPhotoIDs.contains(photo.id) && appState.addingToDumpId == nil && !appState.activeFilters.contains(.used) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 24))
                                 .foregroundColor(.gray)
                         }
                     }
                 )
+                // Pick-order badge — add-to-dump multi-select only. Mirrors
+                // web's green numbered circle (PhotoCard.tsx selectionIndex).
+                .overlay(alignment: .topTrailing) {
+                    if appState.addingToDumpId != nil, let idx = selectedPhotoIDs.firstIndex(of: photo.id) {
+                        Text("\(idx + 1)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(Color.green))
+                            .padding(6)
+                    }
+                }
                 // "pull blur-fade from Magic UI" — Lee's pick from the Motion Library.
                 // Each tile fades in from a blur as it scrolls into the lazy grid's
                 // render window (mirrors the web card's IntersectionObserver replay).

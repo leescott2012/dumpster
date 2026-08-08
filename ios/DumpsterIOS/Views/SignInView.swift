@@ -179,11 +179,18 @@ struct SignInView: View {
 
             Spacer()
 
-            Text("By continuing you agree to Dumpster's\nTerms of Service and Privacy Policy")
-                .font(.caption2)
-                .foregroundColor(.black.opacity(0.4))
-                .multilineTextAlignment(.center)
-                .padding(.bottom, 24)
+            VStack(spacing: 2) {
+                Text("By continuing you agree to Dumpster's")
+                    .foregroundColor(.black.opacity(0.4))
+                HStack(spacing: 4) {
+                    Link("Terms of Service", destination: URL(string: "https://dumpster-web-manus.vercel.app/terms")!)
+                    Text("and").foregroundColor(.black.opacity(0.4))
+                    Link("Privacy Policy", destination: URL(string: "https://dumpster-web-manus.vercel.app/privacy")!)
+                }
+            }
+            .font(.caption2)
+            .multilineTextAlignment(.center)
+            .padding(.bottom, 24)
         }
         .background(Color(white: 0.97).ignoresSafeArea())
         .onAppear { emailFocused = true }

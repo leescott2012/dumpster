@@ -567,8 +567,7 @@ struct DumpCardView: View {
             HapticManager.shared.playSuccess()
             withAnimation(.spring()) { captionResult = result }
         } catch {
-            captionError = error.localizedDescription
-            CrashReporter.shared.capture(error, tags: ["op": "caption_generate", "dumpId": dump.id])
+            captionError = FriendlyError.message(for: error, tags: ["op": "caption_generate", "dumpId": dump.id])
         }
     }
 

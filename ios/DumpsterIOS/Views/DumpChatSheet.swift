@@ -341,10 +341,11 @@ struct DumpChatSheet: View {
 
                 HapticManager.shared.playTick()
             } catch {
+                let friendly = FriendlyError.message(for: error, tags: ["op": "dump_chat", "dumpId": dump.id])
                 let errMsg = DumpChatMessage(
                     dumpId: dump.id,
                     role: "assistant",
-                    text: "Sorry, I hit an error: \(error.localizedDescription)"
+                    text: "Sorry, I hit an error: \(friendly)"
                 )
                 modelContext.insert(errMsg)
                 messages.append(errMsg)

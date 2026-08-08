@@ -90,8 +90,8 @@ struct PaywallView: View {
                                 await credits.restorePurchases()
                             }
                         }
-                        Link("Terms", destination: URL(string: "https://dumpster.app/terms")!)
-                        Link("Privacy", destination: URL(string: "https://dumpster.app/privacy")!)
+                        Link("Terms", destination: URL(string: "https://dumpster-web-manus.vercel.app/terms")!)
+                        Link("Privacy", destination: URL(string: "https://dumpster-web-manus.vercel.app/privacy")!)
                     }
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.35))

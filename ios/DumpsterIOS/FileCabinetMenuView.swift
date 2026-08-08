@@ -1351,15 +1351,39 @@ struct AISettingsTabView: View {
 struct MyDumpsTabView: View {
     @ObservedObject var appState: AppState
 
+    // Same SwiftData store MainAppView reads from — same sort order too, so
+    // this tab shows the real title/thumbnail/count MainAppView is showing,
+    // not a stale/placeholder copy (NATIVE_PORT.md source-of-truth pattern).
+    @Query(sort: \PhotoDump.createdAt, order: .forward) private var dumps: [PhotoDump]
+    @Query private var allPhotos: [DumpPhoto]
+
     private let gold = Color(hex: "#C8A96E")
+
+    // Non-archived dumps, capped at 5 (mirrors the old placeholder's cap).
+    private var savedDumps: [PhotoDump] {
+        Array(dumps.filter { !$0.archived }.prefix(5))
+    }
+
+    private var photosById: [String: DumpPhoto] {
+        Dictionary(uniqueKeysWithValues: allPhotos.map { ($0.id, $0) })
+    }
+
+    // "Photos in use" = distinct photos assigned to at least one dump.
+    private var photosInUseCount: Int {
+        Set(dumps.flatMap { $0.photoIDs }).count
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
 
             // Stats Banner
             HStack(spacing: 20) {
-                statBox(value: "\(appState.dumpCount)", label: "DUMPS")
-                statBox(value: "—", label: "PHOTOS")
+                statBox(value: "\(dumps.count)", label: "DUMPS")
+                statBox(value: "\(photosInUseCount)", label: "PHOTOS")
+                // ponytail: shares aren't persisted anywhere — Analytics.track(.dumpExported)
+                // is a fire-and-forget POST to Supabase, not a local/queryable count — so "—"
+                // is honest rather than a fabricated number. Add a local share counter on
+                // PhotoDump if this needs to be a real value.
                 statBox(value: "—", label: "SHARED")
             }
             .padding(.horizontal, 24)
@@ -1368,10 +1392,10 @@ struct MyDumpsTabView: View {
             // Dump List
             CabinetSectionHeader("SAVED DUMPS", icon: "tray.full")
 
-            if appState.dumpCount == 0 {
+            if dumps.isEmpty {
                 emptyDumpsView
             } else {
-                dumpListPlaceholder
+                dumpList
             }
 
             // Export Options
@@ -1423,26 +1447,21 @@ struct MyDumpsTabView: View {
         .padding(.horizontal, 24)
     }
 
-    private var dumpListPlaceholder: some View {
+    private var dumpList: some View {
         VStack(spacing: 8) {
-            ForEach(0..<min(appState.dumpCount, 5), id: \.self) { index in
+            ForEach(savedDumps) { dump in
                 HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.06))
-                        .frame(width: 48, height: 48)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.15))
-                        )
+                    dumpThumbnail(for: dump)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Dump \(index + 1)")
+                        Text(dump.title)
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white.opacity(0.7))
-                        Text("Tap to view in carousel")
+                            .lineLimit(1)
+                        Text("\(dump.photoIDs.count) photo\(dump.photoIDs.count == 1 ? "" : "s") · Tap to view in carousel")
                             .font(.system(size: 11))
                             .foregroundColor(.white.opacity(0.3))
+                            .lineLimit(1)
                     }
 
                     Spacer()
@@ -1459,6 +1478,32 @@ struct MyDumpsTabView: View {
             }
         }
         .padding(.horizontal, 24)
+    }
+
+    /// Real thumbnail: the dump's first actual photo (same resolution DumpCardView
+    /// uses — photoIDs.first looked up against the pool), not a generic icon.
+    /// Falls back to the placeholder icon only when the dump has no photos yet.
+    private func dumpThumbnail(for dump: PhotoDump) -> some View {
+        let firstPhoto = dump.photoIDs.first.flatMap { photosById[$0] }
+        let image = firstPhoto.flatMap { PhotoStorageManager.shared.loadImage(relativePath: $0.localPath) }
+        return RoundedRectangle(cornerRadius: 8)
+            .fill(Color.white.opacity(0.06))
+            .frame(width: 48, height: 48)
+            .overlay(
+                Group {
+                    if let image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 48, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Image(systemName: "photo")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.15))
+                    }
+                }
+            )
     }
 
     private var exportOptions: some View {

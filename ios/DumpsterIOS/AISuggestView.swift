@@ -54,8 +54,15 @@ struct AISuggestView: View {
     @State private var statusMessage: String = ""
     @State private var isCreating = false
     @State private var maxPhotosPerDump: Int = 10
+    /// AUTO mode — web parity: targetCount == null lets the picker decide the
+    /// natural cluster size (2–20) instead of forcing a fixed count.
+    @State private var isAutoCount: Bool = false
     // Maps AnalyzedPhoto.filename → existing DumpPhoto.id (pool source)
     @State private var poolPhotoMap: [String: String] = [:]
+
+    // MARK: - Advanced filters (NATIVE_PORT.md §C — port of web's AutoGenAdvanced.tsx)
+    @State private var filters: AutoGenFilters = .empty
+    @State private var advancedFiltersOpen = false
 
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
@@ -63,15 +70,35 @@ struct AISuggestView: View {
 
     enum Phase { case picker, results }
 
-    /// Pool photos = photos not assigned to any dump.
+    /// Pool photos = photos not assigned to any dump. Hard rule: always
+    /// excluded regardless of any filter setting (NATIVE_PORT.md §C).
     private var availablePhotos: [DumpPhoto] {
         let usedIDs = Set(existingDumps.flatMap { $0.photoIDs })
         return allPhotos.filter { !usedIDs.contains($0.id) }
     }
 
-    /// Upper bound for the stepper (pool size, capped at 20).
+    /// availablePhotos with the user's advanced filters applied — this is
+    /// the actual Auto-Gen candidate pool.
+    private var filteredPhotos: [DumpPhoto] {
+        AutoGenFilterEngine.apply(availablePhotos, filters: filters)
+    }
+
+    /// Categories offered as chips — from the full pool, not the filtered
+    /// result, so toggling a chip off doesn't make it disappear.
+    private var availableFilterCategories: [String] {
+        Array(Set(availablePhotos.map { $0.category }))
+    }
+
+    /// Upper bound for the stepper (filtered pool size, capped at 20).
     private var stepperMax: Int {
-        min(20, availablePhotos.count)
+        min(20, filteredPhotos.count)
+    }
+
+    private var poolHintText: String {
+        if filters.isEmpty {
+            return "\(availablePhotos.count) photo\(availablePhotos.count == 1 ? "" : "s") in pool"
+        }
+        return "\(filteredPhotos.count) of \(availablePhotos.count) photos match filters"
     }
 
     var body: some View {
@@ -159,13 +186,13 @@ struct AISuggestView: View {
         .preferredColorScheme(.dark)
     }
 
-    /// Kick off full-pool analysis automatically — no user picking.
+    /// Kick off filtered-pool analysis automatically — no user picking.
     private func startAutoAnalyze() {
-        guard !availablePhotos.isEmpty else { return }
+        guard !filteredPhotos.isEmpty else { return }
         isAnalyzing = true
         appState.isAnalyzing = true
         appState.showStatus("Analyzing photos...", duration: 60)
-        loadAndAnalyzeFromPool(photos: availablePhotos)
+        loadAndAnalyzeFromPool(photos: filteredPhotos)
     }
 
     // MARK: - Picker Phase
@@ -222,7 +249,8 @@ struct AISuggestView: View {
 
             if !isAnalyzing {
                 HStack(spacing: 24) {
-                    // Photos in dump stepper — web parity: 2–20 photos, one dump per run
+                    // Photos in dump stepper — web parity: 2–20 photos, one dump per run.
+                    // AUTO lets the picker decide the count (web: targetCount == null).
                     VStack(spacing: 8) {
                         Text("PHOTOS IN DUMP")
                             .font(.system(size: 9, weight: .heavy))
@@ -235,40 +263,52 @@ struct AISuggestView: View {
                             } label: {
                                 Image(systemName: "minus")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(maxPhotosPerDump > 2 ? .white : .white.opacity(0.2))
+                                    .foregroundColor(maxPhotosPerDump > 2 && !isAutoCount ? .white : .white.opacity(0.2))
                                     .frame(width: 36, height: 36)
                                     .background(Color.white.opacity(0.08))
                                     .clipShape(Circle())
                             }
-                            .disabled(maxPhotosPerDump <= 2)
+                            .disabled(maxPhotosPerDump <= 2 || isAutoCount)
 
-                            Text("\(maxPhotosPerDump)")
-                                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                            Text(isAutoCount ? "AUTO" : "\(maxPhotosPerDump)")
+                                .font(.system(size: isAutoCount ? 20 : 32, weight: .bold, design: .monospaced))
                                 .foregroundColor(gold)
-                                .frame(width: 44)
+                                .frame(width: 60)
 
                             Button {
                                 if maxPhotosPerDump < 20 { maxPhotosPerDump += 1 }
                             } label: {
                                 Image(systemName: "plus")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(maxPhotosPerDump < 20 ? .white : .white.opacity(0.2))
+                                    .foregroundColor(maxPhotosPerDump < 20 && !isAutoCount ? .white : .white.opacity(0.2))
                                     .frame(width: 36, height: 36)
                                     .background(Color.white.opacity(0.08))
                                     .clipShape(Circle())
                             }
-                            .disabled(maxPhotosPerDump >= 20)
+                            .disabled(maxPhotosPerDump >= 20 || isAutoCount)
                         }
 
-                        Text("max 20")
-                            .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.2))
+                        Button {
+                            isAutoCount.toggle()
+                        } label: {
+                            Text(isAutoCount ? "Exactly \(maxPhotosPerDump) instead" : "Let AI decide (2–20)")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(isAutoCount ? .white.opacity(0.4) : gold.opacity(0.8))
+                        }
                     }
                 }
                 .padding(.horizontal, 32)
 
+                AutoGenAdvancedView(
+                    filters: $filters,
+                    availableCategories: availableFilterCategories,
+                    isOpen: $advancedFiltersOpen
+                )
+                .padding(.horizontal, 32)
+                .padding(.top, 8)
+
                 // Pool size hint
-                Text("\(availablePhotos.count) photo\(availablePhotos.count == 1 ? "" : "s") in pool")
+                Text(poolHintText)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.25))
                     .padding(.top, 4)
@@ -288,6 +328,19 @@ struct AISuggestView: View {
                             .lineSpacing(4)
                     }
                     .padding(.horizontal, 32)
+                } else if filteredPhotos.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 28, weight: .light))
+                            .foregroundColor(.white.opacity(0.2))
+                        Text("No photos match your filters")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white.opacity(0.3))
+                        Button("Clear filters") { filters = .empty }
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(gold)
+                    }
+                    .padding(.horizontal, 32)
                 } else {
                     Button {
                         haptic.impactOccurred()
@@ -296,7 +349,7 @@ struct AISuggestView: View {
                         HStack(spacing: 10) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 15, weight: .semibold))
-                            Text("AUTO-GENERATE \(availablePhotos.count) PHOTO\(availablePhotos.count == 1 ? "" : "S")")
+                            Text("AUTO-GENERATE \(filteredPhotos.count) PHOTO\(filteredPhotos.count == 1 ? "" : "S")")
                                 .font(.system(size: 13, weight: .bold))
                                 .tracking(3)
                         }
@@ -411,7 +464,7 @@ struct AISuggestView: View {
             let safeMap = map
             lock.unlock()
 
-            PhotoAnalyzer.analyze(images: safeLoaded, targetCount: maxPhotosPerDump) { result in
+            PhotoAnalyzer.analyze(images: safeLoaded, targetCount: isAutoCount ? nil : maxPhotosPerDump) { result in
                 Task { @MainActor in
                     self.poolPhotoMap = safeMap
                     // Metadata now factors into dump-building: order the cluster
@@ -467,8 +520,12 @@ struct AISuggestView: View {
             // 1. Resolve cluster photos → real DumpPhoto records (reuse pool, fallback to new).
             var resolvedPhotos: [DumpPhoto] = []
 
+            // Safety cap: in AUTO mode the picker already chose the cluster
+            // size (2–20), so don't truncate it back down to the stepper's
+            // last fixed value.
+            let cap = isAutoCount ? 20 : maxPhotosPerDump
             for p in cluster.photos {
-                if resolvedPhotos.count >= maxPhotosPerDump { break }
+                if resolvedPhotos.count >= cap { break }
 
                 if let existingID = poolPhotoMap[p.filename],
                    let existing = photoByID[existingID] {

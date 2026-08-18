@@ -88,7 +88,12 @@ class PhotoAnalyzer {
     /// builds a single dump per run (web uses only clusters[0] and its offline
     /// fallback fills from the second-biggest category bucket to reach the
     /// target count; see dumpster-web offlineAutoGen.ts).
-    static func analyze(images: [(UIImage, URL)], targetCount: Int, completion: @escaping ([PhotoCluster]) -> Void) {
+    ///
+    /// `targetCount == nil` is AUTO mode (web: targetCount === null, "Claude
+    /// will decide (2-20)") — instead of topping up from secondary category
+    /// buckets to hit an exact count, the primary bucket's own natural size
+    /// (clamped 2–20) decides how many photos land in the dump.
+    static func analyze(images: [(UIImage, URL)], targetCount: Int?, completion: @escaping ([PhotoCluster]) -> Void) {
         DispatchQueue.global(qos: .utility).async {
             var analyzed: [AnalyzedPhoto] = []
             let group = DispatchGroup()
@@ -124,11 +129,17 @@ class PhotoAnalyzer {
                 return
             }
 
-            let cap = min(max(targetCount, 2), 20)
             var picked: [AnalyzedPhoto] = []
-            for bucket in sorted {
-                if picked.count >= cap { break }
-                picked.append(contentsOf: bucket.prefix(cap - picked.count))
+            if let targetCount {
+                let cap = min(max(targetCount, 2), 20)
+                for bucket in sorted {
+                    if picked.count >= cap { break }
+                    picked.append(contentsOf: bucket.prefix(cap - picked.count))
+                }
+            } else {
+                // AUTO: primary bucket only, no cross-category top-up.
+                let cap = min(max(primary.count, 2), 20)
+                picked = Array(primary.prefix(cap))
             }
 
             let single = PhotoCluster(

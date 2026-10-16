@@ -233,12 +233,12 @@ struct AISuggestView: View {
                     .lineSpacing(5)
             }
 
-            if !llmService.hasAnyAPIKey {
+            if !llmService.hasAnyAPIKey && !AuthManager.shared.isSignedIn {
                 VStack(spacing: 10) {
                     Image(systemName: "key.fill")
                         .font(.system(size: 22, weight: .light))
                         .foregroundColor(gold.opacity(0.6))
-                    Text("No API Key Configured")
+                    Text("Sign in for AI")
                         .font(.system(size: 13, weight: .bold))
                         .tracking(1)
                         .foregroundColor(.white.opacity(0.5))
@@ -508,8 +508,11 @@ struct AISuggestView: View {
             let safeMap = map
             lock.unlock()
 
-            PhotoAnalyzer.analyze(images: safeLoaded, targetCount: isAutoCount ? nil : maxPhotosPerDump) { result in
+            PhotoAnalyzer.analyze(images: safeLoaded, targetCount: isAutoCount ? nil : maxPhotosPerDump) { localResult in
                 Task { @MainActor in
+                    // Server AI (Claude Vision via /api/ai-suggest) when signed in and affordable;
+                    // otherwise (or on any failure) the free on-device clustering result stands.
+                    let result = await self.serverClusters(loaded: safeLoaded, map: safeMap) ?? localResult
                     self.poolPhotoMap = safeMap
                     // Metadata now factors into dump-building: order the cluster
                     // chronologically (EXIF takenAt) instead of arbitrary Vision
@@ -540,6 +543,40 @@ struct AISuggestView: View {
                     // handleAICreateDumps, which also leaves captions untouched.
                 }
             }
+        }
+    }
+
+    /// Server suggest costs this many credits (server/creditGate.ts ai_suggest). Display/gating only;
+    /// the server does the actual charge.
+    private static let serverSuggestCost = 25
+
+    @MainActor
+    private func serverClusters(loaded: [(UIImage, URL)], map: [String: String]) async -> [PhotoCluster]? {
+        guard LLMService.ServerAI.isAvailable, CreditManager.shared.balance >= Self.serverSuggestCost else { return nil }
+        let byId = Dictionary(allPhotos.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var analyzed: [String: AnalyzedPhoto] = [:]
+        var sample: [LLMService.SuggestPhoto] = []
+        for (img, url) in loaded.shuffled().prefix(20) {
+            guard let id = map[url.lastPathComponent], let jpeg = img.jpegData(compressionQuality: 0.6) else { continue }
+            let p = byId[id]
+            analyzed[id] = AnalyzedPhoto(image: img, localURL: url, filename: url.lastPathComponent,
+                                         category: p?.category ?? "LIFESTYLE", clusterKey: p?.category ?? "LIFESTYLE",
+                                         faceCount: 0, labels: p?.labels ?? [])
+            sample.append(.init(id: id, dataURL: "data:image/jpeg;base64," + jpeg.base64EncodedString(),
+                                category: p?.category ?? "LIFESTYLE", alt: (p?.labels ?? []).prefix(3).joined(separator: ", ")))
+        }
+        guard sample.count >= 2 else { return nil }
+        let taste = AITasteExample.promptBlock(from: []) + AITasteExample.captionVoiceBlock()
+        do {
+            let found = try await llmService.serverSuggest(photos: sample, targetCount: isAutoCount ? nil : maxPhotosPerDump, tasteBlock: taste)
+            guard let c = found.first else { return nil }
+            let photos = c.photoIds.compactMap { analyzed[$0] }
+            guard photos.count >= 2 else { return nil }
+            let cat = Dictionary(grouping: photos, by: { $0.category }).max { $0.value.count < $1.value.count }?.key ?? "LIFESTYLE"
+            return [PhotoCluster(title: c.name, category: cat, photos: photos)]
+        } catch {
+            _ = FriendlyError.message(for: error, tags: ["op": "server_suggest"])
+            return nil
         }
     }
 

@@ -99,7 +99,10 @@ struct PhotoCardView: View {
 
     private var imageLayer: some View {
         Group {
-            if let img = PhotoStorageManager.shared.loadImage(relativePath: photo.localPath) {
+            if let img = PhotoStorageManager.shared.thumbnail(
+                relativePath: photo.localPath,
+                maxPixel: max(size.width, size.height) * UIScreen.main.scale
+            ) {
                 Image(uiImage: img)
                     .resizable()
                     .scaledToFill()

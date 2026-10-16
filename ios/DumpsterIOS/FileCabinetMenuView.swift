@@ -513,15 +513,11 @@ struct AISettingsTabView: View {
             // Active Provider Status
             activeProviderBanner
 
-            // API Key Cards — Pro feature
-            CabinetSectionHeader("API PROVIDERS", icon: "key")
+            // API Key Cards — optional for everyone (free users get AI through the Dumpster server)
+            CabinetSectionHeader("YOUR OWN API KEY (OPTIONAL)", icon: "key")
 
-            if SubscriptionManager.shared.isPro {
-                ForEach(LLMService.LLMProvider.allCases) { provider in
-                    apiKeyCard(for: provider)
-                }
-            } else {
-                proGateCard
+            ForEach(LLMService.LLMProvider.allCases) { provider in
+                apiKeyCard(for: provider)
             }
 
             // Labeling Sensitivity

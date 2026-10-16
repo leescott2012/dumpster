@@ -1,4 +1,5 @@
 import UIKit
+import ImageIO
 
 /// Manages on-disk storage for imported photos. Originals are preserved
 /// verbatim (full resolution, original format, EXIF) via `saveImageData`.
@@ -86,6 +87,38 @@ final class PhotoStorageManager {
         guard !VideoStore.isVideoPath(relativePath) else { return nil }
         let url = docs.appendingPathComponent(relativePath)
         return UIImage(contentsOfFile: url.path)
+    }
+
+    // MARK: - Thumbnails (grid tiles)
+
+    private let thumbCache: NSCache<NSString, UIImage> = {
+        let c = NSCache<NSString, UIImage>()
+        c.countLimit = 400
+        c.totalCostLimit = 64 * 1024 * 1024   // ~64 MB of decoded pixels
+        return c
+    }()
+
+    /// Downsampled image for grid tiles. ImageIO decodes straight to `maxPixel`
+    /// (never the full-resolution original) and results are cached by path+size.
+    /// Cropping writes a new path, so path-keyed entries never go stale.
+    func thumbnail(relativePath: String, maxPixel: CGFloat) -> UIImage? {
+        guard !VideoStore.isVideoPath(relativePath) else { return nil }
+        let px = Int(maxPixel.rounded(.up))
+        let key = "\(relativePath)#\(px)" as NSString
+        if let hit = thumbCache.object(forKey: key) { return hit }
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let url = docs.appendingPathComponent(relativePath)
+        let opts = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: px,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ] as CFDictionary
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts) else { return nil }
+        let img = UIImage(cgImage: cg)
+        thumbCache.setObject(img, forKey: key, cost: cg.width * cg.height * 4)
+        return img
     }
 
     // MARK: - Delete

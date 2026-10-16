@@ -17,6 +17,8 @@ final class CreditManager: ObservableObject {
     // MARK: - Published State
     @Published private(set) var balance: Int = 0
     @Published private(set) var products: [Product] = []
+    /// Set when any server AI call returns 402; the app root shows the credits sheet.
+    @Published var showOutOfCredits = false
     @Published var isPurchasing = false
     @Published var purchaseError: String?
     @Published var lastPurchaseSuccess: CreditPack?
@@ -100,6 +102,8 @@ final class CreditManager: ObservableObject {
     /// X-Credits-Remaining is the post-deduct balance; on anything else (402, 5xx,
     /// network failure → nil) re-read, because a refund may still be landing.
     func noteAIResponse(_ http: HTTPURLResponse?) {
+        // 402 = server says out of credits: show the top-up sheet (DumpsterApp presents it).
+        if http?.statusCode == 402 { showOutOfCredits = true }
         if let http, (200..<300).contains(http.statusCode),
            let h = http.value(forHTTPHeaderField: "X-Credits-Remaining"), let n = Int(h) {
             balance = max(0, n)

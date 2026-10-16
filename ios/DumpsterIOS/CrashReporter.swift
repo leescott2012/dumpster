@@ -1,21 +1,19 @@
 import Foundation
 import os.log
+#if canImport(Sentry)
+import Sentry
+#endif
 
-/// Crash + error reporting abstraction.
-///
-/// Currently a no-op + os.Logger fallback. To enable Sentry:
-/// 1. In Xcode: File → Add Package Dependencies… → enter `https://github.com/getsentry/sentry-cocoa`
-/// 2. Add Sentry to the DumpsterIOS target
-/// 3. In `start()` below, uncomment the SentrySDK.start block
-/// 4. Replace the `your-dsn-here` placeholder with the DSN from your Sentry project
-///
-/// Once Sentry is wired, every `capture(...)` call here flows to your dashboard
-/// without changing call sites scattered through the app.
+/// Crash + error reporting. Always logs via os.Logger; also reports to Sentry
+/// when the DSN is set. The DSN comes from the `SENTRY_DSN` Info.plist key,
+/// which reads the `SENTRY_DSN` build setting. Leave it empty to disable Sentry
+/// (set it in the target's build settings or an xcconfig).
 final class CrashReporter {
 
     // MARK: - Singleton
     static let shared = CrashReporter()
     private let log = Logger(subsystem: "com.leescott.dumpster.ios", category: "CrashReporter")
+    private var sentryOn = false
 
     private init() {}
 
@@ -23,31 +21,28 @@ final class CrashReporter {
 
     /// Call once on app launch. Safe to call multiple times.
     func start() {
-        log.info("CrashReporter started (Sentry disabled)")
-
-        // ─── Sentry wire-up — uncomment when SPM package is added ───
-        // Package URL: https://github.com/getsentry/sentry-cocoa
-        // In Xcode: File → Add Package Dependencies → enter URL above → add to DumpsterIOS target
-        /*
-        import Sentry
-
+        let dsn = (Bundle.main.object(forInfoDictionaryKey: "SENTRY_DSN") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !dsn.isEmpty, !dsn.hasPrefix("$(") else {
+            log.info("CrashReporter started (Sentry disabled: SENTRY_DSN empty)")
+            return
+        }
+        #if canImport(Sentry)
         SentrySDK.start { options in
-            // DSN from NATIVE_PORT.md §9 (same org as web — add a separate iOS project in Sentry dashboard)
-            options.dsn = "https://cac00263ad517cfa1ab22990dff35fc2@o4511424233013248.ingest.us.sentry.io/4511424250576896"
+            options.dsn = dsn
             options.debug = false
-            options.tracesSampleRate = 0.2          // 20% perf sampling
-            options.profilesSampleRate = 0.2
-            options.attachScreenshot = false        // ⚠️ user photos may be visible
+            options.tracesSampleRate = 0.2
+            options.attachScreenshot = false        // user photos may be visible
             options.sendDefaultPii = false          // never send IP / email
-            options.enableAutoBreadcrumbTracking = true
-            options.enableAutoPerformanceTracing = true
             #if DEBUG
             options.environment = "debug"
             #else
             options.environment = "release"
             #endif
         }
-        */
+        sentryOn = true
+        log.info("CrashReporter started (Sentry enabled)")
+        #endif
     }
 
     // MARK: - Capture
@@ -59,8 +54,9 @@ final class CrashReporter {
         } else {
             log.error("\(error.localizedDescription, privacy: .public)")
         }
-
-        // ─── Sentry: SentrySDK.capture(error: error) { scope in scope.setTags(tags) } ───
+        #if canImport(Sentry)
+        if sentryOn { SentrySDK.capture(error: error) { scope in scope.setTags(tags) } }
+        #endif
     }
 
     /// Capture a free-form message (warning, recoverable issue).
@@ -71,36 +67,51 @@ final class CrashReporter {
         case .error:   log.error("\(message, privacy: .public)")
         case .fatal:   log.fault("\(message, privacy: .public)")
         }
-
-        // ─── Sentry: SentrySDK.capture(message: message) { scope in scope.setLevel(level.sentryLevel); scope.setTags(tags) } ───
+        #if canImport(Sentry)
+        if sentryOn {
+            SentrySDK.capture(message: message) { scope in
+                scope.setLevel(level.sentryLevel)
+                scope.setTags(tags)
+            }
+        }
+        #endif
     }
 
     /// Drop a breadcrumb so we know what the user was doing right before a crash/error.
     func breadcrumb(_ message: String, category: String = "ui") {
         log.debug("[\(category, privacy: .public)] \(message, privacy: .public)")
-
-        // ─── Sentry:
-        // let crumb = Breadcrumb(level: .info, category: category)
-        // crumb.message = message
-        // SentrySDK.addBreadcrumb(crumb)
-        // ───
+        #if canImport(Sentry)
+        if sentryOn {
+            let crumb = Breadcrumb(level: .info, category: category)
+            crumb.message = message
+            SentrySDK.addBreadcrumb(crumb)
+        }
+        #endif
     }
 
-    // MARK: - User context (for grouping crashes by user once Sign-in lands)
+    // MARK: - User context (for grouping crashes by user)
 
     func setUser(id: String?) {
-        // ─── Sentry:
-        // if let id = id {
-        //     SentrySDK.setUser(User(userId: id))
-        // } else {
-        //     SentrySDK.setUser(nil)
-        // }
-        // ───
+        #if canImport(Sentry)
+        guard sentryOn else { return }
+        SentrySDK.setUser(id.map { User(userId: $0) })
+        #endif
     }
 
     // MARK: - Severity
 
     enum Severity {
         case info, warning, error, fatal
+
+        #if canImport(Sentry)
+        var sentryLevel: SentryLevel {
+            switch self {
+            case .info: return .info
+            case .warning: return .warning
+            case .error: return .error
+            case .fatal: return .fatal
+            }
+        }
+        #endif
     }
 }

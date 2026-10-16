@@ -400,8 +400,10 @@ final class LLMService: ObservableObject {
     // MARK: - Generate Caption by title + category
 
     func generateCaption(for dumpTitle: String, category: String, tasteBlock: String = "", labels: [String] = []) async throws -> CaptionResult {
-        guard hasAnyAPIKey else {
-            return LLMService.fallbackCaptions(for: category, title: dumpTitle)
+        // No own key: use Dumpster's server AI (signed-in users, credit-charged by the server).
+        if !hasAnyAPIKey {
+            guard await ServerAI.isAvailable else { return LLMService.fallbackCaptions(for: category, title: dumpTitle) }
+            return try await serverCaption(title: dumpTitle, category: category, tasteBlock: tasteBlock, labels: labels)
         }
 
         let context = userContextBlock(tasteBlock: tasteBlock)
@@ -419,7 +421,8 @@ final class LLMService: ObservableObject {
     // MARK: - Generate Captions for multiple dumps (called from AISuggestView)
 
     func generateCaptions(for requests: [CaptionRequest], tasteBlock: String = "") async throws -> [CaptionResult] {
-        guard hasAnyAPIKey else {
+        let serverOK = await ServerAI.isAvailable
+        guard hasAnyAPIKey || serverOK else {
             return requests.map { LLMService.fallbackCaptions(for: $0.category, title: $0.dumpTitle) }
         }
 
@@ -652,7 +655,11 @@ final class LLMService: ObservableObject {
         vibe: String?,
         tasteBlock: String = ""
     ) async throws -> DumpChatResponse {
-        guard hasAnyAPIKey else { throw LLMError.noAPIKey }
+        if !hasAnyAPIKey {
+            guard await ServerAI.isAvailable else { throw LLMError.noAPIKey }
+            return try await serverChat(dumpTitle: dumpTitle, dumpPhotos: dumpPhotos, poolPhotos: poolPhotos,
+                                        history: history, message: message, vibe: vibe, tasteBlock: tasteBlock)
+        }
 
         let dumpDesc = dumpPhotos.enumerated().map { i, p in
             "  \(i + 1). [\(p.id)] \(p.category) — \(p.labels.prefix(3).joined(separator: ", "))"
@@ -776,6 +783,106 @@ final class LLMService: ObservableObject {
         return DumpChatResponse(reply: reply, actions: validActions)
     }
 
+    // MARK: - Dumpster server AI (/api/ai-*) — default path, no user key needed
+    //
+    // Same endpoints and request shapes as the web client. The server verifies the
+    // Supabase JWT, applies the rate/budget/credit checks and does ALL charging; the
+    // client sends nothing that influences cost. 402 = out of credits.
+
+    enum ServerAI {
+        static let baseURL: URL = {
+            if let o = Bundle.main.object(forInfoDictionaryKey: "DumpsterAPIBaseURL") as? String, let u = URL(string: o) { return u }
+            return URL(string: "https://dumpster-web-manus.vercel.app")!
+        }()
+
+        @MainActor static var isAvailable: Bool { AuthManager.shared.jwt != nil }
+
+        /// POST JSON to `api/<path>` with the user's JWT. Returns the 200 body.
+        static func post(_ path: String, _ body: [String: Any], timeout: TimeInterval = 60) async throws -> Data {
+            guard let jwt = await AuthManager.shared.jwt else {
+                throw LLMError.providerUnavailable("Sign in to use AI")
+            }
+            var req = URLRequest(url: baseURL.appendingPathComponent("api/" + path))
+            req.httpMethod = "POST"
+            req.timeoutInterval = timeout
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let data: Data, response: URLResponse
+            do {
+                (data, response) = try await URLSession.shared.data(for: req)
+            } catch {
+                await CreditManager.shared.noteAIResponse(nil)   // may have been charged; re-read
+                throw error
+            }
+            guard let http = response as? HTTPURLResponse else { throw LLMError.invalidResponse }
+            await CreditManager.shared.noteAIResponse(http)
+            if http.statusCode == 402 { throw LLMError.insufficientCredits }
+            guard http.statusCode == 200 else {
+                let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                throw LLMError.apiError(statusCode: http.statusCode, message: msg ?? "Server error")
+            }
+            return data
+        }
+    }
+
+    private func serverCaption(title: String, category: String, tasteBlock: String, labels: [String]) async throws -> CaptionResult {
+        await MainActor.run { isGenerating = true; lastError = nil }
+        defer { Task { @MainActor in isGenerating = false } }
+        var prompt = "Style: \(captionStyle.rawValue). \(captionStyle.promptModifier)"
+        if !labels.isEmpty { prompt += "\nWhat's in the photos: \(labels.joined(separator: "; "))" }
+        prompt += userContextBlock(tasteBlock: tasteBlock)
+        let data = try await ServerAI.post("ai-caption", [
+            "dumpTitle": title,
+            "category": category,
+            "userPrompt": prompt,
+        ])
+        guard let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let caps = j["captions"] as? [String], !caps.isEmpty else { throw LLMError.parseFailed }
+        return CaptionResult(dumpTitle: title, captions: caps, vibe: (j["vibe"] as? String) ?? "curated")
+    }
+
+    private func serverChat(dumpTitle: String, dumpPhotos: [ChatPhoto], poolPhotos: [ChatPhoto],
+                            history: [ChatHistoryMessage], message: String, vibe: String?, tasteBlock: String) async throws -> DumpChatResponse {
+        await MainActor.run { isGenerating = true; lastError = nil }
+        defer { Task { @MainActor in isGenerating = false } }
+        func enc(_ p: ChatPhoto) -> [String: String] {
+            ["id": p.id, "url": "", "category": p.category, "alt": p.labels.prefix(3).joined(separator: ", ")]
+        }
+        let data = try await ServerAI.post("ai-chat", [
+            "dumpId": "",
+            "dumpTitle": dumpTitle,
+            "dumpPhotos": dumpPhotos.map(enc),
+            "poolPhotos": poolPhotos.prefix(30).map(enc),
+            "history": history.map { ["role": $0.role, "text": $0.text] },
+            "message": message,
+            "tasteProfile": userContextBlock(tasteBlock: tasteBlock),
+            "vibe": vibe ?? "",
+        ])
+        return parseChatResponse(String(data: data, encoding: .utf8) ?? "")
+    }
+
+    /// /api/ai-suggest — Claude Vision picks the best carousel from pool photos (the server charges
+    /// for it). Photos carry downscaled JPEG data URLs. Returns clusters as photo-id lists.
+    struct SuggestPhoto { let id: String; let dataURL: String; let category: String; let alt: String }
+    struct SuggestCluster { let name: String; let subtitle: String; let photoIds: [String] }
+
+    func serverSuggest(photos: [SuggestPhoto], targetCount: Int?, tasteBlock: String) async throws -> [SuggestCluster] {
+        var body: [String: Any] = [
+            "photos": photos.prefix(20).map { ["id": $0.id, "url": $0.dataURL, "category": $0.category, "alt": $0.alt] },
+            "variation": 0,
+            "tasteBlock": userContextBlock(tasteBlock: tasteBlock),
+        ]
+        if let targetCount { body["targetCount"] = targetCount }
+        let data = try await ServerAI.post("ai-suggest", body, timeout: 90)
+        guard let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let arr = j["clusters"] as? [[String: Any]] else { throw LLMError.parseFailed }
+        return arr.compactMap { c in
+            guard let ids = c["photoIds"] as? [String], !ids.isEmpty else { return nil }
+            return SuggestCluster(name: (c["name"] as? String) ?? "Dump", subtitle: (c["subtitle"] as? String) ?? "", photoIds: ids)
+        }
+    }
+
     // MARK: - Errors
 
     enum LLMError: LocalizedError {
@@ -789,8 +896,8 @@ final class LLMService: ObservableObject {
 
         var errorDescription: String? {
             switch self {
-            case .noAPIKey:                  return "No API key configured. Tap the brain icon to open AI Settings."
-            case .insufficientCredits:       return "Not enough credits. Purchase more to continue."
+            case .noAPIKey:                  return "Sign in to use Dumpster AI, or add your own API key in AI Settings."
+            case .insufficientCredits:       return "You're out of credits. Get more to keep using AI."
             case .encodingFailed:            return "Failed to encode the request."
             case .invalidResponse:           return "Received an invalid response from the API."
             case .parseFailed:               return "Failed to parse the AI response."

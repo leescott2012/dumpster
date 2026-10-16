@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D774F0000000000000000B1 /* VideoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D774F0000000000000000A1 /* VideoSheet.swift */; };
+		D773F0000000000000000B1 /* VideoPoolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D773F0000000000000000A1 /* VideoPoolView.swift */; };
+		D772F0000000000000000B1 /* VideoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D772F0000000000000000A1 /* VideoStore.swift */; };
+		D771F0000000000000000B1 /* VideoItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D771F0000000000000000A1 /* VideoItem.swift */; };
 		0026E79D334EDE569AAA154D /* UndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A26BB7172434E549C9A9D /* UndoManager.swift */; };
 		0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81E7E5BB2905556C06187290 /* DebugSeeder.swift */; };
 		0EFF5AE87F175E278D167941 /* CreditManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BEB2D6552AFB6AB0311814B /* CreditManager.swift */; };
@@ -73,6 +77,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D774F0000000000000000A1 /* VideoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoSheet.swift; sourceTree = "<group>"; };
+		D773F0000000000000000A1 /* VideoPoolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPoolView.swift; sourceTree = "<group>"; };
+		D772F0000000000000000A1 /* VideoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStore.swift; sourceTree = "<group>"; };
+		D771F0000000000000000A1 /* VideoItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoItem.swift; sourceTree = "<group>"; };
 		18FB4008CEC5180C6AC6B7EE /* DumpPhoto.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpPhoto.swift; sourceTree = "<group>"; };
 		202A316C5E1892E09EBE6F49 /* LightboxView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LightboxView.swift; sourceTree = "<group>"; };
 		223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCaptionBubble.swift; sourceTree = "<group>"; };
@@ -163,6 +171,7 @@
 				D5A1000000000000000000A1 /* DumpStyle.swift */,
 				E2E2E2E2F3F3F3F3A4A4A4A4 /* SavedScrub.swift */,
 				CC11DD22EE33FF44AA55BB67 /* DumpChatMessage.swift */,
+				D771F0000000000000000A1 /* VideoItem.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -174,6 +183,8 @@
 				AA01BB02CC03DD04EE05FF07 /* PhotoMenuSheet.swift */,
 				BB11CC22DD33EE44FF550012 /* OnboardingView.swift */,
 				23A5101A689318A2375DE509 /* PoolFilterMenu.swift */,
+				D774F0000000000000000A1 /* VideoSheet.swift */,
+				D773F0000000000000000A1 /* VideoPoolView.swift */,
 				C08A4384BC616EBDE1702D74 /* PhotoPoolView.swift */,
 				A61564A55124AA0946A46F09 /* CaptionPoolView.swift */,
 				D5A1000000000000000000A2 /* DumpStylesCard.swift */,
@@ -200,6 +211,7 @@
 			children = (
 				7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */,
 				C0F40CA50033B8B07FFAC959 /* PhotoStorageManager.swift */,
+				D772F0000000000000000A1 /* VideoStore.swift */,
 				5FAFC6DDDE09CA03CD99446E /* FormulaEngine.swift */,
 				35245FF235DF426CBE4AC3C9 /* AutoGenFilters.swift */,
 				230A26BB7172434E549C9A9D /* UndoManager.swift */,
@@ -366,6 +378,7 @@
 				744D41C3B53C0DD9B32BA428 /* DumpCaption.swift in Sources */,
 				D687086BE070123EAB8776E3 /* Theme.swift in Sources */,
 				EB0D5748896835B99BE96D18 /* PhotoStorageManager.swift in Sources */,
+				D772F0000000000000000B1 /* VideoStore.swift in Sources */,
 				C126023D169A8F06E722B4C4 /* FormulaEngine.swift in Sources */,
 				0026E79D334EDE569AAA154D /* UndoManager.swift in Sources */,
 				AA11BB22CC33DD44EE55FF66 /* HapticManager.swift in Sources */,
@@ -375,6 +388,8 @@
 				AA01BB02CC03DD04EE05FF06 /* PhotoMenuSheet.swift in Sources */,
 				BB11CC22DD33EE44FF550011 /* OnboardingView.swift in Sources */,
 				2E360841D8A252DFB82BE410 /* PoolFilterMenu.swift in Sources */,
+				D774F0000000000000000B1 /* VideoSheet.swift in Sources */,
+				D773F0000000000000000B1 /* VideoPoolView.swift in Sources */,
 				F2651D292FAA7733009E2389 /* DumpMenuSheet.swift in Sources */,
 				F2651D2B2FAA7733009E2389 /* Contentview.swift in Sources */,
 				F2651D2C2FAA7733009E2389 /* LLMService.swift in Sources */,
@@ -395,6 +410,7 @@
 				D5A1000000000000000000B1 /* DumpStyle.swift in Sources */,
 				B5B5B5B5C6C6C6C6D7D7D7D7 /* SavedScrub.swift in Sources */,
 				CC11DD22EE33FF44AA55BB66 /* DumpChatMessage.swift in Sources */,
+				D771F0000000000000000B1 /* VideoItem.swift in Sources */,
 				CC22DD33EE44FF55AA66BB77 /* DumpChatSheet.swift in Sources */,
 				B011D0C00000000000000001 /* AuthManager.swift in Sources */,
 				B011D0C00000000000000002 /* SupabaseClient.swift in Sources */,

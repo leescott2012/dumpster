@@ -469,14 +469,7 @@ struct MainAppView: View {
                         removal: .move(edge: .leading).combined(with: .opacity)
                     ))
             case .videos:
-                // ponytail: native has no Video Pool model yet (no duration/asset list). Videos are device-only, never cloud.
-                VStack(spacing: 10) {
-                    Image(systemName: "play.rectangle").font(.system(size: 36))
-                    Text("Videos stay on this device").font(.system(size: 15, weight: .semibold))
-                    Text("Your videos are never uploaded.").font(.system(size: 12))
-                }
-                .foregroundColor(Theme.text3(appState.colorMode, cs))
-                .frame(maxWidth: .infinity).padding(.vertical, 60)
+                VideoPoolView()
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }

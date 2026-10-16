@@ -12,7 +12,7 @@ struct DumpsterApp: App {
         do {
             container = try ModelContainer(for:
                 DumpPhoto.self, PhotoDump.self, DumpCaption.self,
-                AITasteExample.self, SavedScrub.self, DumpChatMessage.self
+                AITasteExample.self, SavedScrub.self, DumpChatMessage.self, VideoItem.self
             )
             // Wire shared context so AIProfileSync can reach SwiftData without
             // a context being passed on every call.

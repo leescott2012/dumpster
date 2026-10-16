@@ -31,7 +31,8 @@ struct PhotoPoolView: View {
     }
 
     private var filteredPhotos: [DumpPhoto] {
-        var result = allPhotos
+        // Videos live in the device-only Video Pool, never in the photo grid.
+        var result = allPhotos.filter { !VideoStore.isVideoPath($0.localPath) }
 
         if appState.activeFilters.contains(.used) {
             result = result.filter { usedPhotoIDs.contains($0.id) }

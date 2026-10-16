@@ -82,6 +82,8 @@ final class PhotoStorageManager {
     /// Load a UIImage from a relative path produced by saveImage.
     func loadImage(relativePath: String) -> UIImage? {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        // Cloud/AI guard: loadImage feeds AI/label payloads; videos must never flow through here.
+        guard !VideoStore.isVideoPath(relativePath) else { return nil }
         let url = docs.appendingPathComponent(relativePath)
         return UIImage(contentsOfFile: url.path)
     }

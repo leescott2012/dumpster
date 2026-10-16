@@ -16,6 +16,8 @@ struct DumpChatSheet: View {
     @State private var input = ""
     @State private var isLoading = false
     @State private var errorText: String?
+    /// Valet-suggested preferences waiting for the user's Save / Dismiss.
+    @State private var pendingPrefs: [String] = []
 
     private let gold = Color(hex: "#C8A96E")
 
@@ -29,6 +31,7 @@ struct DumpChatSheet: View {
                 photoStrip
                 Divider().background(Color.white.opacity(0.07))
                 messageList
+                pendingPrefsBar
                 inputBar
             }
         }
@@ -272,6 +275,52 @@ struct DumpChatSheet: View {
         }
     }
 
+    // MARK: - Confirm Valet-suggested memories
+
+    @ViewBuilder
+    private var pendingPrefsBar: some View {
+        if !pendingPrefs.isEmpty {
+            VStack(spacing: 6) {
+                ForEach(pendingPrefs, id: \.self) { pref in
+                    HStack(spacing: 8) {
+                        Text("Remember: “\(pref)”?")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(white: 0.85))
+                            .lineLimit(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button("Save") { savePref(pref) }
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(Capsule().fill(gold))
+                        Button("Dismiss") { pendingPrefs.removeAll { $0 == pref } }
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(white: 0.5))
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(white: 0.09)))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(gold.opacity(0.25), lineWidth: 1))
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+        }
+    }
+
+    private func savePref(_ pref: String) {
+        pendingPrefs.removeAll { $0 == pref }
+        switch AITasteExample.appendTastePreference(pref) {
+        case .saved:
+            appState.showStatus("Saved to your Taste Profile")
+            if let userId = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt {
+                AIProfileSync.shared.scheduleSave(userId: userId, jwt: jwt)
+            }
+        case .duplicate: appState.showStatus("Already in your Taste Profile")
+        case .full: appState.showStatus("Taste Profile is full — trim it in Settings first")
+        case .empty: break
+        }
+    }
+
     private var canSend: Bool {
         !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isLoading
     }
@@ -312,7 +361,9 @@ struct DumpChatSheet: View {
                     .dropLast()
                     .map { LLMService.ChatHistoryMessage(role: $0.role, text: $0.text) }
 
-                let taste = AITasteExample.promptBlock(from: tasteExamples)
+                // Full taste block: examples + caption favorites/bans (profile, rules and the
+                // active dump style are added by LLMService.userContextBlock).
+                let taste = AITasteExample.promptBlock(from: tasteExamples) + AITasteExample.captionVoiceBlock()
 
                 let response = try await LLMService.shared.chatWithDump(
                     dumpTitle: dump.title,
@@ -382,10 +433,10 @@ struct DumpChatSheet: View {
                     dump.vibeBadge = vibe
                 }
             case "taste_update":
-                if let pref = action.preference {
-                    let current = UserDefaults.standard.string(forKey: "ai_style_profile") ?? ""
-                    let updated = current.isEmpty ? pref : current + "\n" + pref
-                    UserDefaults.standard.set(updated, forKey: "ai_style_profile")
+                // Never write the model's text straight into the profile — ask first.
+                if let raw = action.preference {
+                    let pref = AITasteExample.cleanTastePreference(raw)
+                    if !pref.isEmpty && !pendingPrefs.contains(pref) { pendingPrefs.append(pref) }
                 }
             default:
                 break
@@ -530,7 +581,7 @@ private struct MessageBubble: View {
             case "swap_in":      return ActionChip(icon: "arrow.down.to.line", label: "Added from pool", color: Color(hex: "#4ADE80"))
             case "swap_out":     return ActionChip(icon: "arrow.up.forward", label: "Sent to pool", color: Color(hex: "#F97316"))
             case "update_vibe":  return ActionChip(icon: "paintpalette", label: "Vibe updated", color: Color(hex: "#A78BFA"))
-            case "taste_update": return ActionChip(icon: "brain", label: "Remembered", color: Color(hex: "#6EE7B7"))
+            case "taste_update": return ActionChip(icon: "brain", label: "Suggested memory", color: Color(hex: "#6EE7B7"))
             default:             return nil
             }
         }

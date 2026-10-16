@@ -11,7 +11,9 @@ struct DumpCaptionBubble: View {
 
     @EnvironmentObject var appState: AppState
     @Environment(\.colorScheme) private var cs
+    var dumpTitle: String = ""
     @State private var copiedIndex: Int?
+    @State private var savedLine = false
     @State private var dragY: CGFloat = 0
 
     var body: some View {
@@ -66,6 +68,14 @@ struct DumpCaptionBubble: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
 
+            if savedLine {
+                Text("Copied · Saved to \(dumpTitle.isEmpty ? result.dumpTitle : dumpTitle)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(appState.accentColor)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
+            }
+
             Divider()
                 .background(Theme.border(appState.colorMode, cs))
 
@@ -94,6 +104,7 @@ struct DumpCaptionBubble: View {
         Button {
             UIPasteboard.general.string = text
             onSaveCaption?(text)
+            savedLine = onSaveCaption != nil
             withAnimation(.easeOut(duration: 0.15)) { copiedIndex = idx }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
                 if copiedIndex == idx { copiedIndex = nil }

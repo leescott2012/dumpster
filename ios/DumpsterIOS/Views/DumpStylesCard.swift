@@ -4,6 +4,9 @@ import SwiftUI
 /// Every edit / activate / delete persists locally and calls scheduleCloudSync().
 struct DumpStylesCard: View {
     private let gold = Color(hex: "#C8A96E")
+    /// Optional — when present, activating/deactivating a style also flashes the header status.
+    var appState: AppState? = nil
+    static let usedBy = "Used by Captions and the Valet"   // web: DUMP_STYLE_USED_BY (Auto-arrange is on-device here)
 
     @State private var styles = DumpStyle.load()
     @State private var activeId = DumpStyle.activeId()
@@ -28,11 +31,14 @@ struct DumpStylesCard: View {
             FlowLayout(spacing: 6) {
                 chip("None", on: activeId.isEmpty) { activate("") }
                 ForEach(styles) { s in
-                    chip((s.name.isEmpty ? "Untitled" : s.name) + (s.id == activeId ? " · Active" : ""),
-                         on: s.id == activeId) { activate(s.id) }
+                    chip(s.name.isEmpty ? "Untitled" : s.name, on: s.id == activeId, active: s.id == activeId) { activate(s.id) }
                 }
                 chip("+ New style", on: false, dashed: true) { addStyle() }
             }
+
+            Text(Self.usedBy)
+                .font(.system(size: 10))
+                .foregroundColor(.white.opacity(0.35))
 
             if let idx = styles.firstIndex(where: { $0.id == editId }) {
                 field("Name", text: binding(idx, \.name), height: 36)
@@ -56,6 +62,17 @@ struct DumpStylesCard: View {
         if !id.isEmpty { editId = id }
         confirmDelete = false
         scheduleCloudSync()
+        // Confirmation toast (web: "<name> style on" / "Dump style off").
+        let name = styles.first(where: { $0.id == id })?.name ?? ""
+        let msg = id.isEmpty ? "Dump style off" : "\(name.isEmpty ? "Untitled" : name) style on"
+        appState?.showStatus(msg)
+        status = msg
+        statusTask?.cancel()
+        statusTask = Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard !Task.isCancelled else { return }
+            status = ""
+        }
     }
 
     private func addStyle() {
@@ -80,7 +97,9 @@ struct DumpStylesCard: View {
             get: { idx < styles.count ? styles[idx][keyPath: kp] : "" },
             set: { v in
                 guard idx < styles.count else { return }
-                styles[idx][keyPath: kp] = v
+                // Same caps as web's maxLength on the style editors.
+                let cap = kp == \DumpStyle.rules ? AIProfileLimits.aiRulesMax : (kp == \DumpStyle.profile ? AIProfileLimits.tasteProfileMax : 80)
+                styles[idx][keyPath: kp] = String(v.prefix(cap))
                 styles[idx].updatedAt = DumpStyle.nowISO()
                 persist()
             }
@@ -109,9 +128,18 @@ struct DumpStylesCard: View {
 
     // MARK: - Pieces
 
-    private func chip(_ title: String, on: Bool, dashed: Bool = false, action: @escaping () -> Void) -> some View {
+    private func chip(_ title: String, on: Bool, dashed: Bool = false, active: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
+            HStack(spacing: 6) {
+                Text(title)
+                if active {
+                    Text("ACTIVE")
+                        .font(.system(size: 8, weight: .heavy)).tracking(1)
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(Capsule().fill(gold))
+                }
+            }
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(on ? .white : .white.opacity(0.6))
                 .padding(.horizontal, 10).padding(.vertical, 6)
@@ -120,6 +148,7 @@ struct DumpStylesCard: View {
                                           style: StrokeStyle(lineWidth: 1, dash: dashed ? [3] : [])))
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     private func field(_ placeholder: String, text: Binding<String>, height: CGFloat) -> some View {

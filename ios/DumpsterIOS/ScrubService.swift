@@ -88,12 +88,25 @@ final class ScrubService {
             "resultsLimit": resultsLimit
         ])
 
-        let (data, response) = try await URLSession.shared.data(for: req)
-
-        guard let http = response as? HTTPURLResponse else {
-            throw ScrubError(message: "Network error.")
+        let data: Data, response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch {
+            await CreditManager.shared.noteAIResponse(nil)   // may have been charged; re-read
+            throw error
         }
 
+        guard let http = response as? HTTPURLResponse else {
+            await CreditManager.shared.noteAIResponse(nil)
+            throw ScrubError(message: "Network error.")
+        }
+        // 2xx: balance from X-Credits-Remaining. Anything else (402 insufficient, or a
+        // failure the server refunds after responding): re-read now and in ~2.5s.
+        await CreditManager.shared.noteAIResponse(http)
+
+        if http.statusCode == 402 {
+            throw ScrubError(message: "Not enough credits for an Instagram scrub (\(CreditManager.Cost.igScrub) credits). Get more credits and try again.")
+        }
         if http.statusCode != 200 {
             let detail = Self.extractError(from: data) ?? "Unknown error (HTTP \(http.statusCode))"
             throw ScrubError(message: detail)
@@ -177,6 +190,7 @@ final class LabelService {
         let id: String
         let category: String
         let label: String
+        let confidence: Double?
     }
     private struct LabelResponse: Codable { let labels: [LabelResult] }
 
@@ -185,42 +199,64 @@ final class LabelService {
         var errorDescription: String? { message }
     }
 
-    /// Label photos by Documents-relative path. Per-batch failures (network
-    /// blip, rate limit, one bad image) are swallowed rather than thrown —
-    /// a failure in batch 2 of 3 must not discard batch 1's already-succeeded
-    /// results and force every photo in the pool back to the Vision fallback.
-    /// Missing ids in the returned array (skipped thumbnail, or a batch that
-    /// failed outright) are the caller's signal to fall back for just those.
-    func label(photos: [(id: String, relativePath: String)], jwt: String) async -> [LabelResult] {
-        var results: [LabelResult] = []
+    enum Outcome {
+        case ok([LabelResult])
+        /// 402 / 429 / 503 — out of credits, burst/daily cap, or budget. `daily` = long back-off.
+        case quota(daily: Bool)
+        case failed
+    }
+
+    /// One /api/ai-label request. `auto` = the free, server-capped auto-label path
+    /// (no credits); `audit` = independent second look. Only { id, url } is sent —
+    /// no EXIF/GPS. Callers must never pass video files.
+    func request(photos: [(id: String, relativePath: String)], jwt: String, auto: Bool, audit: Bool) async -> Outcome {
         var batch: [[String: String]] = []
-
-        func flush() async {
-            guard !batch.isEmpty else { return }
-            defer { batch.removeAll() }
-            let url = baseURL.appendingPathComponent("api/ai-label")
-            var req = URLRequest(url: url)
-            req.httpMethod = "POST"
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-            do {
-                req.httpBody = try JSONSerialization.data(withJSONObject: ["photos": batch])
-                let (data, response) = try await URLSession.shared.data(for: req)
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                    return // this batch's photos stay unresolved -- caller falls back for them
-                }
-                results.append(contentsOf: try JSONDecoder().decode(LabelResponse.self, from: data).labels)
-            } catch {
-                return // network/encode/decode failure -- same, only this batch is affected
-            }
-        }
-
         for photo in photos {
             guard let dataUrl = Self.jpegDataURL(relativePath: photo.relativePath) else { continue }
             batch.append(["id": photo.id, "url": dataUrl])
-            if batch.count == Self.batchSize { await flush() }
         }
-        await flush()
+        guard !batch.isEmpty else { return .ok([]) }
+        var req = URLRequest(url: baseURL.appendingPathComponent("api/ai-label"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        var body: [String: Any] = ["photos": batch]
+        if auto { body["auto"] = true }
+        if audit { body["audit"] = true }
+        do {
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else { return .failed }
+            if !auto { await CreditManager.shared.noteAIResponse(http) }   // paid path only
+            if [402, 429, 503].contains(http.statusCode) {
+                let code = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["code"] as? String
+                return .quota(daily: code != "rate_limit_exceeded")
+            }
+            guard http.statusCode == 200 else { return .failed }
+            return .ok(try JSONDecoder().decode(LabelResponse.self, from: data).labels)
+        } catch {
+            if !auto { await CreditManager.shared.noteAIResponse(nil) }
+            return .failed
+        }
+    }
+
+    /// Paid Scan: label photos by Documents-relative path in batches. Per-batch
+    /// failures (network blip, 402, one bad image) are swallowed rather than thrown —
+    /// a failure in batch 2 of 3 must not discard batch 1's already-succeeded
+    /// results and force every photo back to the Vision fallback. Missing ids in the
+    /// returned array are the caller's signal to fall back for just those.
+    func label(photos: [(id: String, relativePath: String)], jwt: String) async -> [LabelResult] {
+        var results: [LabelResult] = []
+        var i = 0
+        while i < photos.count {
+            let chunk = Array(photos[i..<min(i + Self.batchSize, photos.count)])
+            i += Self.batchSize
+            switch await request(photos: chunk, jwt: jwt, auto: false, audit: false) {
+            case .ok(let r): results.append(contentsOf: r)
+            case .quota: return results   // out of credits — stop spending, caller falls back
+            case .failed: continue
+            }
+        }
         return results
     }
 

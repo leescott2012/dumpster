@@ -96,6 +96,12 @@ struct AISuggestView: View {
         min(20, filteredPhotos.count)
     }
 
+    /// Name of the active Dump Style, nil when none/stale id.
+    private var activeStyleName: String? {
+        guard !activeStyleId.isEmpty, let s = dumpStyles.first(where: { $0.id == activeStyleId }) else { return nil }
+        return s.name.isEmpty ? "Untitled" : s.name
+    }
+
     private var poolHintText: String {
         if filters.isEmpty {
             return "\(availablePhotos.count) photo\(availablePhotos.count == 1 ? "" : "s") in pool"
@@ -116,6 +122,15 @@ struct AISuggestView: View {
                         .foregroundColor(gold)
 
                     Spacer()
+
+                    if let name = activeStyleName {
+                        Text("STYLE · \(name.uppercased())")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1)
+                            .foregroundColor(gold)
+                            .lineLimit(1)
+                            .accessibilityLabel("Dump style \(name) is on")
+                    }
 
                     if let provider = llmService.preferredProvider() {
                         HStack(spacing: 4) {
@@ -314,6 +329,8 @@ struct AISuggestView: View {
                         .tint(gold)
                         .onChange(of: activeStyleId) { _, id in
                             UserDefaults.standard.set(id, forKey: DumpStyle.activeKey)
+                            let name = dumpStyles.first(where: { $0.id == id })?.name ?? ""
+                            appState.showStatus(id.isEmpty ? "Dump style off" : "\(name.isEmpty ? "Untitled" : name) style on")
                             if let userId = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt {
                                 AIProfileSync.shared.scheduleSave(userId: userId, jwt: jwt)
                             }
@@ -321,6 +338,9 @@ struct AISuggestView: View {
                     }
                     .padding(.horizontal, 32)
                     .padding(.top, 8)
+                    Text(DumpStylesCard.usedBy)
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.3))
                 }
 
                 AutoGenAdvancedView(

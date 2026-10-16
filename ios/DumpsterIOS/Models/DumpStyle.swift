@@ -1,5 +1,12 @@
 import Foundation
 
+/// Mirrors TASTE_PROFILE_MAX / AI_RULES_MAX / TASTE_PREF_MAX in client/src/lib/captionPool.ts.
+enum AIProfileLimits {
+    static let tasteProfileMax = 2000
+    static let aiRulesMax = 1500
+    static let tastePrefMax = 160
+}
+
 /// Named, reusable dump recipe. Port of DumpStyle in client/src/lib/captionPool.ts.
 /// Persisted as JSON in UserDefaults ("dump_styles") + active id ("active_dump_style"),
 /// synced via AIProfileSync (user_ai_profile.dump_styles / active_dump_style).

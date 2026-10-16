@@ -507,7 +507,7 @@ struct AISettingsTabView: View {
 
             // Dump Styles
             CabinetSectionHeader("DUMP STYLES", icon: "square.stack.3d.up")
-            DumpStylesCard()
+            DumpStylesCard(appState: appState)
                 .padding(.horizontal, 24)
 
             // Active Provider Status
@@ -565,7 +565,7 @@ struct AISettingsTabView: View {
             HStack(spacing: 8) {
                 generateFromInstagramButton
                 Spacer()
-                Text("\(styleProfile.count)/750")
+                Text("\(styleProfile.count)/\(AIProfileLimits.tasteProfileMax)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(tertiaryText)
             }
@@ -595,6 +595,10 @@ struct AISettingsTabView: View {
             .background(RoundedRectangle(cornerRadius: 10).fill(cardFill))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(cardBorder, lineWidth: 1))
             .onChange(of: styleProfile) { _, newVal in
+                if newVal.count > AIProfileLimits.tasteProfileMax {
+                    styleProfile = String(newVal.prefix(AIProfileLimits.tasteProfileMax))
+                    return
+                }
                 guard !activeScrubId.isEmpty else {
                     scheduleCloudSync()
                     return
@@ -690,6 +694,10 @@ struct AISettingsTabView: View {
         guard !trimmed.isEmpty else { return }
         var current = rulesList
         current.append(trimmed)
+        guard current.joined(separator: "\n").count <= AIProfileLimits.aiRulesMax else {
+            HapticManager.shared.playRemove()   // full — web caps rules at AI_RULES_MAX
+            return
+        }
         writeRules(current)
         draftRule = ""
         HapticManager.shared.playAdded()
@@ -756,7 +764,7 @@ struct AISettingsTabView: View {
                     .transition(.opacity)
                 }
                 Spacer()
-                Text("\(rulesList.count) RULE\(rulesList.count == 1 ? "" : "S")")
+                Text("\(rulesList.count) RULE\(rulesList.count == 1 ? "" : "S") · \(aiRules.count)/\(AIProfileLimits.aiRulesMax)")
                     .font(.system(size: 10, weight: .heavy, design: .monospaced))
                     .tracking(1.2)
                     .foregroundColor(tertiaryText)
@@ -890,7 +898,7 @@ struct AISettingsTabView: View {
             return
         }
         HapticManager.shared.playSuccess()
-        styleProfile = String(scrub.styleDescription.prefix(750))
+        styleProfile = String(scrub.styleDescription.prefix(AIProfileLimits.tasteProfileMax))
         engagementPlaybook = String(scrub.engagementPlaybook.prefix(750))
         activeScrubId = scrub.id
     }

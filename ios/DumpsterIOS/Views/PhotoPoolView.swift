@@ -132,26 +132,14 @@ struct PhotoPoolView: View {
                     .font(.system(size: 13))
                     .foregroundColor(Theme.text2(appState.colorMode, cs))
                 Spacer()
-                Button {
-                    rescanAll()
-                } label: {
-                    HStack(spacing: 5) {
-                        if isRescanning {
-                            ProgressView().scaleEffect(0.6).tint(appState.accentColor)
-                        }
-                        Text(isRescanning ? "Scanning…" : "Rescan All")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(isRescanning ? Theme.text2(appState.colorMode, cs) : Theme.text(appState.colorMode, cs))
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(Theme.bg2(appState.colorMode, cs))
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                }
-                .disabled(isRescanning)
+                ScanButton(isRescanning: isRescanning) { rescanAll(useServer: $0) }
             }
             .padding(.horizontal, 14)
             .padding(.top, 2)
+
+            LabelHealthChip()
+                .padding(.horizontal, 14)
+                .padding(.top, 4)
         }
         .padding(.top, 4)
         .confirmationDialog("Photo Pool", isPresented: $showPoolMenu) {
@@ -241,19 +229,24 @@ struct PhotoPoolView: View {
     /// Re-label every photo. Primary: /api/ai-label (Claude — same specific
     /// labels as web Scan; costs credits, needs sign-in). Fallback when signed
     /// out, offline, or out of credits: on-device Apple Vision.
-    private func rescanAll() {
+    private func rescanAll(useServer: Bool = true) {
         guard !allPhotos.isEmpty, !isRescanning else { return }
         isRescanning = true
-        let items = allPhotos.map { (id: $0.id, relativePath: $0.localPath) }
-        let jwt = AuthManager.shared.jwt
+        // Videos never go to AI; user-set labels are never overwritten.
+        let eligible = allPhotos.filter {
+            !LabelPhoto(id: $0.id, path: $0.localPath, category: $0.category, alt: "").isVideo
+                && !LabelHealthManager.shared.isUserOwned($0.id)
+        }
+        let items = eligible.map { (id: $0.id, relativePath: $0.localPath) }
+        let jwt = useServer ? AuthManager.shared.jwt : nil
 
         Task {
             var results: [String: (category: String, labels: [String])] = [:]
 
             if let jwt {
-                for r in await LabelService.shared.label(photos: items, jwt: jwt) {
-                    results[r.id] = (r.category, [r.label])
-                }
+                let server = await LabelService.shared.label(photos: items, jwt: jwt)
+                for r in server { results[r.id] = (r.category, [r.label]) }
+                await LabelHealthManager.shared.noteScan(server)
             }
 
             // Fallback only for photos LabelService didn't resolve (offline,

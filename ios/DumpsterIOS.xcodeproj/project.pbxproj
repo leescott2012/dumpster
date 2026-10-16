@@ -10,6 +10,7 @@
 		0026E79D334EDE569AAA154D /* UndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A26BB7172434E549C9A9D /* UndoManager.swift */; };
 		0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81E7E5BB2905556C06187290 /* DebugSeeder.swift */; };
 		0EFF5AE87F175E278D167941 /* CreditManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BEB2D6552AFB6AB0311814B /* CreditManager.swift */; };
+		AA11000000000000000000A2 /* LabelHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000000000000A1 /* LabelHealth.swift */; };
 		1E84D1DFE6FF62704A4DA1A7 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 942EA7AB9A670BD8CC090DEF /* PaywallView.swift */; };
 		2E360841D8A252DFB82BE410 /* PoolFilterMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A5101A689318A2375DE509 /* PoolFilterMenu.swift */; };
 		3CCDDD9C8209A2FF11975B67 /* PhotoCropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B29D6079112B364B7740AA /* PhotoCropView.swift */; };
@@ -25,6 +26,7 @@
 		925E6F2365D0473D98F167C5 /* ConfettiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA341A66087474A8CB27607 /* ConfettiView.swift */; };
 		9E2EED52E28C46B9AE8D816E /* DumpFlipIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */; };
 		9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */; };
+		AA11000000000000000000B2 /* LabelHealthSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000000000000B1 /* LabelHealthSheet.swift */; };
 		D5A1000000000000000000B1 /* DumpStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A1000000000000000000A1 /* DumpStyle.swift */; };
 		A1A2A3A4B5B6B7B8C9C0D1D2 /* AITasteExample.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E2E3E4F5F6A7A8B9B0C1C2 /* AITasteExample.swift */; };
 		AA01BB02CC03DD04EE05FF06 /* PhotoMenuSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01BB02CC03DD04EE05FF07 /* PhotoMenuSheet.swift */; };
@@ -76,6 +78,7 @@
 		18FB4008CEC5180C6AC6B7EE /* DumpPhoto.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpPhoto.swift; sourceTree = "<group>"; };
 		202A316C5E1892E09EBE6F49 /* LightboxView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LightboxView.swift; sourceTree = "<group>"; };
 		223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCaptionBubble.swift; sourceTree = "<group>"; };
+		AA11000000000000000000B1 /* LabelHealthSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LabelHealthSheet.swift; sourceTree = "<group>"; };
 		230A26BB7172434E549C9A9D /* UndoManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UndoManager.swift; sourceTree = "<group>"; };
 		23A5101A689318A2375DE509 /* PoolFilterMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PoolFilterMenu.swift; sourceTree = "<group>"; };
 		36E61C275F679BEBC565B6B8 /* PhotoDump.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoDump.swift; sourceTree = "<group>"; };
@@ -83,6 +86,7 @@
 		473F28E8A98C2B5E91A4C4CA /* DumpCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCardView.swift; sourceTree = "<group>"; };
 		4B4FBAB204DBA8CB45149F47 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4BEB2D6552AFB6AB0311814B /* CreditManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CreditManager.swift; sourceTree = "<group>"; };
+		AA11000000000000000000A1 /* LabelHealth.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LabelHealth.swift; sourceTree = "<group>"; };
 		5FAFC6DDDE09CA03CD99446E /* FormulaEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FormulaEngine.swift; sourceTree = "<group>"; };
 		6773F78BA7CBCB0A7D7DE45E /* SpotlightTutorialView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpotlightTutorialView.swift; sourceTree = "<group>"; };
 		6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -183,6 +187,7 @@
 				F3115232C67E460CA16F1007 /* Dump3DCarouselView.swift */,
 				AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */,
 				223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */,
+				AA11000000000000000000B1 /* LabelHealthSheet.swift */,
 				702838F65FF68DD79CFE568A /* MainAppView.swift */,
 				6773F78BA7CBCB0A7D7DE45E /* SpotlightTutorialView.swift */,
 				FF33EE44FF55006677889900 /* ScrubInstagramSheet.swift */,
@@ -230,6 +235,7 @@
 				4B4FBAB204DBA8CB45149F47 /* Info.plist */,
 				6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */,
 				4BEB2D6552AFB6AB0311814B /* CreditManager.swift */,
+				AA11000000000000000000A1 /* LabelHealth.swift */,
 				C1C2C3C4D5D6E7E8F9F0A1A2 /* SubscriptionManager.swift */,
 				E1E2E3E4F5F6A7A8B9B0C1C3 /* CrashReporter.swift */,
 				942EA7AB9A670BD8CC090DEF /* PaywallView.swift */,
@@ -356,6 +362,7 @@
 				F2690B2C2FA5BC44000AA4F6 /* SettingsView.swift in Sources */,
 				F2690B2D2FA5BC44000AA4F6 /* CaptionService.swift in Sources */,
 				0EFF5AE87F175E278D167941 /* CreditManager.swift in Sources */,
+				AA11000000000000000000A2 /* LabelHealth.swift in Sources */,
 				B1B2B3B4C5C6D7D8E9E0F1F2 /* SubscriptionManager.swift in Sources */,
 				D1D2D3D4E5E6F7F8A9A0B1B2 /* CrashReporter.swift in Sources */,
 				1E84D1DFE6FF62704A4DA1A7 /* PaywallView.swift in Sources */,
@@ -388,6 +395,7 @@
 				E23526264EAF4A65A1FB719B /* Dump3DCarouselView.swift in Sources */,
 				9E2EED52E28C46B9AE8D816E /* DumpFlipIntroView.swift in Sources */,
 				9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */,
+				AA11000000000000000000B2 /* LabelHealthSheet.swift in Sources */,
 				710B8108FF1ED0318E925C2D /* MainAppView.swift in Sources */,
 				0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */,
 				4FA9614A1AC84564DABB074C /* SpotlightTutorialView.swift in Sources */,

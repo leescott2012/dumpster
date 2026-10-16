@@ -387,6 +387,9 @@ final class LLMService: ObservableObject {
         if !rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             parts.append("Rules you MUST follow:\n\(rules.trimmingCharacters(in: .whitespacesAndNewlines))")
         }
+        if let styleBlock = DumpStyle.activeBlock() {
+            parts.append(styleBlock)
+        }
         if !tasteBlock.isEmpty {
             parts.append(tasteBlock)
         }

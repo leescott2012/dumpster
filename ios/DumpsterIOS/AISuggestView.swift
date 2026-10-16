@@ -63,6 +63,8 @@ struct AISuggestView: View {
     // MARK: - Advanced filters (NATIVE_PORT.md §C — port of web's AutoGenAdvanced.tsx)
     @State private var filters: AutoGenFilters = .empty
     @State private var advancedFiltersOpen = false
+    @State private var dumpStyles = DumpStyle.load()
+    @State private var activeStyleId = DumpStyle.activeId()
 
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
@@ -298,6 +300,28 @@ struct AISuggestView: View {
                     }
                 }
                 .padding(.horizontal, 32)
+
+                if !dumpStyles.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("Style")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.5))
+                        Picker("Style", selection: $activeStyleId) {
+                            Text("None").tag("")
+                            ForEach(dumpStyles) { Text($0.name.isEmpty ? "Untitled" : $0.name).tag($0.id) }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(gold)
+                        .onChange(of: activeStyleId) { _, id in
+                            UserDefaults.standard.set(id, forKey: DumpStyle.activeKey)
+                            if let userId = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt {
+                                AIProfileSync.shared.scheduleSave(userId: userId, jwt: jwt)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.top, 8)
+                }
 
                 AutoGenAdvancedView(
                     filters: $filters,

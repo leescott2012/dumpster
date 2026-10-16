@@ -25,6 +25,7 @@
 		925E6F2365D0473D98F167C5 /* ConfettiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA341A66087474A8CB27607 /* ConfettiView.swift */; };
 		9E2EED52E28C46B9AE8D816E /* DumpFlipIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */; };
 		9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */; };
+		D5A1000000000000000000B1 /* DumpStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A1000000000000000000A1 /* DumpStyle.swift */; };
 		A1A2A3A4B5B6B7B8C9C0D1D2 /* AITasteExample.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E2E3E4F5F6A7A8B9B0C1C2 /* AITasteExample.swift */; };
 		AA01BB02CC03DD04EE05FF06 /* PhotoMenuSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01BB02CC03DD04EE05FF07 /* PhotoMenuSheet.swift */; };
 		AA11BB22CC33DD44EE55FF66 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF11EE22DD33CC44BB55AA66 /* HapticManager.swift */; };
@@ -59,6 +60,7 @@
 		E23526264EAF4A65A1FB719B /* Dump3DCarouselView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3115232C67E460CA16F1007 /* Dump3DCarouselView.swift */; };
 		EB0D5748896835B99BE96D18 /* PhotoStorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F40CA50033B8B07FFAC959 /* PhotoStorageManager.swift */; };
 		EC83CE521C6FFA186F28F215 /* AppEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1EFF72D39C18BA5DBDEF2 /* AppEnums.swift */; };
+		D5A1000000000000000000B2 /* DumpStylesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A1000000000000000000A2 /* DumpStylesCard.swift */; };
 		F09412A62E2FB43EFB3E4BF4 /* CaptionPoolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61564A55124AA0946A46F09 /* CaptionPoolView.swift */; };
 		F2651D292FAA7733009E2389 /* DumpMenuSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2651D262FAA7733009E2389 /* DumpMenuSheet.swift */; };
 		F2651D2B2FAA7733009E2389 /* Contentview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2651D252FAA7733009E2389 /* Contentview.swift */; };
@@ -96,6 +98,7 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AISuggestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISuggestView.swift; sourceTree = "<group>"; };
 		35245FF235DF426CBE4AC3C9 /* AutoGenFilters.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoGenFilters.swift; sourceTree = "<group>"; };
 		98621440A0F44C6DA46AFACB /* AutoGenAdvancedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoGenAdvancedView.swift; sourceTree = "<group>"; };
+		D5A1000000000000000000A2 /* DumpStylesCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpStylesCard.swift; sourceTree = "<group>"; };
 		A61564A55124AA0946A46F09 /* CaptionPoolView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptionPoolView.swift; sourceTree = "<group>"; };
 		AA01BB02CC03DD04EE05FF07 /* PhotoMenuSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoMenuSheet.swift; sourceTree = "<group>"; };
 		AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpFlipIntroView.swift; sourceTree = "<group>"; };
@@ -120,6 +123,7 @@
 		D0C0FFEE000000000000000B /* PhotoEXIF.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoEXIF.swift; sourceTree = "<group>"; };
 		D4E1EFF72D39C18BA5DBDEF2 /* AppEnums.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppEnums.swift; sourceTree = "<group>"; };
 		DBEC3288F059A41256981069 /* PhotoCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoCardView.swift; sourceTree = "<group>"; };
+		D5A1000000000000000000A1 /* DumpStyle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpStyle.swift; sourceTree = "<group>"; };
 		E1E2E3E4F5F6A7A8B9B0C1C2 /* AITasteExample.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AITasteExample.swift; sourceTree = "<group>"; };
 		E1E2E3E4F5F6A7A8B9B0C1C3 /* CrashReporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CrashReporter.swift; sourceTree = "<group>"; };
 		E2E2E2E2F3F3F3F3A4A4A4A4 /* SavedScrub.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SavedScrub.swift; sourceTree = "<group>"; };
@@ -156,6 +160,7 @@
 				36E61C275F679BEBC565B6B8 /* PhotoDump.swift */,
 				6F80D6842A3F2E2562A0926D /* DumpCaption.swift */,
 				E1E2E3E4F5F6A7A8B9B0C1C2 /* AITasteExample.swift */,
+				D5A1000000000000000000A1 /* DumpStyle.swift */,
 				E2E2E2E2F3F3F3F3A4A4A4A4 /* SavedScrub.swift */,
 				CC11DD22EE33FF44AA55BB67 /* DumpChatMessage.swift */,
 			);
@@ -171,6 +176,7 @@
 				23A5101A689318A2375DE509 /* PoolFilterMenu.swift */,
 				C08A4384BC616EBDE1702D74 /* PhotoPoolView.swift */,
 				A61564A55124AA0946A46F09 /* CaptionPoolView.swift */,
+				D5A1000000000000000000A2 /* DumpStylesCard.swift */,
 				473F28E8A98C2B5E91A4C4CA /* DumpCardView.swift */,
 				202A316C5E1892E09EBE6F49 /* LightboxView.swift */,
 				7FA341A66087474A8CB27607 /* ConfettiView.swift */,
@@ -375,6 +381,7 @@
 				F2651D2D2FAA7733009E2389 /* ResponsiveGrid.swift in Sources */,
 				8D6DA427EE2682893A8F3B19 /* PhotoPoolView.swift in Sources */,
 				F09412A62E2FB43EFB3E4BF4 /* CaptionPoolView.swift in Sources */,
+				D5A1000000000000000000B2 /* DumpStylesCard.swift in Sources */,
 				DBF61DCC27BD7EFC2BECBD43 /* DumpCardView.swift in Sources */,
 				E0A7AAA1E3B6AAA770B95DF1 /* LightboxView.swift in Sources */,
 				925E6F2365D0473D98F167C5 /* ConfettiView.swift in Sources */,
@@ -385,6 +392,7 @@
 				0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */,
 				4FA9614A1AC84564DABB074C /* SpotlightTutorialView.swift in Sources */,
 				A1A2A3A4B5B6B7B8C9C0D1D2 /* AITasteExample.swift in Sources */,
+				D5A1000000000000000000B1 /* DumpStyle.swift in Sources */,
 				B5B5B5B5C6C6C6C6D7D7D7D7 /* SavedScrub.swift in Sources */,
 				CC11DD22EE33FF44AA55BB66 /* DumpChatMessage.swift in Sources */,
 				CC22DD33EE44FF55AA66BB77 /* DumpChatSheet.swift in Sources */,

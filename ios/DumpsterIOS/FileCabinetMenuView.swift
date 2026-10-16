@@ -505,6 +505,11 @@ struct AISettingsTabView: View {
             aiRulesCard
                 .padding(.horizontal, 24)
 
+            // Dump Styles
+            CabinetSectionHeader("DUMP STYLES", icon: "square.stack.3d.up")
+            DumpStylesCard()
+                .padding(.horizontal, 24)
+
             // Active Provider Status
             activeProviderBanner
 

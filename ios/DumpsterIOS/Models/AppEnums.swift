@@ -28,5 +28,5 @@ enum FilterType: String, CaseIterable, Identifiable {
 }
 
 enum PoolTab: String {
-    case photos, captions
+    case photos, captions, videos
 }

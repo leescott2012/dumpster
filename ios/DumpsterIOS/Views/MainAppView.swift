@@ -23,6 +23,7 @@ struct MainAppView: View {
     @Query(sort: \AITasteExample.createdAt, order: .reverse) private var tasteExamples: [AITasteExample]
 
     @State private var poolTabSegmentWidth: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pillDragOffset: CGFloat = 0
     @State private var isDraggingPill: Bool = false
     @State private var showArchived: Bool = false
@@ -368,8 +369,11 @@ struct MainAppView: View {
     // MARK: - Pool tab switcher
 
     private var poolTabSwitcher: some View {
-        let tabs: [(String, PoolTab)] = [("PHOTOS", .photos), ("CAPTIONS", .captions)]
-        let selectedIndex = appState.activePoolTab == .photos ? 0 : 1
+        let tabs: [(String, String, PoolTab)] = [
+            ("Photos", "photo", .photos), ("Captions", "textformat", .captions), ("Videos", "play.rectangle", .videos)
+        ]
+        let selectedIndex = tabs.firstIndex { $0.2 == appState.activePoolTab } ?? 0
+        let snap: Animation? = reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.7)
 
         return GeometryReader { geo in
             let inset: CGFloat = 4
@@ -379,57 +383,49 @@ struct MainAppView: View {
             let liveOffset = min(maxOffset, max(inset, baseOffset + pillDragOffset))
 
             ZStack(alignment: .leading) {
-                // Track background
-                Capsule().fill(Theme.bg2(appState.colorMode, cs))
+                RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.bg2(appState.colorMode, cs))
 
-                // Sliding highlight — follows finger while dragging, snaps on release
-                Capsule()
-                    .fill(appState.accentColor.opacity(0.18))
-                    .overlay(
-                        Capsule().stroke(appState.accentColor.opacity(0.5), lineWidth: 1)
-                    )
+                // Gold-outlined thumb: follows finger 1:1 while dragging, springs on release
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.white.opacity(0.08))
+                    .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .stroke(Theme.gold, lineWidth: 1.5))
                     .frame(width: max(0, segWidth), height: geo.size.height - inset * 2)
                     .offset(x: liveOffset)
-                    .animation(isDraggingPill ? nil : .spring(response: 0.45, dampingFraction: 0.78),
-                               value: liveOffset)
+                    .animation(isDraggingPill ? nil : snap, value: liveOffset)
 
-                // Tappable labels on top
                 HStack(spacing: 0) {
                     ForEach(Array(tabs.enumerated()), id: \.offset) { _, item in
-                        let isSel = appState.activePoolTab == item.1
-                        Button { switchPoolTab(to: item.1) } label: {
-                            Text(item.0)
-                                .font(.system(size: 12, weight: .heavy))
-                                .tracking(1.8)
-                                .foregroundColor(isSel ? appState.accentColor : Theme.text3(appState.colorMode, cs))
-                                .animation(.easeInOut(duration: 0.2), value: isSel)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .contentShape(Rectangle())
+                        let isSel = appState.activePoolTab == item.2
+                        VStack(spacing: 2) {
+                            Image(systemName: item.1).font(.system(size: 17, weight: .semibold))
+                            Text(item.0).font(.system(size: 9, weight: .bold))
                         }
-                        .buttonStyle(.plain)
+                        .foregroundColor(isSel ? Theme.gold : Theme.text3(appState.colorMode, cs))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(item.0)
+                        .accessibilityAddTraits(isSel ? [.isButton, .isSelected] : .isButton)
+                        .accessibilityAction { switchPoolTab(to: item.2) }
                     }
                 }
             }
-            .overlay(
-                Capsule().stroke(Color.white.opacity(0.06), lineWidth: 1)
-            )
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            .contentShape(Rectangle())
+            // minimumDistance 0 handles taps too (a tap = zero-travel drag snaps to the tapped segment).
+            // Horizontal-only pill, so vertical scrolling elsewhere is unaffected.
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        if !isDraggingPill {
-                            isDraggingPill = true
-                            HapticManager.shared.playTick()
-                        }
-                        pillDragOffset = value.translation.width
+                        // Thumb centre tracks the finger; a tap jumps the thumb under the finger.
+                        isDraggingPill = true
+                        pillDragOffset = value.location.x - segWidth / 2 - baseOffset
                     }
                     .onEnded { value in
-                        let projectedOffset = baseOffset + value.translation.width + value.predictedEndTranslation.width * 0.1
-                        let pillCenter = projectedOffset + segWidth / 2
-                        let nearest = Int((pillCenter - inset) / segWidth)
-                        let clamped = max(0, min(tabs.count - 1, nearest))
-                        let target: PoolTab = clamped == 0 ? .photos : .captions
-
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.78)) {
+                        let idx = max(0, min(tabs.count - 1, Int((value.location.x - inset) / segWidth)))
+                        let target = tabs[idx].2
+                        withAnimation(snap) {
                             pillDragOffset = 0
                             isDraggingPill = false
                             if appState.activePoolTab != target {
@@ -440,7 +436,7 @@ struct MainAppView: View {
                     }
             )
         }
-        .frame(height: 44)
+        .frame(height: 52)
         .padding(.horizontal, 14)
     }
 
@@ -472,6 +468,9 @@ struct MainAppView: View {
                         insertion: .move(edge: .trailing).combined(with: .opacity),
                         removal: .move(edge: .leading).combined(with: .opacity)
                     ))
+            case .videos:
+                VideoPoolView()
+                .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .simultaneousGesture(
@@ -481,11 +480,10 @@ struct MainAppView: View {
                     let v = value.translation.height
                     // Only trigger when motion is mostly horizontal
                     guard abs(h) > abs(v) * 1.5, abs(h) > 50 else { return }
-                    if h < 0, appState.activePoolTab == .photos {
-                        switchPoolTab(to: .captions)
-                    } else if h > 0, appState.activePoolTab == .captions {
-                        switchPoolTab(to: .photos)
-                    }
+                    let order: [PoolTab] = [.photos, .captions, .videos]
+                    guard let i = order.firstIndex(of: appState.activePoolTab) else { return }
+                    let j = h < 0 ? i + 1 : i - 1
+                    if order.indices.contains(j) { switchPoolTab(to: order[j]) }
                 }
         )
     }

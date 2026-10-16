@@ -38,6 +38,8 @@ private struct CloudAIProfile: Codable {
     var taste_profile: String
     var ai_rules: String
     var caption_pool: [CloudCaption]
+    var dump_styles: [DumpStyle]?
+    var active_dump_style: String?
     var updated_at: String
 }
 
@@ -110,7 +112,7 @@ final class AIProfileSync {
     // MARK: - Load from Supabase
 
     private func loadCloud(userId: String, jwt: String) async throws -> CloudAIProfile? {
-        let query = "user_id=eq.\(userId)&select=taste_profile,ai_rules,caption_pool,updated_at"
+        let query = "user_id=eq.\(userId)&select=taste_profile,ai_rules,caption_pool,dump_styles,active_dump_style,updated_at"
         let data = try await SupabaseClient.shared.get(table: "user_ai_profile", query: query, jwt: jwt)
         guard let profile = try? JSONDecoder().decode(CloudAIProfile.self, from: data) else {
             return nil
@@ -144,6 +146,10 @@ final class AIProfileSync {
             "taste_profile": taste,
             "ai_rules": rules,
             "caption_pool": cloudCaptions,
+            "dump_styles": DumpStyle.load().map { s in
+                ["id": s.id, "name": s.name, "profile": s.profile, "rules": s.rules, "updatedAt": s.updatedAt]
+            },
+            "active_dump_style": DumpStyle.activeId(),
             "updated_at": ISO8601DateFormatter().string(from: Date()),
         ]
 
@@ -175,6 +181,14 @@ final class AIProfileSync {
             UserDefaults.standard.set(cloud.ai_rules, forKey: "ai_rules")
         }
         // If both have rules, prefer local (user typed those explicitly, don't override).
+
+        // — Dump styles: union by id, newer updatedAt wins; cloud active id only if local empty —
+        let localStyles = DumpStyle.load()
+        let mergedStyles = DumpStyle.merge(local: localStyles, cloud: cloud.dump_styles ?? [])
+        if mergedStyles != localStyles { DumpStyle.save(mergedStyles) }
+        if let a = cloud.active_dump_style, !a.isEmpty, DumpStyle.activeId().isEmpty {
+            UserDefaults.standard.set(a, forKey: DumpStyle.activeKey)
+        }
 
         // — Caption pool ——————————————————————————————————————————————————
         let localRaw = fetchRawCaptions(context: context)

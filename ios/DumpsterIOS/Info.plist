@@ -38,8 +38,6 @@
 		<string>instagram</string>
 		<string>instagram-stories</string>
 	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>DUMPSTER needs camera access to capture photos for your dumps.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>DUMPSTER saves analyzed photos to build your dumps.</string>
 	<key>UIApplicationSceneManifest</key>
@@ -57,8 +55,8 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>SENTRY_DSN</key>
+	<string>$(SENTRY_DSN)</string>
 </dict>
 </plist>

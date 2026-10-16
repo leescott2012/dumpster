@@ -1,10 +1,13 @@
 import Foundation
 import StoreKit
+import UIKit
+import Combine
 
 // MARK: - Credit Manager
 
 /// Manages the user's AI credit balance and in-app purchases.
-/// Credits are persisted in UserDefaults and gated before every AI call.
+/// The balance is read from the server (profiles) and kept live from the
+/// X-Credits-Remaining response header; the device never writes it.
 @MainActor
 final class CreditManager: ObservableObject {
 
@@ -14,14 +17,14 @@ final class CreditManager: ObservableObject {
     // MARK: - Published State
     @Published private(set) var balance: Int = 0
     @Published private(set) var products: [Product] = []
+    /// Set when any server AI call returns 402; the app root shows the credits sheet.
+    @Published var showOutOfCredits = false
     @Published var isPurchasing = false
     @Published var purchaseError: String?
     @Published var lastPurchaseSuccess: CreditPack?
 
-    // MARK: - Constants
-    private let balanceKey = "dumpster_credit_balance"
-    private let hasOnboardedKey = "dumpster_credits_onboarded"
-    static let freeStarterCredits = 10
+    /// True once a balance has been read from the server this session.
+    @Published private(set) var hasLoaded = false
 
     // MARK: - Credit Packs
     struct CreditPack: Identifiable, Equatable {
@@ -37,20 +40,32 @@ final class CreditManager: ObservableObject {
         ]
     }
 
-    // MARK: - Credit Costs
-    enum AIAction: String {
-        case generateCaptions  = "Generate Captions"
-        case checkVibe         = "Check Vibe"
-        case analyzePhotos     = "Analyze Photos"
-
-        var cost: Int { 1 }
+    // MARK: - Credit Costs (server is the source of truth — server/creditGate.ts COSTS)
+    // Only calls that hit the Dumpster server spend credits. On native that is
+    // Scan (/api/ai-label) and IG Scrub. Suggest runs on-device; Captions and
+    // the Valet use the user's own provider key — neither is charged.
+    enum Cost {
+        static let scanRequest = 12   // per /api/ai-label request (server cap 12 photos each)
+        static let igScrub = 5
+        static let scanBatchPhotos = 12
+        static func scan(photoCount: Int) -> Int {
+            photoCount <= 0 ? 0 : ((photoCount + scanBatchPhotos - 1) / scanBatchPhotos) * scanRequest
+        }
     }
 
     // MARK: - Init
     private init() {
-        loadBalance()
         Task { await fetchProducts() }
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+        // Sign-in / sign-out / token refresh → re-read.
+        authSub = AuthManager.shared.$session.dropFirst().sink { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+        refresh()
     }
+    private var authSub: AnyCancellable?
 
     // MARK: - Server verification
 
@@ -63,42 +78,73 @@ final class CreditManager: ObservableObject {
         return URL(string: "https://dumpster-web-manus.vercel.app")!
     }()
 
-    // MARK: - Balance Management
+    // MARK: - Balance (read-only on the device)
+    // The profiles table only lets the client write onboarding/avatar fields, so
+    // credits are NEVER written from here — we only read them.
 
-    private func loadBalance() {
-        if !UserDefaults.standard.bool(forKey: hasOnboardedKey) {
-            // First launch — give free starter credits
-            balance = Self.freeStarterCredits
-            UserDefaults.standard.set(balance, forKey: balanceKey)
-            UserDefaults.standard.set(true, forKey: hasOnboardedKey)
-        } else {
-            balance = UserDefaults.standard.integer(forKey: balanceKey)
+    func canAfford(_ cost: Int) -> Bool { balance >= cost }
+
+    /// Re-read the balance from the server.
+    func refresh() {
+        Task { await fetchBalance() }
+    }
+
+    /// Re-read now and again after ~2.5s (refunds land after the response is sent).
+    func refreshSoonAndLater() {
+        refresh()
+        Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            await fetchBalance()
         }
     }
 
-    private func saveBalance() {
-        UserDefaults.standard.set(balance, forKey: balanceKey)
+    /// Call after every credit-charged response (Scan, IG Scrub). On 2xx the server's
+    /// X-Credits-Remaining is the post-deduct balance; on anything else (402, 5xx,
+    /// network failure → nil) re-read, because a refund may still be landing.
+    func noteAIResponse(_ http: HTTPURLResponse?) {
+        // 402 = server says out of credits: show the top-up sheet (DumpsterApp presents it).
+        if http?.statusCode == 402 { showOutOfCredits = true }
+        if let http, (200..<300).contains(http.statusCode),
+           let h = http.value(forHTTPHeaderField: "X-Credits-Remaining"), let n = Int(h) {
+            balance = max(0, n)
+            hasLoaded = true
+        } else {
+            refreshSoonAndLater()
+        }
     }
 
-    /// Returns true if the user has enough credits for the action.
-    func canAfford(_ action: AIAction) -> Bool {
-        balance >= action.cost
+    private func fetchBalance() async {
+        guard let uid = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt else {
+            balance = 0
+            hasLoaded = false
+            return
+        }
+        do {
+            let data = try await SupabaseClient.shared.get(
+                table: "profiles",
+                query: "id=eq.\(uid)&select=credits,daily_credits_remaining,daily_credits_reset_at,subscription_tier",
+                jwt: jwt)
+            guard let row = (try JSONSerialization.jsonObject(with: data) as? [[String: Any]])?.first else { return }
+            let purchased = (row["credits"] as? NSNumber)?.intValue ?? 0
+            var daily = (row["daily_credits_remaining"] as? NSNumber)?.intValue ?? 0
+            // Display only — the server performs the real 24h reset on the next spend.
+            if let s = row["daily_credits_reset_at"] as? String, let d = Self.parseISO(s),
+               Date().timeIntervalSince(d) > 24 * 3600 {
+                daily = (row["subscription_tier"] as? String) == "pro" ? 200 : 15
+            }
+            balance = purchased + daily
+            hasLoaded = true
+        } catch {
+            // Keep the last known balance on a transient failure.
+        }
     }
 
-    /// Deducts credits for an AI action. Call AFTER a successful AI response.
-    /// Returns false if insufficient credits (shouldn't happen if you gate with canAfford first).
-    @discardableResult
-    func spend(_ action: AIAction) -> Bool {
-        guard balance >= action.cost else { return false }
-        balance -= action.cost
-        saveBalance()
-        return true
-    }
-
-    /// Add credits (called after successful purchase).
-    func addCredits(_ amount: Int) {
-        balance += amount
-        saveBalance()
+    private static func parseISO(_ s: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: s) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: s)
     }
 
     // MARK: - StoreKit 2
@@ -116,9 +162,8 @@ final class CreditManager: ObservableObject {
 
     func purchase(_ pack: CreditPack) async {
         guard let product = products.first(where: { $0.id == pack.id }) else {
-            // No StoreKit product yet (e.g. sandbox not configured) — use fallback
-            addCredits(pack.credits)
-            lastPurchaseSuccess = pack
+            // Never grant credits locally — the server ledger is the only source.
+            purchaseError = "The store isn't available right now. Try again in a moment."
             return
         }
 
@@ -140,7 +185,7 @@ final class CreditManager: ObservableObject {
                     // (The signed JWS lives on the VerificationResult, not the unwrapped
                     // Transaction — that's what re-verifying the signature needs.)
                     await reportPurchaseToServer(jws: verification.jwsRepresentation)
-                    addCredits(pack.credits)
+                    refreshSoonAndLater()   // server credited the pack; show it
                     lastPurchaseSuccess = pack
                     await transaction.finish()
                 case .unverified:

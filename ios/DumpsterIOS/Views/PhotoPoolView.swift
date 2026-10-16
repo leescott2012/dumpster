@@ -31,7 +31,8 @@ struct PhotoPoolView: View {
     }
 
     private var filteredPhotos: [DumpPhoto] {
-        var result = allPhotos
+        // Videos live in the device-only Video Pool, never in the photo grid.
+        var result = allPhotos.filter { !VideoStore.isVideoPath($0.localPath) }
 
         if appState.activeFilters.contains(.used) {
             result = result.filter { usedPhotoIDs.contains($0.id) }
@@ -132,26 +133,14 @@ struct PhotoPoolView: View {
                     .font(.system(size: 13))
                     .foregroundColor(Theme.text2(appState.colorMode, cs))
                 Spacer()
-                Button {
-                    rescanAll()
-                } label: {
-                    HStack(spacing: 5) {
-                        if isRescanning {
-                            ProgressView().scaleEffect(0.6).tint(appState.accentColor)
-                        }
-                        Text(isRescanning ? "Scanning…" : "Rescan All")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(isRescanning ? Theme.text2(appState.colorMode, cs) : Theme.text(appState.colorMode, cs))
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(Theme.bg2(appState.colorMode, cs))
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                }
-                .disabled(isRescanning)
+                ScanButton(isRescanning: isRescanning) { rescanAll(useServer: $0) }
             }
             .padding(.horizontal, 14)
             .padding(.top, 2)
+
+            LabelHealthChip()
+                .padding(.horizontal, 14)
+                .padding(.top, 4)
         }
         .padding(.top, 4)
         .confirmationDialog("Photo Pool", isPresented: $showPoolMenu) {
@@ -241,19 +230,24 @@ struct PhotoPoolView: View {
     /// Re-label every photo. Primary: /api/ai-label (Claude — same specific
     /// labels as web Scan; costs credits, needs sign-in). Fallback when signed
     /// out, offline, or out of credits: on-device Apple Vision.
-    private func rescanAll() {
+    private func rescanAll(useServer: Bool = true) {
         guard !allPhotos.isEmpty, !isRescanning else { return }
         isRescanning = true
-        let items = allPhotos.map { (id: $0.id, relativePath: $0.localPath) }
-        let jwt = AuthManager.shared.jwt
+        // Videos never go to AI; user-set labels are never overwritten.
+        let eligible = allPhotos.filter {
+            !LabelPhoto(id: $0.id, path: $0.localPath, category: $0.category, alt: "").isVideo
+                && !LabelHealthManager.shared.isUserOwned($0.id)
+        }
+        let items = eligible.map { (id: $0.id, relativePath: $0.localPath) }
+        let jwt = useServer ? AuthManager.shared.jwt : nil
 
         Task {
             var results: [String: (category: String, labels: [String])] = [:]
 
             if let jwt {
-                for r in await LabelService.shared.label(photos: items, jwt: jwt) {
-                    results[r.id] = (r.category, [r.label])
-                }
+                let server = await LabelService.shared.label(photos: items, jwt: jwt)
+                for r in server { results[r.id] = (r.category, [r.label]) }
+                await LabelHealthManager.shared.noteScan(server)
             }
 
             // Fallback only for photos LabelService didn't resolve (offline,
@@ -510,24 +504,26 @@ struct PhotoPoolView: View {
 
     private func importPickedPhotos(_ items: [PhotosPickerItem]) async {
         var added = 0
-        for item in items {
-            // Save the ORIGINAL bytes verbatim — full resolution, original
-            // format, and EXIF preserved (no UIImage decode/re-encode).
-            if let data = try? await item.loadTransferable(type: Data.self),
-               let localPath = PhotoStorageManager.shared.saveImageData(data) {
-                let filename = (localPath as NSString).lastPathComponent
-                let photo = DumpPhoto(
-                    localPath: localPath,
-                    filename: filename
-                )
-                // Extract EXIF from the original bytes we just saved (§B) — order
-                // matters, this must happen before any future downscale step strips it.
-                PhotoEXIF.populate(photo, from: data)
-                modelContext.insert(photo)
-                added += 1
+        // Batches of 50: each batch's Data/decoded buffers are released (autoreleasepool)
+        // and saved before the next starts, so a big pick doesn't balloon memory.
+        let batchSize = 50
+        for start in stride(from: 0, to: items.count, by: batchSize) {
+            for item in items[start..<min(start + batchSize, items.count)] {
+                // Save the ORIGINAL bytes verbatim — full resolution, original
+                // format, and EXIF preserved (no UIImage decode/re-encode).
+                guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+                let photo: DumpPhoto? = autoreleasepool {
+                    guard let localPath = PhotoStorageManager.shared.saveImageData(data) else { return nil }
+                    let p = DumpPhoto(localPath: localPath, filename: (localPath as NSString).lastPathComponent)
+                    // Extract EXIF from the original bytes we just saved (§B) — order
+                    // matters, this must happen before any future downscale step strips it.
+                    PhotoEXIF.populate(p, from: data)
+                    return p
+                }
+                if let photo { modelContext.insert(photo); added += 1 }
             }
+            try? modelContext.save()
         }
-        try? modelContext.save()
         pickerItems.removeAll()
         // Dashboard: photos landed in the pool.
         if added > 0 { Analytics.track(.photoUploaded, metadata: ["count": added]) }

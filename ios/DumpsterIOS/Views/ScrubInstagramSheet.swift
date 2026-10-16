@@ -525,7 +525,7 @@ struct ScrubInstagramSheet: View {
     private func replaceProfile() {
         let trimmedStyle = editableResult.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedPlay  = editablePlaybook.trimmingCharacters(in: .whitespacesAndNewlines)
-        currentProfile = String(trimmedStyle.prefix(750))
+        currentProfile = String(trimmedStyle.prefix(AIProfileLimits.tasteProfileMax))
         enginePlaybook = String(trimmedPlay.prefix(750))
         // Mark this scrub as active when style still matches the saved record.
         if let active = savedRecord, trimmedStyle == active.styleDescription {
@@ -544,7 +544,7 @@ struct ScrubInstagramSheet: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let combinedPlay = (enginePlaybook.trimmingCharacters(in: .whitespacesAndNewlines) + "\n\n" + trimmedPlay)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        currentProfile = String(combinedStyle.prefix(750))
+        currentProfile = String(combinedStyle.prefix(AIProfileLimits.tasteProfileMax))
         enginePlaybook = String(combinedPlay.prefix(750))
         activeScrubId = ""
         HapticManager.shared.playAdded()

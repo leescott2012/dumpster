@@ -137,7 +137,8 @@ struct DumpCardView: View {
                         let cap = DumpCaption(text: text, style: "ai", dumpId: dump.id)
                         modelContext.insert(cap)
                         try? modelContext.save()
-                    }
+                    },
+                    dumpTitle: dump.title
                 )
             }
         }
@@ -555,7 +556,7 @@ struct DumpCardView: View {
             .prefix(20)
             .map { $0 }
 
-        let taste = AITasteExample.promptBlock(from: tasteExamples)
+        let taste = AITasteExample.promptBlock(from: tasteExamples) + AITasteExample.captionVoiceBlock()
 
         do {
             let result = try await LLMService.shared.generateCaption(

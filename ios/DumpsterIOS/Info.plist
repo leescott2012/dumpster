@@ -57,6 +57,6 @@
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>SENTRY_DSN</key>
-	<string>$(SENTRY_DSN)</string>
+	<string>https://6c198d7692c39b03ac23d0280f87f74b@o4511424233013248.ingest.us.sentry.io/4512269943767040</string>
 </dict>
 </plist>

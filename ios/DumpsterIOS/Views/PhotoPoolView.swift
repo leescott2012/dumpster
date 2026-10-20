@@ -387,7 +387,8 @@ struct PhotoPoolView: View {
                 selection: $pickerItems,
                 maxSelectionCount: 50,
                 selectionBehavior: .ordered,
-                matching: .images
+                matching: .images,
+                photoLibrary: .shared()   // gives each pick its Photos-library itemIdentifier (Find in Photos)
             ) {
                 HStack(spacing: 7) {
                     Image(systemName: "plus")
@@ -489,7 +490,8 @@ struct PhotoPoolView: View {
                 selection: $pickerItems,
                 maxSelectionCount: 50,
                 selectionBehavior: .ordered,
-                matching: .images
+                matching: .images,
+                photoLibrary: .shared()   // gives each pick its Photos-library itemIdentifier (Find in Photos)
             ) {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 40))
@@ -515,6 +517,7 @@ struct PhotoPoolView: View {
                 let photo: DumpPhoto? = autoreleasepool {
                     guard let localPath = PhotoStorageManager.shared.saveImageData(data) else { return nil }
                     let p = DumpPhoto(localPath: localPath, filename: (localPath as NSString).lastPathComponent)
+                    p.assetId = item.itemIdentifier
                     // Extract EXIF from the original bytes we just saved (§B) — order
                     // matters, this must happen before any future downscale step strips it.
                     PhotoEXIF.populate(p, from: data)

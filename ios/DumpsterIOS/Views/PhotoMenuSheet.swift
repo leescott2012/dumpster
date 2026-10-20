@@ -39,6 +39,10 @@ struct PhotoMenuSheet: View {
                 menuItem(icon: "square.and.arrow.down", label: "Save to Photos", tint: .white) {
                     onSaveToPhotos(); dismiss()
                 }
+                Divider().background(Color.white.opacity(0.07))
+                menuItem(icon: "magnifyingglass", label: "Find in Photos", tint: .white) {
+                    findInPhotos(); dismiss()
+                }
                 if isDuplicate {
                     Divider().background(Color.white.opacity(0.07))
                     menuItem(icon: "checkmark.circle", label: "Not a duplicate", tint: .white) {
@@ -88,9 +92,41 @@ struct PhotoMenuSheet: View {
                 Spacer()
             }
         }
-        .presentationDetents([.height(isDuplicate ? 328 : 280)])
+        .presentationDetents([.height(isDuplicate ? 378 : 330)])
         .presentationDragIndicator(.hidden)
         .preferredColorScheme(.dark)
+    }
+
+    /// Opens the ORIGINAL of this photo in the Photos app. Uses the library id saved at import;
+    /// older imports are matched by capture time + pixel size. Falls back to just opening Photos.
+    private func findInPhotos() {
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+            var uuid: String?
+            if status == .authorized || status == .limited {
+                var asset: PHAsset?
+                if let id = photo.assetId {
+                    asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject
+                }
+                if asset == nil, let t = photo.takenAt {
+                    let o = PHFetchOptions()
+                    o.predicate = NSPredicate(format: "creationDate >= %@ AND creationDate <= %@",
+                                              t.addingTimeInterval(-1) as NSDate, t.addingTimeInterval(1) as NSDate)
+                    let r = PHAsset.fetchAssets(with: .image, options: o)
+                    r.enumerateObjects { a, _, stop in
+                        if photo.pixelWidth == nil || (a.pixelWidth == photo.pixelWidth && a.pixelHeight == photo.pixelHeight) {
+                            asset = a; stop.pointee = true
+                        }
+                    }
+                }
+                uuid = asset?.localIdentifier.components(separatedBy: "/").first
+            }
+            DispatchQueue.main.async {
+                let target = uuid.flatMap { URL(string: "photos://asset?uuid=\($0)") } ?? URL(string: "photos-redirect://")!
+                UIApplication.shared.open(target) { ok in
+                    if !ok, let fallback = URL(string: "photos-redirect://") { UIApplication.shared.open(fallback) }
+                }
+            }
+        }
     }
 
     private func menuItem(icon: String, label: String, tint: Color, action: @escaping () -> Void) -> some View {

@@ -224,9 +224,27 @@ final class SupabaseClient {
         return data
     }
 
+    /// Code requests go through our server so the 3-per-hour limit is enforced per account
+    /// (clearing the app or switching devices can't reset it). Verifying still goes straight to Supabase.
+    private func requestCodeViaServer(phone: String, mode: String, jwt: String? = nil) async throws {
+        guard let url = URL(string: "https://dumpster-web-manus.vercel.app/api/otp-send"),
+              let bodyData = try? JSONSerialization.data(withJSONObject: ["channel": "phone", "identifier": phone, "mode": mode])
+        else { throw SupabaseError.decodeFailed("bad request") }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let jwt = jwt { req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization") }
+        req.httpBody = bodyData
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let msg = String(data: data, encoding: .utf8) ?? "unknown"
+            throw SupabaseError.httpError((resp as? HTTPURLResponse)?.statusCode ?? 0, msg)
+        }
+    }
+
     /// Sign-in: text a 6-digit code to `phone` (E.164, e.g. +14045551234). Creates the account if new.
     func sendPhoneOTP(phone: String) async throws {
-        _ = try await authJSON("POST", path: "/auth/v1/otp", body: ["phone": phone, "create_user": true])
+        try await requestCodeViaServer(phone: phone, mode: "signin")
     }
 
     /// Sign-in: verify the texted code and return a session.
@@ -245,7 +263,7 @@ final class SupabaseClient {
 
     /// Signed-in account without a phone: attach one. Texts a code to `phone`.
     func addPhone(phone: String, jwt: String) async throws {
-        _ = try await authJSON("PUT", path: "/auth/v1/user", body: ["phone": phone], jwt: jwt)
+        try await requestCodeViaServer(phone: phone, mode: "add", jwt: jwt)
     }
 
     /// Confirm the code for addPhone; the verified number is then stored on the account.

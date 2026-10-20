@@ -1,4 +1,6 @@
 import SwiftUI
+import LocalAuthentication
+import CommonCrypto
 
 // MARK: - Sign-In View
 //
@@ -512,5 +514,197 @@ struct PhoneGateView: View {
         .padding(24)
         .background(DK.bg.ignoresSafeArea())
         .preferredColorScheme(.dark)
+    }
+}
+
+
+// MARK: - PIN lock: a 4-digit PIN (or Face ID) that unlocks the app on THIS device
+//
+// Never signs anyone in by itself — it only gates an already signed-in session, so it can't be
+// guessed from another device. Salted PBKDF2 hash in the Keychain. 3 wrong = 30s wait, 4 = 60s,
+// 5 = PIN wiped and the user must sign in again with a code. Re-locks after 5 min in the background.
+
+@MainActor
+final class PinLock: ObservableObject {
+    static let shared = PinLock()
+
+    @Published private(set) var unlocked = false
+    @Published private(set) var revision = 0     // bump so views re-read after set/remove/dismiss
+
+    enum Result { case ok, wrong(remaining: Int, waitSeconds: Int), forceSignOut }
+
+    private struct Rec: Codable { var salt: String; var hash: String; var fails: Int; var lockedUntil: Double }
+    private let service = "com.leescott.dumpster.ios.pin"
+    private let maxFails = 5
+    private var uid: String? { AuthManager.shared.userId }
+
+    var hasPin: Bool { uid.flatMap { read($0) } != nil }
+    var setupDismissed: Bool { uid.map { UserDefaults.standard.bool(forKey: "dumpster_pin_dismissed_\($0)") } ?? true }
+    /// Signed in, phone verified, but no PIN yet and hasn't said "Not now".
+    var needsSetup: Bool { AuthManager.shared.isSignedIn && !AuthManager.shared.needsPhone && !hasPin && !setupDismissed }
+    var needsUnlock: Bool { AuthManager.shared.isSignedIn && !AuthManager.shared.needsPhone && hasPin && !unlocked }
+    var showGate: Bool { _ = revision; return needsSetup || needsUnlock }
+
+    func markUnlocked() { unlocked = true; revision += 1 }
+    func relock() { if hasPin { unlocked = false; revision += 1 } }
+    func dismissSetup() { if let u = uid { UserDefaults.standard.set(true, forKey: "dumpster_pin_dismissed_\(u)") }; revision += 1 }
+
+    func setPin(_ pin: String) {
+        guard let u = uid else { return }
+        var saltBytes = [UInt8](repeating: 0, count: 16)
+        _ = SecRandomCopyBytes(kSecRandomDefault, 16, &saltBytes)
+        let salt = Data(saltBytes)
+        write(u, Rec(salt: salt.base64EncodedString(), hash: derive(pin, salt: salt), fails: 0, lockedUntil: 0))
+        unlocked = true; revision += 1
+    }
+
+    func removePin() { if let u = uid { delete(u) }; unlocked = false; revision += 1 }
+
+    func verify(_ pin: String) -> Result {
+        guard let u = uid, var r = read(u), let salt = Data(base64Encoded: r.salt) else { return .forceSignOut }
+        let wait = Int(ceil(r.lockedUntil - Date().timeIntervalSince1970))
+        if wait > 0 { return .wrong(remaining: maxFails - r.fails, waitSeconds: wait) }
+        if derive(pin, salt: salt) == r.hash { r.fails = 0; r.lockedUntil = 0; write(u, r); markUnlocked(); return .ok }
+        r.fails += 1
+        if r.fails >= maxFails { delete(u); return .forceSignOut }
+        let waitSecs = r.fails >= 4 ? 60 : (r.fails >= 3 ? 30 : 0)
+        r.lockedUntil = waitSecs > 0 ? Date().timeIntervalSince1970 + Double(waitSecs) : 0
+        write(u, r)
+        return .wrong(remaining: maxFails - r.fails, waitSeconds: waitSecs)
+    }
+
+    // Face ID / Touch ID: convenience unlock only (a PIN must exist first).
+    func tryBiometrics() async {
+        guard hasPin else { return }
+        let ctx = LAContext()
+        var err: NSError?
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) else { return }
+        if (try? await ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Unlock Dumpster")) == true {
+            markUnlocked()
+        }
+    }
+
+    // MARK: PBKDF2 + Keychain
+    private func derive(_ pin: String, salt: Data) -> String {
+        var out = [UInt8](repeating: 0, count: 32)
+        let pw = Array(pin.utf8)
+        let saltBytes = [UInt8](salt)
+        _ = pw.withUnsafeBufferPointer { pwp in
+            pwp.baseAddress!.withMemoryRebound(to: Int8.self, capacity: pw.count) { p in
+                CCKeyDerivationPBKDF(CCPBKDFAlgorithm(kCCPBKDF2), p, pw.count, saltBytes, saltBytes.count,
+                                     CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256), 150_000, &out, 32)
+            }
+        }
+        return out.map { String(format: "%02x", $0) }.joined()
+    }
+    private func query(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
+    }
+    private func read(_ account: String) -> Rec? {
+        var q = query(account); q[kSecReturnData as String] = true; q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let data = out as? Data else { return nil }
+        return try? JSONDecoder().decode(Rec.self, from: data)
+    }
+    private func write(_ account: String, _ rec: Rec) {
+        guard let data = try? JSONEncoder().encode(rec) else { return }
+        SecItemDelete(query(account) as CFDictionary)
+        var q = query(account)
+        q[kSecValueData as String] = data
+        q[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        SecItemAdd(q as CFDictionary, nil)
+    }
+    private func delete(_ account: String) { SecItemDelete(query(account) as CFDictionary) }
+}
+
+struct PinGateView: View {
+    @ObservedObject private var pin = PinLock.shared
+    @ObservedObject private var auth = AuthManager.shared
+    @State private var digits = ""
+    @State private var first = ""
+    @State private var choosing = true          // setup: false while confirming
+    @State private var error: String?
+    @State private var wait = 0
+
+    private var setupMode: Bool { pin.needsSetup }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Spacer()
+            Text(setupMode ? (choosing ? "Set a 4-digit PIN" : "Confirm your PIN") : "Enter your PIN")
+                .font(.title2.weight(.bold)).foregroundColor(DK.text)
+            if setupMode && choosing {
+                Text("Unlock Dumpster quickly on this device. You'll still use a code to sign in on a new device.")
+                    .font(.footnote).foregroundColor(DK.text2).multilineTextAlignment(.center).padding(.horizontal, 40)
+            }
+            HStack(spacing: 14) {
+                ForEach(0..<4, id: \.self) { i in
+                    Circle().stroke(DK.gold, lineWidth: 1.5).background(Circle().fill(i < digits.count ? DK.gold : .clear)).frame(width: 14, height: 14)
+                }
+            }
+            Text(wait > 0 ? "Too many tries. Wait \(wait)s." : (error ?? " "))
+                .font(.footnote).foregroundColor(.red).frame(minHeight: 18)
+
+            VStack(spacing: 14) {
+                ForEach([["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]], id: \.self) { row in
+                    HStack(spacing: 14) { ForEach(row, id: \.self) { key($0) } }
+                }
+                HStack(spacing: 14) {
+                    if !setupMode {
+                        Button { Task { await pin.tryBiometrics() } } label: {
+                            Image(systemName: "faceid").font(.title2).foregroundColor(DK.gold).frame(width: 72, height: 72)
+                        }.accessibilityLabel("Unlock with Face ID")
+                    } else { Color.clear.frame(width: 72, height: 72) }
+                    key("0")
+                    Button { if !digits.isEmpty { digits.removeLast() } } label: {
+                        Image(systemName: "delete.left").font(.title3).foregroundColor(DK.text).frame(width: 72, height: 72)
+                    }.accessibilityLabel("Delete")
+                }
+            }
+            .opacity(wait > 0 ? 0.4 : 1).disabled(wait > 0)
+
+            if setupMode {
+                Button("Not now") { pin.dismissSetup() }.font(.footnote).foregroundColor(DK.text2).padding(.top, 8)
+            } else {
+                Button("Forgot PIN? Sign in with a code") { pin.removePin(); Task { await auth.signOut() } }
+                    .font(.footnote).foregroundColor(DK.text2).padding(.top, 8)
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DK.bg.ignoresSafeArea())
+        .preferredColorScheme(.dark)
+        .task { if !setupMode { await pin.tryBiometrics() } }
+        .task(id: wait) {
+            guard wait > 0 else { return }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if !Task.isCancelled { wait -= 1 }
+        }
+    }
+
+    private func key(_ d: String) -> some View {
+        Button { press(d) } label: {
+            Text(d).font(.system(size: 28)).foregroundColor(DK.text)
+                .frame(width: 72, height: 72).background(DK.field).clipShape(Circle())
+                .overlay(Circle().stroke(DK.stroke, lineWidth: 1))
+        }
+    }
+
+    private func press(_ d: String) {
+        guard wait == 0, digits.count < 4 else { return }
+        digits += d
+        guard digits.count == 4 else { return }
+        let entered = digits
+        digits = ""
+        if setupMode {
+            if choosing { first = entered; choosing = false; error = nil; return }
+            if entered == first { pin.setPin(entered) } else { error = "PINs didn't match. Try again."; first = ""; choosing = true }
+            return
+        }
+        switch pin.verify(entered) {
+        case .ok: error = nil
+        case .forceSignOut: Task { await auth.signOut() }          // 5 wrong PINs: back to a full code sign-in
+        case .wrong(let remaining, let waitSeconds): wait = waitSeconds; error = "Wrong PIN. \(remaining) tries left."
+        }
     }
 }

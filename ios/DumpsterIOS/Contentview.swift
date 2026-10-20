@@ -97,6 +97,9 @@ struct ContentView: View {
     @StateObject private var appState = AppState()
     @StateObject private var undoManager = DumpsterUndoManager()
     @ObservedObject private var auth = AuthManager.shared
+    @ObservedObject private var pinLock = PinLock.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var backgroundedAt: Date?
     // First launch: show the Log in screen once (after onboarding) if signed out. Dismissible; the Sync card keeps a way back in.
     @AppStorage("dumpster_signInPrompted") private var signInPrompted = false
     @State private var showFirstSignIn = false
@@ -185,6 +188,14 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: Binding(get: { auth.needsPhone }, set: { _ in })) {
             PhoneGateView()
+        }
+        .fullScreenCover(isPresented: Binding(get: { pinLock.showGate }, set: { _ in })) {
+            PinGateView()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Re-lock after 5+ minutes in the background.
+            if phase == .background { backgroundedAt = Date() }
+            else if phase == .active, let t = backgroundedAt, Date().timeIntervalSince(t) > 300 { pinLock.relock(); backgroundedAt = nil }
         }
         .fullScreenCover(isPresented: $appState.showSettings) {
             SettingsView(isPresented: $appState.showSettings)

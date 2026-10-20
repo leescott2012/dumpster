@@ -16,11 +16,6 @@
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
-	<!-- URL scheme for Supabase magic link deep link: dumpster://auth/callback?token_hash=... -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -32,14 +27,19 @@
 			</array>
 		</dict>
 	</array>
-	<!-- Allow canOpenURL() to detect Instagram for the share/export hand-off -->
+	<key>CFBundleVersion</key>
+	<string>1</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>instagram</string>
 		<string>instagram-stories</string>
 	</array>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>DUMPSTER needs camera access to capture photos for your dumps.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Unlock Dumpster with Face ID.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>DUMPSTER saves analyzed photos to build your dumps.</string>
 	<key>UIApplicationSceneManifest</key>

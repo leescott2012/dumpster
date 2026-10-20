@@ -13,6 +13,7 @@ struct PhotoMenuSheet: View {
     var onRescan: () -> Void = {}
     var onRemove: () -> Void = {}     // remove from dump OR delete from pool
     @Environment(\.dismiss) private var dismiss
+    @State private var showFind = false
 
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
 
@@ -41,7 +42,7 @@ struct PhotoMenuSheet: View {
                 }
                 Divider().background(Color.white.opacity(0.07))
                 menuItem(icon: "magnifyingglass", label: "Find in Photos", tint: .white) {
-                    findInPhotos(); dismiss()
+                    showFind = true
                 }
                 if isDuplicate {
                     Divider().background(Color.white.opacity(0.07))
@@ -95,38 +96,26 @@ struct PhotoMenuSheet: View {
         .presentationDetents([.height(isDuplicate ? 378 : 330)])
         .presentationDragIndicator(.hidden)
         .preferredColorScheme(.dark)
+        .alert("Find in Photos", isPresented: $showFind) {
+            Button("Open Photos") {
+                if let u = URL(string: "photos-redirect://") { UIApplication.shared.open(u) }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text(findMessage) }
     }
 
-    /// Opens the ORIGINAL of this photo in the Photos app. Uses the library id saved at import;
-    /// older imports are matched by capture time + pixel size. Falls back to just opening Photos.
-    private func findInPhotos() {
-        PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
-            var uuid: String?
-            if status == .authorized || status == .limited {
-                var asset: PHAsset?
-                if let id = photo.assetId {
-                    asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject
-                }
-                if asset == nil, let t = photo.takenAt {
-                    let o = PHFetchOptions()
-                    o.predicate = NSPredicate(format: "creationDate >= %@ AND creationDate <= %@",
-                                              t.addingTimeInterval(-1) as NSDate, t.addingTimeInterval(1) as NSDate)
-                    let r = PHAsset.fetchAssets(with: .image, options: o)
-                    r.enumerateObjects { a, _, stop in
-                        if photo.pixelWidth == nil || (a.pixelWidth == photo.pixelWidth && a.pixelHeight == photo.pixelHeight) {
-                            asset = a; stop.pointee = true
-                        }
-                    }
-                }
-                uuid = asset?.localIdentifier.components(separatedBy: "/").first
-            }
-            DispatchQueue.main.async {
-                let target = uuid.flatMap { URL(string: "photos://asset?uuid=\($0)") } ?? URL(string: "photos-redirect://")!
-                UIApplication.shared.open(target) { ok in
-                    if !ok, let fallback = URL(string: "photos-redirect://") { UIApplication.shared.open(fallback) }
-                }
-            }
+    /// iOS can't open a specific photo inside the Photos app, so show exactly when/where it was
+    /// taken, then open Photos so the user can scroll straight to it.
+    private var findMessage: String {
+        guard let t = photo.takenAt else {
+            return "This photo has no saved date (likely a screenshot or edited image). Look near when you imported it."
         }
+        let f = DateFormatter(); f.dateFormat = "EEE, MMM d, yyyy 'at' h:mm a"
+        var lines = ["Taken " + f.string(from: t)]
+        if let lat = photo.lat, let lng = photo.lng { lines.append(String(format: "Near %.3f, %.3f", lat, lng)) }
+        lines.append("In Photos, scroll to that date.")
+        return lines.joined(separator: "\n")
     }
 
     private func menuItem(icon: String, label: String, tint: Color, action: @escaping () -> Void) -> some View {

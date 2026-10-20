@@ -469,6 +469,7 @@ struct AISettingsTabView: View {
 
     // AI Rules editor state
     @State private var draftRule: String = ""
+    @State private var openRule: Int? = nil
     @FocusState private var newRuleFocused: Bool
     @State private var savedToast: Bool = false
 
@@ -682,6 +683,7 @@ struct AISettingsTabView: View {
         guard current.indices.contains(index) else { return }
         HapticManager.shared.playRemove()
         current.remove(at: index)
+        openRule = nil
         writeRules(current)
     }
 
@@ -717,10 +719,23 @@ struct AISettingsTabView: View {
             if rulesList.isEmpty {
                 emptyRulesHint
             } else {
-                VStack(spacing: 6) {
-                    ForEach(Array(rulesList.enumerated()), id: \.offset) { idx, rule in
-                        ruleRow(index: idx, text: rule)
+                // Tap-to-open chips (web parity): "Rule 1", "Rule 2"… show the rule text when tapped.
+                FlowLayout(spacing: 6) {
+                    ForEach(Array(rulesList.enumerated()), id: \.offset) { idx, _ in
+                        Button { openRule = (openRule == idx) ? nil : idx } label: {
+                            Text("Rule \(idx + 1)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(openRule == idx ? primaryText : secondaryText)
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(Capsule().fill(openRule == idx ? gold.opacity(0.18) : cardFill))
+                                .overlay(Capsule().stroke(openRule == idx ? gold : cardBorder, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(openRule == idx ? .isSelected : [])
                     }
+                }
+                if let idx = openRule, rulesList.indices.contains(idx) {
+                    ruleRow(index: idx, text: rulesList[idx])
                 }
             }
 

@@ -174,7 +174,7 @@ struct SignInView: View {
 
                         HStack {
                             Rectangle().fill(Color.black.opacity(0.1)).frame(height: 1)
-                            Text("Or use your phone").font(.system(size: 14)).foregroundColor(.black.opacity(0.4))
+                            Text("Or use phone").font(.system(size: 14)).foregroundColor(.black.opacity(0.4)).fixedSize()
                             Rectangle().fill(Color.black.opacity(0.1)).frame(height: 1)
                         }
                         .padding(.vertical, 20)
@@ -288,7 +288,8 @@ struct PhoneCodeForm: View {
                     .background(Color.black.opacity(0.05))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
-                TextField("Phone number", text: $phone)
+                TextField("Phone number", text: $phone, prompt: Text("Phone number").foregroundColor(.black.opacity(0.4)))
+                    .foregroundColor(.black)
                     .keyboardType(.phonePad)
                     .textContentType(.telephoneNumber)
                     .disabled(codeStage || busy)
@@ -298,7 +299,8 @@ struct PhoneCodeForm: View {
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.15), lineWidth: 1))
 
                 if codeStage {
-                    TextField("6-digit code", text: $code)
+                    TextField("6-digit code", text: $code, prompt: Text("6-digit code").foregroundColor(.black.opacity(0.4)))
+                        .foregroundColor(.black)
                         .keyboardType(.numberPad)
                         .textContentType(.oneTimeCode)
                         .disabled(busy)

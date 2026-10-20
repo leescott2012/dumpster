@@ -97,7 +97,7 @@ struct SyncAccountCard: View {
             Button {
                 showSignIn = true
             } label: {
-                Text("Sign In with Email →")
+                Text("Sign In →")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(gold)
             }

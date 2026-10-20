@@ -97,6 +97,9 @@ struct ContentView: View {
     @StateObject private var appState = AppState()
     @StateObject private var undoManager = DumpsterUndoManager()
     @ObservedObject private var auth = AuthManager.shared
+    // First launch: show the Log in screen once (after onboarding) if signed out. Dismissible; the Sync card keeps a way back in.
+    @AppStorage("dumpster_signInPrompted") private var signInPrompted = false
+    @State private var showFirstSignIn = false
 
     @State private var isExpanded = false
     @State private var showAppIntro = true
@@ -178,6 +181,7 @@ struct ContentView: View {
         .onAppear {
             isExpanded = true
             if !onboardingDone { appState.showOnboarding = true }
+            else { promptSignInIfNeeded() }
         }
         .fullScreenCover(isPresented: Binding(get: { auth.needsPhone }, set: { _ in })) {
             PhoneGateView()
@@ -189,7 +193,10 @@ struct ContentView: View {
             AISuggestView(isPresented: $appState.showAISuggest, appState: appState)
         }
         .onChange(of: appState.showOnboarding) { _, showing in
-            if !showing { onboardingDone = true }
+            if !showing { onboardingDone = true; promptSignInIfNeeded() }
+        }
+        .fullScreenCover(isPresented: $showFirstSignIn) {
+            SignInView()
         }
     }
 
@@ -314,5 +321,15 @@ struct SlidableSegmentedControl: View {
         if let index = options.firstIndex(of: selectedOption) {
             currentOffset = CGFloat(index) * buttonWidth
         }
+    }
+}
+
+
+extension ContentView {
+    /// Once per install: open the Log in screen for signed-out users.
+    fileprivate func promptSignInIfNeeded() {
+        guard !signInPrompted, !AuthManager.shared.isSignedIn else { return }
+        signInPrompted = true
+        showFirstSignIn = true
     }
 }

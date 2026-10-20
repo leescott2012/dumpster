@@ -117,23 +117,8 @@ final class SupabaseClient {
 
     /// Sends a magic link email. The user taps it and is redirected to the app via deep link.
     func sendMagicLink(email: String) async throws {
-        let urlStr = "\(Self.url)/auth/v1/otp"
-        guard let url = URL(string: urlStr) else { return }
-        let body: [String: Any] = [
-            "email": email,
-            "create_user": true,
-            "options": ["emailRedirectTo": "dumpster://auth/callback"]
-        ]
-        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        anonHeaders.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        req.httpBody = bodyData
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            let msg = String(data: data, encoding: .utf8) ?? "unknown"
-            throw SupabaseError.httpError(http.statusCode, msg)
-        }
+        // Through our server so the per-account code limit (3/hour) applies to email too.
+        try await requestCodeViaServer(channel: "email", identifier: email, mode: "signin", redirectTo: "dumpster://auth/callback")
     }
 
     /// Exchange the token_hash from a deep link callback for a session.
@@ -226,9 +211,9 @@ final class SupabaseClient {
 
     /// Code requests go through our server so the 3-per-hour limit is enforced per account
     /// (clearing the app or switching devices can't reset it). Verifying still goes straight to Supabase.
-    private func requestCodeViaServer(phone: String, mode: String, jwt: String? = nil) async throws {
+    private func requestCodeViaServer(channel: String = "phone", identifier: String, mode: String, jwt: String? = nil, redirectTo: String? = nil) async throws {
         guard let url = URL(string: "https://dumpster-web-manus.vercel.app/api/otp-send"),
-              let bodyData = try? JSONSerialization.data(withJSONObject: ["channel": "phone", "identifier": phone, "mode": mode])
+              let bodyData = try? JSONSerialization.data(withJSONObject: ["channel": channel, "identifier": identifier, "mode": mode].merging(redirectTo.map { ["redirectTo": $0] } ?? [:]) { a, _ in a })
         else { throw SupabaseError.decodeFailed("bad request") }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -244,7 +229,7 @@ final class SupabaseClient {
 
     /// Sign-in: text a 6-digit code to `phone` (E.164, e.g. +14045551234). Creates the account if new.
     func sendPhoneOTP(phone: String) async throws {
-        try await requestCodeViaServer(phone: phone, mode: "signin")
+        try await requestCodeViaServer(identifier: phone, mode: "signin")
     }
 
     /// Sign-in: verify the texted code and return a session.
@@ -263,7 +248,7 @@ final class SupabaseClient {
 
     /// Signed-in account without a phone: attach one. Texts a code to `phone`.
     func addPhone(phone: String, jwt: String) async throws {
-        try await requestCodeViaServer(phone: phone, mode: "add", jwt: jwt)
+        try await requestCodeViaServer(identifier: phone, mode: "add", jwt: jwt)
     }
 
     /// Confirm the code for addPhone; the verified number is then stored on the account.

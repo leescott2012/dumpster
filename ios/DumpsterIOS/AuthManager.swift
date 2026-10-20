@@ -39,6 +39,13 @@ final class AuthManager: ObservableObject {
     var userId: String? { session?.userId }
     var userEmail: String? { session?.email }
     var jwt: String? { session?.accessToken }
+    var userPhone: String? { session?.phone }
+
+    /// True once we've confirmed with the server (refresh/sign-in this launch) that
+    /// the signed-in account has no verified phone. Avoids flashing the gate at launch
+    /// for accounts that already verified on web.
+    @Published private(set) var phoneStatusKnown = false
+    var needsPhone: Bool { phoneStatusKnown && isSignedIn && (session?.phone ?? "").isEmpty }
 
     // MARK: - Keychain keys
     private static let keychainService = "com.leescott.dumpster.ios.auth"
@@ -72,23 +79,56 @@ final class AuthManager: ObservableObject {
         }
     }
 
-    /// Step 2: called from onOpenURL when the app receives `dumpster://auth/callback?token_hash=...`.
+    /// Step 2: called from onOpenURL when the app receives the magic link callback.
+    ///
+    /// This can arrive in two different shapes depending on the Supabase email
+    /// template config, and we can't assume which one is live in the dashboard:
+    ///   1. `dumpster://auth/callback?token_hash=...&type=...` — template uses
+    ///      `{{ .TokenHash }}` directly (Supabase's documented native deep-link
+    ///      pattern). We verify the token_hash ourselves.
+    ///   2. `dumpster://auth/callback#access_token=...&refresh_token=...` — template
+    ///      still uses the default `{{ .ConfirmationURL }}`, which verifies
+    ///      server-side and redirects back with tokens already issued (same
+    ///      shape as the OAuth callback).
+    /// Previously only (1) was handled and everything else was silently dropped —
+    /// a tap on the email link would look like it did nothing.
     func handleCallback(url: URL) async {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let tokenHash = components.queryItems?.first(where: { $0.name == "token_hash" })?.value
-        else { return }
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
 
-        isSigningIn = true
-        authError = nil
-        defer { isSigningIn = false }
-
-        do {
-            let newSession = try await SupabaseClient.shared.verifyOTP(tokenHash: tokenHash)
-            await completeSignIn(newSession)
-        } catch {
-            authError = error.localizedDescription
-            CrashReporter.shared.capture(error, tags: ["action": "magic_link_callback"])
+        if let tokenHash = components.queryItems?.first(where: { $0.name == "token_hash" })?.value {
+            // "email" is the generic OTP type Supabase's own docs use for token_hash
+            // links (and what verifyEmailOTP already uses for the 6-digit code path)
+            // — fall back to it unless the link itself specifies a different type.
+            let type = components.queryItems?.first(where: { $0.name == "type" })?.value ?? "email"
+            isSigningIn = true
+            authError = nil
+            defer { isSigningIn = false }
+            do {
+                let newSession = try await SupabaseClient.shared.verifyOTP(tokenHash: tokenHash, type: type)
+                await completeSignIn(newSession)
+            } catch {
+                authError = error.localizedDescription
+                CrashReporter.shared.capture(error, tags: ["action": "magic_link_callback"])
+            }
+            return
         }
+
+        if url.fragment != nil {
+            isSigningIn = true
+            authError = nil
+            defer { isSigningIn = false }
+            do {
+                let newSession = try await SupabaseClient.shared.session(fromOAuthCallback: url)
+                await completeSignIn(newSession)
+            } catch {
+                authError = error.localizedDescription
+                CrashReporter.shared.capture(error, tags: ["action": "magic_link_callback"])
+            }
+            return
+        }
+
+        // Neither shape matched — surface it instead of failing silently.
+        authError = "That sign-in link is missing its token. Try the 6-digit code from the email instead."
     }
 
     /// Alternative to the deep-link callback: user types the 6-digit code from the
@@ -108,8 +148,42 @@ final class AuthManager: ObservableObject {
         }
     }
 
+    // MARK: - Phone verification (returns an error message, or nil on success)
+
+    /// mode .signIn: sign in / sign up by phone. mode .add: attach a phone to the signed-in account.
+    func sendPhoneCode(phone: String, adding: Bool) async -> String? {
+        do {
+            if adding {
+                guard let jwt = jwt else { return "Sign in first." }
+                try await SupabaseClient.shared.addPhone(phone: phone, jwt: jwt)
+            } else {
+                try await SupabaseClient.shared.sendPhoneOTP(phone: phone)
+            }
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    func verifyPhoneCode(phone: String, code: String, adding: Bool) async -> String? {
+        do {
+            if adding {
+                guard let jwt = jwt else { return "Sign in first." }
+                try await SupabaseClient.shared.verifyPhoneChange(phone: phone, token: code, jwt: jwt)
+                await silentRefresh()   // pulls the now-verified phone into the session; the gate goes away
+            } else {
+                await completeSignIn(try await SupabaseClient.shared.verifyPhoneOTP(phone: phone, token: code))
+            }
+            return nil
+        } catch {
+            CrashReporter.shared.capture(error, tags: ["action": adding ? "phone_add_verify" : "phone_signin_verify"])
+            return error.localizedDescription
+        }
+    }
+
     private func completeSignIn(_ newSession: SupabaseSession) async {
         session = newSession
+        phoneStatusKnown = true
         saveSessionToKeychain(newSession)
         magicLinkSent = false
 
@@ -184,6 +258,7 @@ final class AuthManager: ObservableObject {
             let refreshed = try await SupabaseClient.shared.refreshSession(refreshToken: stored.refreshToken)
             session = refreshed
             saveSessionToKeychain(refreshed)
+            phoneStatusKnown = true
         } catch {
             // Refresh failed → session is dead, clear it
             session = nil

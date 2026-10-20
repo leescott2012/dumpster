@@ -96,6 +96,7 @@ final class AppState: ObservableObject {
 struct ContentView: View {
     @StateObject private var appState = AppState()
     @StateObject private var undoManager = DumpsterUndoManager()
+    @ObservedObject private var auth = AuthManager.shared
 
     @State private var isExpanded = false
     @State private var showAppIntro = true
@@ -177,6 +178,9 @@ struct ContentView: View {
         .onAppear {
             isExpanded = true
             if !onboardingDone { appState.showOnboarding = true }
+        }
+        .fullScreenCover(isPresented: Binding(get: { auth.needsPhone }, set: { _ in })) {
+            PhoneGateView()
         }
         .fullScreenCover(isPresented: $appState.showSettings) {
             SettingsView(isPresented: $appState.showSettings)

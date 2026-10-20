@@ -171,6 +171,15 @@ struct SignInView: View {
                             )
                         }
                         .disabled(auth.isSigningIn)
+
+                        HStack {
+                            Rectangle().fill(Color.black.opacity(0.1)).frame(height: 1)
+                            Text("Or use your phone").font(.system(size: 14)).foregroundColor(.black.opacity(0.4))
+                            Rectangle().fill(Color.black.opacity(0.1)).frame(height: 1)
+                        }
+                        .padding(.vertical, 20)
+
+                        PhoneCodeForm(adding: false, lockedHint: "Use email or Google above instead.")
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
@@ -219,5 +228,179 @@ struct SignInView: View {
     private func verifyCode() {
         codeFocused = false
         Task { await auth.verifyEmailCode(email: email, code: code) }
+    }
+}
+
+
+// MARK: - Phone code form (shared by sign-in and the verify gate)
+//
+// Limits (per device, 1 hour): 3 codes sent, 30s between sends, 3 wrong guesses per code.
+// Resend and "change number" both count as a send. Supabase rate-limits server-side too.
+
+struct PhoneCodeForm: View {
+    let adding: Bool            // true = attach phone to the signed-in account; false = sign in by phone
+    let lockedHint: String
+
+    @ObservedObject private var auth = AuthManager.shared
+    @State private var phone = ""
+    @State private var code = ""
+    @State private var codeStage = false
+    @State private var busy = false
+    @State private var error: String?
+    @State private var cooldown = 0
+    @State private var wrong = 0
+    @State private var sends: [Double] = PhoneCodeForm.recentSends()
+
+    private static let maxSends = 3
+    private static let maxWrong = 3
+    private static let windowSecs: Double = 3600
+    private static let cooldownSecs = 30
+    private static let key = "dumpster_otp_sends"
+
+    private static func recentSends() -> [Double] {
+        let all = (UserDefaults.standard.array(forKey: key) as? [Double]) ?? []
+        return all.filter { Date().timeIntervalSince1970 - $0 < windowSecs }
+    }
+
+    private var locked: Bool { sends.count >= Self.maxSends }
+    private var minutesLeft: Int {
+        guard let first = sends.first else { return 1 }
+        return max(1, Int(ceil((first + Self.windowSecs - Date().timeIntervalSince1970) / 60)))
+    }
+
+    /// US numbers by default: 10 digits -> +1XXXXXXXXXX; anything starting with + is used as typed.
+    private var e164: String? {
+        let t = phone.trimmingCharacters(in: .whitespaces)
+        let digits = t.filter(\.isNumber)
+        if t.hasPrefix("+") { return "+" + digits }
+        if digits.count == 11 && digits.hasPrefix("1") { return "+" + digits }
+        return digits.count == 10 ? "+1" + digits : nil
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            if locked && !codeStage {
+                Text("Too many codes requested. Try again in about \(minutesLeft) min. \(lockedHint)")
+                    .font(.footnote)
+                    .foregroundColor(.black.opacity(0.6))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(Color.black.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                TextField("Phone number", text: $phone)
+                    .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber)
+                    .disabled(codeStage || busy)
+                    .padding(14)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.15), lineWidth: 1))
+
+                if codeStage {
+                    TextField("6-digit code", text: $code)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .disabled(busy)
+                        .onChange(of: code) { _, v in code = String(v.filter(\.isNumber).prefix(6)) }
+                        .padding(14)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.15), lineWidth: 1))
+                }
+
+                Button(action: { Task { codeStage ? await verify() : await send() } }) {
+                    HStack {
+                        if busy { ProgressView().tint(.white) }
+                        Text(codeStage ? "Verify code" : "Text me a code")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(canSubmit ? Color.black : Color.black.opacity(0.15))
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(!canSubmit || busy)
+
+                if codeStage {
+                    HStack {
+                        Button(cooldown > 0 ? "Resend code in \(cooldown)s" : (locked ? "No more resends" : "Resend code")) {
+                            Task { await send() }
+                        }
+                        .disabled(busy || cooldown > 0 || locked)
+                        Spacer()
+                        Button("Wrong number? Change it") {
+                            codeStage = false; code = ""; error = nil
+                        }
+                    }
+                    .font(.footnote)
+                    .foregroundColor(.black.opacity(0.5))
+                    if locked { Text("Code limit reached. \(lockedHint)").font(.footnote).foregroundColor(.black.opacity(0.5)) }
+                }
+            }
+
+            if let error = error {
+                Text(error).font(.caption).foregroundColor(.red).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .task(id: cooldown) {
+            guard cooldown > 0 else { return }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if !Task.isCancelled { cooldown -= 1 }
+        }
+    }
+
+    private var canSubmit: Bool { codeStage ? code.count == 6 : e164 != nil }
+
+    private func send() async {
+        error = nil
+        guard let number = e164 else { error = "Enter a valid phone number, like 404 555 1234."; return }
+        if Self.recentSends().count >= Self.maxSends { sends = Self.recentSends(); return }
+        busy = true
+        let err = await auth.sendPhoneCode(phone: number, adding: adding)
+        busy = false
+        if let err = err { error = err; return }
+        UserDefaults.standard.set(Self.recentSends() + [Date().timeIntervalSince1970], forKey: Self.key)
+        sends = Self.recentSends()
+        code = ""; wrong = 0; cooldown = Self.cooldownSecs; codeStage = true
+    }
+
+    private func verify() async {
+        error = nil
+        guard let number = e164 else { return }
+        busy = true
+        let err = await auth.verifyPhoneCode(phone: number, code: code, adding: adding)
+        busy = false
+        guard err != nil else { return }   // success: sign-in view dismisses / gate disappears on its own
+        wrong += 1
+        code = ""
+        if wrong >= Self.maxWrong {
+            codeStage = false
+            error = "Too many wrong codes. Request a new code."
+        } else {
+            error = "That code didn't work (\(Self.maxWrong - wrong) tries left)."
+        }
+    }
+}
+
+// MARK: - Phone gate: blocks the app until the signed-in account has a verified phone
+
+struct PhoneGateView: View {
+    @ObservedObject private var auth = AuthManager.shared
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Text("Verify your phone").font(.system(size: 24, weight: .bold))
+            Text("Add a phone number to keep your account secure. We'll text you a 6-digit code.")
+                .font(.subheadline).foregroundColor(.black.opacity(0.6)).multilineTextAlignment(.center)
+            PhoneCodeForm(adding: true, lockedHint: "Sign out below and sign in a different way, or try again later.")
+            Button("Sign out") { Task { await auth.signOut() } }
+                .font(.footnote).foregroundColor(.black.opacity(0.4)).padding(.top, 8)
+            Spacer()
+        }
+        .padding(24)
+        .background(Color(white: 0.97).ignoresSafeArea())
     }
 }

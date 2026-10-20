@@ -32,10 +32,21 @@ final class SupabaseClient {
         var errorDescription: String? {
             switch self {
             case .noSession:              return "Not signed in."
-            case .httpError(let c, let m): return "HTTP \(c): \(m)"
+            case .httpError(let c, let m): return "\(Self.friendlyMessage(from: m) ?? m) (HTTP \(c))"
             case .decodeFailed(let m):    return "Decode error: \(m)"
             case .noRow:                  return "No row found."
             }
+        }
+
+        /// Supabase error bodies are JSON like {"error_code":"over_email_send_rate_limit","msg":"..."}.
+        /// Pull the human-readable field out so the UI shows "email rate limit exceeded"
+        /// instead of a raw JSON blob. Returns nil (falls back to the raw body) if it's
+        /// not JSON in the shape we expect.
+        static func friendlyMessage(from body: String) -> String? {
+            guard let data = body.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return nil }
+            return (json["msg"] as? String) ?? (json["error_description"] as? String) ?? (json["error"] as? String)
         }
     }
 
@@ -127,7 +138,13 @@ final class SupabaseClient {
 
     /// Exchange the token_hash from a deep link callback for a session.
     /// Call this from `onOpenURL` when the magic link fires.
-    func verifyOTP(tokenHash: String, type: String = "magiclink") async throws -> SupabaseSession {
+    /// Default type is "email" — the generic OTP type Supabase's own native
+    /// deep-linking docs use for token_hash links, which also matches what
+    /// verifyEmailOTP below already uses for the 6-digit code path. "magiclink"
+    /// is a narrower type that only matches tokens Supabase categorized that
+    /// way; if the incoming link doesn't have its own `type` param, "email" is
+    /// the safer generic match.
+    func verifyOTP(tokenHash: String, type: String = "email") async throws -> SupabaseSession {
         let urlStr = "\(Self.url)/auth/v1/verify"
         guard let url = URL(string: urlStr) else { throw SupabaseError.decodeFailed("bad url") }
         let body: [String: Any] = ["token_hash": tokenHash, "type": type]
@@ -188,6 +205,54 @@ final class SupabaseClient {
                                userId: userId, email: userEmail)
     }
 
+    // MARK: - Auth: phone (SMS code via Twilio Verify, configured in Supabase)
+
+    /// POST/PUT JSON to an /auth/v1 path. `jwt` nil = anonymous (sign-in), set = acting as the signed-in user.
+    private func authJSON(_ method: String, path: String, body: [String: Any], jwt: String? = nil) async throws -> Data {
+        guard let url = URL(string: "\(Self.url)\(path)"),
+              let bodyData = try? JSONSerialization.data(withJSONObject: body)
+        else { throw SupabaseError.decodeFailed("bad request") }
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        (jwt.map { authHeaders(jwt: $0) } ?? anonHeaders).forEach { req.setValue($1, forHTTPHeaderField: $0) }
+        req.httpBody = bodyData
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let msg = String(data: data, encoding: .utf8) ?? "unknown"
+            throw SupabaseError.httpError((resp as? HTTPURLResponse)?.statusCode ?? 0, msg)
+        }
+        return data
+    }
+
+    /// Sign-in: text a 6-digit code to `phone` (E.164, e.g. +14045551234). Creates the account if new.
+    func sendPhoneOTP(phone: String) async throws {
+        _ = try await authJSON("POST", path: "/auth/v1/otp", body: ["phone": phone, "create_user": true])
+    }
+
+    /// Sign-in: verify the texted code and return a session.
+    func verifyPhoneOTP(phone: String, token: String) async throws -> SupabaseSession {
+        let data = try await authJSON("POST", path: "/auth/v1/verify", body: ["phone": phone, "token": token, "type": "sms"])
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let accessToken = json["access_token"] as? String,
+              let refreshToken = json["refresh_token"] as? String,
+              let user = json["user"] as? [String: Any],
+              let userId = user["id"] as? String
+        else { throw SupabaseError.decodeFailed("session parse failed") }
+        return SupabaseSession(accessToken: accessToken, refreshToken: refreshToken,
+                               userId: userId, email: (user["email"] as? String) ?? "",
+                               phone: (user["phone"] as? String) ?? phone)
+    }
+
+    /// Signed-in account without a phone: attach one. Texts a code to `phone`.
+    func addPhone(phone: String, jwt: String) async throws {
+        _ = try await authJSON("PUT", path: "/auth/v1/user", body: ["phone": phone], jwt: jwt)
+    }
+
+    /// Confirm the code for addPhone; the verified number is then stored on the account.
+    func verifyPhoneChange(phone: String, token: String, jwt: String) async throws {
+        _ = try await authJSON("POST", path: "/auth/v1/verify", body: ["phone": phone, "token": token, "type": "phone_change"], jwt: jwt)
+    }
+
     /// Refresh an expired access token using the refresh token.
     func refreshSession(refreshToken: String) async throws -> SupabaseSession {
         let urlStr = "\(Self.url)/auth/v1/token?grant_type=refresh_token"
@@ -209,13 +274,13 @@ final class SupabaseClient {
               let accessToken = json["access_token"] as? String,
               let newRefresh = json["refresh_token"] as? String,
               let user = json["user"] as? [String: Any],
-              let userId = user["id"] as? String,
-              let email = user["email"] as? String
+              let userId = user["id"] as? String
         else {
             throw SupabaseError.decodeFailed("refresh parse failed")
         }
         return SupabaseSession(accessToken: accessToken, refreshToken: newRefresh,
-                               userId: userId, email: email)
+                               userId: userId, email: (user["email"] as? String) ?? "",
+                               phone: user["phone"] as? String)
     }
 
     // MARK: - Auth: OAuth (Google, etc.)
@@ -245,14 +310,14 @@ final class SupabaseClient {
             let errorDesc = params.first(where: { $0.name == "error_description" })?.value
             throw SupabaseError.httpError(0, errorDesc ?? "OAuth callback missing tokens")
         }
-        let (userId, email) = try await fetchUser(accessToken: accessToken)
+        let (userId, email, phone) = try await fetchUser(accessToken: accessToken)
         return SupabaseSession(accessToken: accessToken, refreshToken: refreshToken,
-                               userId: userId, email: email)
+                               userId: userId, email: email, phone: phone)
     }
 
     /// GET /auth/v1/user — resolves id/email for an access token (OAuth callbacks
     /// don't include the user object inline the way verify/token responses do).
-    private func fetchUser(accessToken: String) async throws -> (id: String, email: String) {
+    private func fetchUser(accessToken: String) async throws -> (id: String, email: String, phone: String?) {
         guard let url = URL(string: "\(Self.url)/auth/v1/user") else {
             throw SupabaseError.decodeFailed("bad url")
         }
@@ -266,12 +331,11 @@ final class SupabaseClient {
             throw SupabaseError.httpError((resp as? HTTPURLResponse)?.statusCode ?? 0, msg)
         }
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let id = json["id"] as? String,
-              let email = json["email"] as? String
+              let id = json["id"] as? String
         else {
             throw SupabaseError.decodeFailed("user parse failed")
         }
-        return (id, email)
+        return (id, (json["email"] as? String) ?? "", json["phone"] as? String)
     }
 
     /// Sign out — invalidates the server session.
@@ -291,4 +355,6 @@ struct SupabaseSession: Codable {
     let refreshToken: String
     let userId: String
     let email: String
+    /// Verified phone on the Supabase user; nil/empty until the account verifies one.
+    var phone: String? = nil
 }

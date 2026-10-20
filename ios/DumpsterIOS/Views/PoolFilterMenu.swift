@@ -9,7 +9,7 @@ struct PoolFilterMenu: View {
 
     var body: some View {
         Menu {
-            ForEach(FilterType.allCases) { filter in
+            ForEach(FilterType.allCases.filter { $0 != .videos }) { filter in
                 Button {
                     toggle(filter)
                 } label: {

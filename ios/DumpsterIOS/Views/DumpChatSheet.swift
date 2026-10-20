@@ -37,7 +37,7 @@ struct DumpChatSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
-        .onAppear(perform: loadHistory)
+        .onAppear { loadHistory(); reviewIfRulesChanged() }
     }
 
     // MARK: - Drag Handle
@@ -145,7 +145,9 @@ struct DumpChatSheet: View {
                     }
 
                     ForEach(messages, id: \.id) { msg in
-                        MessageBubble(message: msg, accentColor: gold)
+                        MessageBubble(message: msg, accentColor: gold,
+                                      onApply: { applyProposed(msg) },
+                                      onUndo: { undo(msg) })
                             .id(msg.id)
                     }
 
@@ -340,6 +342,52 @@ struct DumpChatSheet: View {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isLoading else { return }
         input = ""
+        send(text)
+    }
+
+    // MARK: - Ask first / Apply / Undo
+
+    private struct Snapshot: Codable { var ids: [String]; var vibe: String? }
+    private func snapshotJSON() -> String? {
+        (try? JSONEncoder().encode(Snapshot(ids: dump.photoIDs, vibe: dump.vibeBadge)))
+            .flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    /// Rules / taste / dump style changed since this dump's Valet was last opened:
+    /// review the dump and suggest fixes. Nothing moves until the user taps Apply.
+    private func reviewIfRulesChanged() {
+        let key = "valet_rules_seen_" + dump.id
+        let sig = LLMService.shared.userContextBlock()
+        guard let seen = UserDefaults.standard.string(forKey: key) else {
+            UserDefaults.standard.set(sig, forKey: key); return
+        }
+        guard seen != sig, !dump.photoIDs.isEmpty, !isLoading else { return }
+        UserDefaults.standard.set(sig, forKey: key)
+        send("My AI rules or dump style changed. Check this dump against my current rules. Don't change anything yet: tell me what doesn't fit, suggest fixes, or ask me a question first.", askFirst: true)
+    }
+
+    private func applyProposed(_ msg: DumpChatMessage) {
+        guard msg.proposed,
+              let json = msg.actionsJSON, let data = json.data(using: .utf8),
+              let actions = try? JSONDecoder().decode([LLMService.ChatAction].self, from: data) else { return }
+        msg.undoJSON = snapshotJSON()
+        msg.proposed = false
+        executeActions(actions)
+        try? modelContext.save()
+        HapticManager.shared.playTick()
+    }
+
+    private func undo(_ msg: DumpChatMessage) {
+        guard let json = msg.undoJSON, let data = json.data(using: .utf8),
+              let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
+        dump.photoIDs = snap.ids
+        dump.vibeBadge = snap.vibe
+        msg.undone = true
+        try? modelContext.save()
+        HapticManager.shared.playRemove()
+    }
+
+    private func send(_ text: String, askFirst: Bool = false) {
         errorText = nil
 
         let userMsg = DumpChatMessage(dumpId: dump.id, role: "user", text: text)
@@ -375,7 +423,14 @@ struct DumpChatSheet: View {
                     tasteBlock: taste
                 )
 
-                executeActions(response.actions)
+                let hasActions = response.actions.contains { $0.type != "taste_update" && $0.type != "suggest_missing" }
+                let undoJSON = (hasActions && !askFirst) ? snapshotJSON() : nil
+                if askFirst {
+                    // Suggest only — still queue taste prefs, but don't touch the dump.
+                    executeActions(response.actions.filter { $0.type == "taste_update" })
+                } else {
+                    executeActions(response.actions)
+                }
 
                 let actionsData = try? JSONEncoder().encode(response.actions)
                 let actionsJSON = actionsData.flatMap { String(data: $0, encoding: .utf8) }
@@ -386,6 +441,8 @@ struct DumpChatSheet: View {
                     text: response.reply,
                     actionsJSON: actionsJSON
                 )
+                assistantMsg.proposed = askFirst && hasActions
+                assistantMsg.undoJSON = undoJSON
                 modelContext.insert(assistantMsg)
                 messages.append(assistantMsg)
                 try? modelContext.save()
@@ -458,6 +515,8 @@ struct DumpChatSheet: View {
 private struct MessageBubble: View {
     let message: DumpChatMessage
     let accentColor: Color
+    var onApply: () -> Void = {}
+    var onUndo: () -> Void = {}
 
     private var isUser: Bool { message.role == "user" }
 
@@ -500,6 +559,23 @@ private struct MessageBubble: View {
                             )
                         }
                     }
+                }
+                if message.proposed {
+                    Button("Apply these changes", action: onApply)
+                        .font(.system(size: 11, weight: .bold)).foregroundColor(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Capsule().fill(accentColor.opacity(0.2)))
+                        .overlay(Capsule().stroke(accentColor, lineWidth: 1))
+                        .padding(.top, 8)
+                } else if message.undoJSON != nil && !message.undone {
+                    Button("Undo", action: onUndo)
+                        .font(.system(size: 11, weight: .bold)).foregroundColor(.white.opacity(0.7))
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Capsule().fill(Color.black.opacity(0.3)))
+                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                        .padding(.top, 8)
+                } else if message.undone {
+                    Text("Undone").font(.system(size: 10)).foregroundColor(.white.opacity(0.4)).padding(.top, 8)
                 }
             }
             .padding(.horizontal, 14)

@@ -10,7 +10,7 @@ struct DumpStylesCard: View {
 
     @State private var styles = DumpStyle.load()
     @State private var activeId = DumpStyle.activeId()
-    @State private var editId = DumpStyle.activeId().isEmpty ? (DumpStyle.load().first?.id ?? "") : DumpStyle.activeId()
+    @State private var editId = ""          // editor stays closed until a style chip is tapped
     @State private var confirmDelete = false
     @State private var status = ""          // "", "Saving…", "Saved"
     @State private var statusTask: Task<Void, Never>?
@@ -29,9 +29,9 @@ struct DumpStylesCard: View {
             }
 
             FlowLayout(spacing: 6) {
-                chip("None", on: activeId.isEmpty) { activate("") }
+                chip("None", on: activeId.isEmpty) { activate(""); editId = "" }
                 ForEach(styles) { s in
-                    chip(s.name.isEmpty ? "Untitled" : s.name, on: s.id == activeId, active: s.id == activeId) { activate(s.id) }
+                    chip(s.name.isEmpty ? "Untitled" : s.name, on: s.id == activeId, active: s.id == activeId) { activate(s.id); editId = (editId == s.id) ? "" : s.id }
                 }
                 chip("+ New style", on: false, dashed: true) { addStyle() }
             }
@@ -59,7 +59,6 @@ struct DumpStylesCard: View {
     private func activate(_ id: String) {
         activeId = id
         UserDefaults.standard.set(id, forKey: DumpStyle.activeKey)
-        if !id.isEmpty { editId = id }
         confirmDelete = false
         scheduleCloudSync()
         // Confirmation toast (web: "<name> style on" / "Dump style off").

@@ -333,6 +333,14 @@ struct FileCabinetMenuView: View {
                     .padding(.bottom, 60)
                 }
             }
+            // Swipe from the left edge = back to the folder list.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20).onEnded { v in
+                    if v.startLocation.x < 32, v.translation.width > 70, abs(v.translation.height) < 80 {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { selectedTab = nil }
+                    }
+                }
+            )
             .background(darkBg.ignoresSafeArea())
         }
     }

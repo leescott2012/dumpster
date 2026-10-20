@@ -201,11 +201,13 @@ struct FriendProfileView: View {
     let person: SocialPerson
     private let gold = Color(hex: "#C8A96E")
     @State private var dumps: [FriendDump]?
+    @State private var displayName = ""
     @State private var error = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                hero
                 if !error.isEmpty { Text(error).foregroundColor(.white.opacity(0.6)) }
                 else if dumps == nil { ProgressView().tint(gold) }
                 else if dumps?.isEmpty == true {
@@ -215,20 +217,20 @@ struct FriendProfileView: View {
                     NavigationLink { FriendDumpView(dump: d) } label: {
                         VStack(alignment: .leading, spacing: 8) {
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 6) {
-                                    ForEach(Array(d.photoURLs.prefix(5).enumerated()), id: \.offset) { _, u in
+                                HStack(spacing: 10) {
+                                    ForEach(Array(d.photoURLs.prefix(6).enumerated()), id: \.offset) { _, u in
                                         AsyncImage(url: u) { $0.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
-                                            .frame(width: 74, height: 96).clipShape(RoundedRectangle(cornerRadius: 8))
+                                            .frame(width: 168, height: 216).clipShape(RoundedRectangle(cornerRadius: 12))
                                     }
                                 }
                             }
-                            Text(d.title).font(.system(size: 14, weight: .bold)).foregroundColor(.white)
-                            if let s = d.subtitle { Text(s).font(.system(size: 12)).foregroundColor(.white.opacity(0.5)) }
+                            Text(d.title).font(.system(size: 17, weight: .heavy)).foregroundColor(.white)
+                            if let s = d.subtitle { Text(s).font(.system(size: 13)).foregroundColor(.white.opacity(0.5)) }
                             Text("\(d.photoURLs.count) photos · " + (d.commentCount > 0 ? "\(d.commentCount) comment\(d.commentCount == 1 ? "" : "s")" : "Tap to comment"))
                                 .font(.system(size: 11)).foregroundColor(gold)
                         }
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.05)))
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 18).fill(Color.white.opacity(0.05)))
                     }
                 }
             }
@@ -240,11 +242,40 @@ struct FriendProfileView: View {
         .task { await load() }
     }
 
+    private var hero: some View {
+        VStack(spacing: 6) {
+            Text(String(person.username.prefix(1)).uppercased())
+                .font(.system(size: 32, weight: .heavy)).foregroundColor(.black)
+                .frame(width: 84, height: 84)
+                .background(Circle().fill(LinearGradient(colors: [person.color.map { Color(hex: $0) } ?? gold, Color(white: 0.1)], startPoint: .topLeading, endPoint: .bottomTrailing)))
+                .overlay(Circle().stroke(gold, lineWidth: 2))
+            Text("@\(person.username)").font(.system(size: 20, weight: .heavy)).foregroundColor(.white)
+            if !displayName.isEmpty { Text(displayName).font(.system(size: 13)).foregroundColor(.white.opacity(0.5)) }
+            if let dumps {
+                HStack(spacing: 28) {
+                    stat(dumps.count, "DUMPS")
+                    stat(dumps.reduce(0) { $0 + $1.photoURLs.count }, "PHOTOS")
+                    stat(dumps.reduce(0) { $0 + $1.commentCount }, "COMMENTS")
+                }.padding(.top, 8)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 10)
+    }
+
+    private func stat(_ n: Int, _ label: String) -> some View {
+        VStack(spacing: 2) {
+            Text("\(n)").font(.system(size: 18, weight: .heavy)).foregroundColor(.white)
+            Text(label).font(.system(size: 9, weight: .heavy)).tracking(1).foregroundColor(.white.opacity(0.4))
+        }
+    }
+
     private func load() async {
         guard let (code, json) = try? await SocialAPI.request("api/connections", query: ["mode": "profile", "userId": person.id]) else {
             error = "Couldn't load this profile."; return
         }
         guard code == 200 else { error = (json["error"] as? String) ?? "Couldn't load this profile."; return }
+        displayName = ((json["profile"] as? [String: Any])?["display_name"] as? String) ?? ""
         dumps = ((json["dumps"] as? [[String: Any]]) ?? []).compactMap { d in
             guard let id = d["id"] as? String, let title = d["title"] as? String else { return nil }
             let urls = ((d["photos"] as? [[String: Any]]) ?? []).compactMap { ($0["url"] as? String).flatMap(URL.init) }
@@ -273,11 +304,19 @@ private struct FriendDumpView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                        ForEach(Array(dump.photoURLs.enumerated()), id: \.offset) { _, u in
-                            AsyncImage(url: u) { $0.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
-                                .aspectRatio(4.0 / 5.0, contentMode: .fill)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(Array(dump.photoURLs.enumerated()), id: \.offset) { i, u in
+                                AsyncImage(url: u) { $0.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
+                                    .frame(width: 300, height: 375)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                    .overlay(alignment: .topTrailing) {
+                                        Text("\(i + 1) / \(dump.photoURLs.count)")
+                                            .font(.system(size: 11)).foregroundColor(.white)
+                                            .padding(.horizontal, 9).padding(.vertical, 3)
+                                            .background(Capsule().fill(Color.black.opacity(0.6))).padding(10)
+                                    }
+                            }
                         }
                     }
                     Text("IDEAS & COMMENTS").font(.system(size: 10, weight: .heavy)).tracking(1.2).foregroundColor(.white.opacity(0.4))

@@ -5,6 +5,51 @@ import SwiftUI
 // Magic link (email OTP) sign-in — the ONLY auth method allowed per NATIVE_PORT.md §8.
 // Password-based auth is PROHIBITED.
 
+// MARK: - Dark tokens (match Theme.swift: black surface, #C8A96E gold)
+
+private enum DK {
+    static let bg = Color(red: 10/255, green: 10/255, blue: 10/255)
+    static let field = Color.white.opacity(0.07)
+    static let stroke = Color.white.opacity(0.14)
+    static let text = Color(red: 232/255, green: 232/255, blue: 232/255)
+    static let text2 = Color(red: 153/255, green: 153/255, blue: 153/255)
+    static let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
+    static let radius: CGFloat = 12
+}
+
+private extension View {
+    func dkField() -> some View {
+        self.font(.body)
+            .foregroundColor(DK.text)
+            .tint(DK.gold)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 50)
+            .background(DK.field)
+            .clipShape(RoundedRectangle(cornerRadius: DK.radius))
+            .overlay(RoundedRectangle(cornerRadius: DK.radius).stroke(DK.stroke, lineWidth: 1))
+    }
+    func dkPrimary(enabled: Bool) -> some View {
+        self.font(.body.weight(.semibold))
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(enabled ? DK.gold : DK.gold.opacity(0.25))
+            .foregroundColor(enabled ? .black : DK.text2)
+            .clipShape(RoundedRectangle(cornerRadius: DK.radius))
+    }
+}
+
+private func dkPrompt(_ s: String) -> Text { Text(s).foregroundColor(DK.text2) }
+
+private struct DKDivider: View {
+    let label: String
+    var body: some View {
+        HStack(spacing: 12) {
+            Rectangle().fill(DK.stroke).frame(height: 1)
+            Text(label).font(.footnote).foregroundColor(DK.text2).fixedSize()
+            Rectangle().fill(DK.stroke).frame(height: 1)
+        }
+    }
+}
+
 struct SignInView: View {
     @ObservedObject private var auth = AuthManager.shared
     @Environment(\.dismiss) private var dismiss
@@ -16,20 +61,16 @@ struct SignInView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Top bar
-            ZStack {
-                HStack {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.black)
-                            .frame(width: 44, height: 44)
-                            .background(Circle().fill(Color.black.opacity(0.05)))
-                    }
-                    Spacer()
+            HStack {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(DK.text)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.white.opacity(0.08)))
                 }
-                Text("Log in")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.black)
+                .accessibilityLabel("Back")
+                Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -42,29 +83,26 @@ struct SignInView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "envelope.badge.fill")
                             .font(.system(size: 40))
-                            .foregroundColor(.black.opacity(0.6))
+                            .foregroundColor(DK.gold)
                         Text("Check your email")
-                            .font(.headline)
-                            .foregroundColor(.black)
+                            .font(.title2.weight(.bold))
+                            .foregroundColor(DK.text)
                         Text("Enter the 6-digit code we sent to\n\(email)")
                             .font(.subheadline)
-                            .foregroundColor(.black.opacity(0.55))
+                            .foregroundColor(DK.text2)
                             .multilineTextAlignment(.center)
 
-                        TextField("123456", text: $code)
+                        TextField("123456", text: $code, prompt: dkPrompt("123456"))
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.center)
                             .focused($codeFocused)
                             .font(.system(size: 28, weight: .semibold, design: .monospaced))
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .foregroundColor(.black)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.black.opacity(0.15), lineWidth: 1)
-                            )
+                            .foregroundColor(DK.text)
+                            .tint(DK.gold)
+                            .frame(minHeight: 56)
+                            .background(DK.field)
+                            .clipShape(RoundedRectangle(cornerRadius: DK.radius))
+                            .overlay(RoundedRectangle(cornerRadius: DK.radius).stroke(DK.stroke, lineWidth: 1))
                             .onChange(of: code) { _, newValue in
                                 let digits = newValue.filter(\.isNumber)
                                 code = String(digits.prefix(6))
@@ -78,7 +116,7 @@ struct SignInView: View {
                         }
 
                         if auth.isSigningIn {
-                            ProgressView().progressViewStyle(.circular)
+                            ProgressView().progressViewStyle(.circular).tint(DK.gold)
                         }
 
                         Button("Use a different email") {
@@ -88,40 +126,36 @@ struct SignInView: View {
                             code = ""
                         }
                         .font(.footnote)
-                        .foregroundColor(.black.opacity(0.45))
+                        .foregroundColor(DK.text2)
+                        .frame(minHeight: 44)
                     }
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, 24)
                     .padding(.top, 40)
                     .onAppear { codeFocused = true }
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Email")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.black)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Log in")
+                            .font(.largeTitle.weight(.bold))
+                            .foregroundColor(DK.text)
+                        Text("We'll email you a code. No password needed.")
+                            .font(.subheadline)
+                            .foregroundColor(DK.text2)
+                            .padding(.top, 6)
+                            .padding(.bottom, 24)
 
-                        TextField("your@email.com", text: $email)
+                        TextField("Email", text: $email, prompt: dkPrompt("your@email.com"))
                             .keyboardType(.emailAddress)
+                            .textContentType(.emailAddress)
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
                             .focused($emailFocused)
-                            .padding()
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .foregroundColor(.black)
-                            .font(.system(size: 16))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.black.opacity(0.15), lineWidth: 1)
-                            )
-
-                        Text("We'll email you a code to sign in.")
-                            .font(.system(size: 13))
-                            .foregroundColor(.black.opacity(0.5))
+                            .dkField()
 
                         if let err = auth.authError {
                             Text(err)
                                 .font(.caption)
                                 .foregroundColor(.red)
+                                .padding(.top, 8)
                         }
 
                         Button(action: sendLink) {
@@ -129,79 +163,58 @@ struct SignInView: View {
                                 if auth.isSigningIn {
                                     ProgressView()
                                         .progressViewStyle(.circular)
-                                        .scaleEffect(0.85)
-                                        .tint(.white)
+                                        .tint(.black)
                                 } else {
                                     Text("Continue")
-                                        .font(.system(size: 16, weight: .semibold))
                                 }
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(isValidEmail ? Color.black : Color.black.opacity(0.15))
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .dkPrimary(enabled: isValidEmail)
                         }
                         .disabled(!isValidEmail || auth.isSigningIn)
-                        .padding(.top, 20)
+                        .padding(.top, 14)
 
-                        HStack {
-                            Rectangle().fill(Color.black.opacity(0.1)).frame(height: 1)
-                            Text("Or").font(.system(size: 14)).foregroundColor(.black.opacity(0.4))
-                            Rectangle().fill(Color.black.opacity(0.1)).frame(height: 1)
-                        }
-                        .padding(.vertical, 20)
+                        DKDivider(label: "or").padding(.vertical, 20)
 
                         Button(action: signInWithGoogle) {
                             HStack(spacing: 10) {
-                                Text("G")
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundColor(.black)
-                                Text("Continue with Google")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.black)
+                                Text("G").font(.body.weight(.bold))
+                                Text("Continue with Google").font(.body.weight(.semibold))
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.black.opacity(0.15), lineWidth: 1)
-                            )
+                            .foregroundColor(DK.text)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(DK.field)
+                            .clipShape(RoundedRectangle(cornerRadius: DK.radius))
+                            .overlay(RoundedRectangle(cornerRadius: DK.radius).stroke(DK.stroke, lineWidth: 1))
                         }
                         .disabled(auth.isSigningIn)
 
-                        HStack {
-                            Rectangle().fill(Color.black.opacity(0.1)).frame(height: 1)
-                            Text("Or use phone").font(.system(size: 14)).foregroundColor(.black.opacity(0.4)).fixedSize()
-                            Rectangle().fill(Color.black.opacity(0.1)).frame(height: 1)
-                        }
-                        .padding(.vertical, 20)
+                        DKDivider(label: "or use phone").padding(.vertical, 20)
 
                         PhoneCodeForm(adding: false, lockedHint: "Use email or Google above instead.")
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 24)
+                    .padding(.top, 20)
+                    .padding(.bottom, 16)
                 }
             }
-
-            Spacer()
+            .scrollDismissesKeyboard(.interactively)
 
             VStack(spacing: 2) {
                 Text("By continuing you agree to Dumpster's")
-                    .foregroundColor(.black.opacity(0.4))
+                    .foregroundColor(DK.text2)
                 HStack(spacing: 4) {
                     Link("Terms of Service", destination: URL(string: "https://dumpster-web-manus.vercel.app/terms")!)
-                    Text("and").foregroundColor(.black.opacity(0.4))
+                    Text("and").foregroundColor(DK.text2)
                     Link("Privacy Policy", destination: URL(string: "https://dumpster-web-manus.vercel.app/privacy")!)
                 }
+                .tint(DK.gold)
             }
             .font(.caption2)
             .multilineTextAlignment(.center)
-            .padding(.bottom, 24)
+            .padding(.vertical, 12)
         }
-        .background(Color(white: 0.97).ignoresSafeArea())
+        .background(DK.bg.ignoresSafeArea())
+        .preferredColorScheme(.dark)
         .onAppear { emailFocused = true }
         .onChange(of: auth.isSignedIn) { _, signedIn in
             if signedIn { dismiss() }
@@ -282,46 +295,33 @@ struct PhoneCodeForm: View {
             if locked && !codeStage {
                 Text("Too many codes requested. Try again in about \(minutesLeft) min. \(lockedHint)")
                     .font(.footnote)
-                    .foregroundColor(.black.opacity(0.6))
+                    .foregroundColor(DK.text2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(Color.black.opacity(0.05))
+                    .background(DK.field)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
-                TextField("Phone number", text: $phone, prompt: Text("Phone number").foregroundColor(.black.opacity(0.4)))
-                    .foregroundColor(.black)
+                TextField("Phone number", text: $phone, prompt: dkPrompt("Phone number"))
                     .keyboardType(.phonePad)
                     .textContentType(.telephoneNumber)
                     .disabled(codeStage || busy)
-                    .padding(14)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.15), lineWidth: 1))
+                    .dkField()
 
                 if codeStage {
-                    TextField("6-digit code", text: $code, prompt: Text("6-digit code").foregroundColor(.black.opacity(0.4)))
-                        .foregroundColor(.black)
+                    TextField("6-digit code", text: $code, prompt: dkPrompt("6-digit code"))
                         .keyboardType(.numberPad)
                         .textContentType(.oneTimeCode)
                         .disabled(busy)
                         .onChange(of: code) { _, v in code = String(v.filter(\.isNumber).prefix(6)) }
-                        .padding(14)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.15), lineWidth: 1))
+                        .dkField()
                 }
 
                 Button(action: { Task { codeStage ? await verify() : await send() } }) {
                     HStack {
-                        if busy { ProgressView().tint(.white) }
+                        if busy { ProgressView().tint(.black) }
                         Text(codeStage ? "Verify code" : "Text me a code")
-                            .font(.system(size: 16, weight: .semibold))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(canSubmit ? Color.black : Color.black.opacity(0.15))
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .dkPrimary(enabled: canSubmit)
                 }
                 .disabled(!canSubmit || busy)
 
@@ -337,8 +337,9 @@ struct PhoneCodeForm: View {
                         }
                     }
                     .font(.footnote)
-                    .foregroundColor(.black.opacity(0.5))
-                    if locked { Text("Code limit reached. \(lockedHint)").font(.footnote).foregroundColor(.black.opacity(0.5)) }
+                    .foregroundColor(DK.text2)
+                    .frame(minHeight: 44)
+                    if locked { Text("Code limit reached. \(lockedHint)").font(.footnote).foregroundColor(DK.text2) }
                 }
             }
 
@@ -394,15 +395,17 @@ struct PhoneGateView: View {
     var body: some View {
         VStack(spacing: 16) {
             Spacer()
-            Text("Verify your phone").font(.system(size: 24, weight: .bold))
+            Image(systemName: "phone.badge.checkmark").font(.system(size: 36)).foregroundColor(DK.gold)
+            Text("Verify your phone").font(.title2.weight(.bold)).foregroundColor(DK.text)
             Text("Add a phone number to keep your account secure. We'll text you a 6-digit code.")
-                .font(.subheadline).foregroundColor(.black.opacity(0.6)).multilineTextAlignment(.center)
+                .font(.subheadline).foregroundColor(DK.text2).multilineTextAlignment(.center)
             PhoneCodeForm(adding: true, lockedHint: "Sign out below and sign in a different way, or try again later.")
             Button("Sign out") { Task { await auth.signOut() } }
-                .font(.footnote).foregroundColor(.black.opacity(0.4)).padding(.top, 8)
+                .font(.footnote).foregroundColor(DK.text2).frame(minHeight: 44)
             Spacer()
         }
         .padding(24)
-        .background(Color(white: 0.97).ignoresSafeArea())
+        .background(DK.bg.ignoresSafeArea())
+        .preferredColorScheme(.dark)
     }
 }

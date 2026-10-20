@@ -199,9 +199,14 @@ final class AuthManager: ObservableObject {
     /// same way handleCallback does for magic link. No Google SDK / client ID
     /// needed on our end — Supabase already brokers Google OAuth (same config
     /// web's AuthContext.tsx uses).
-    func signInWithGoogle() async {
-        guard let authorizeURL = SupabaseClient.shared.oauthAuthorizeURL(provider: "google") else {
-            authError = "Could not build Google sign-in URL."
+    func signInWithGoogle() async { await oauthSignIn(provider: "google") }
+
+    /// Same browser-sheet flow as Google; Supabase brokers Apple (already enabled for the web app).
+    func signInWithApple() async { await oauthSignIn(provider: "apple") }
+
+    private func oauthSignIn(provider: String) async {
+        guard let authorizeURL = SupabaseClient.shared.oauthAuthorizeURL(provider: provider) else {
+            authError = "Could not build \(provider.capitalized) sign-in URL."
             return
         }
 
@@ -217,7 +222,7 @@ final class AuthManager: ObservableObject {
             // User dismissed the sheet — not a real error, stay quiet.
         } catch {
             authError = error.localizedDescription
-            CrashReporter.shared.capture(error, tags: ["action": "google_oauth"])
+            CrashReporter.shared.capture(error, tags: ["action": "\(provider)_oauth"])
         }
     }
 

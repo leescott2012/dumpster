@@ -37,6 +37,15 @@ private extension View {
     }
 }
 
+/// US numbers by default: 10 digits -> +1XXXXXXXXXX; anything starting with + is used as typed.
+private func normalizedE164(_ raw: String) -> String? {
+    let t = raw.trimmingCharacters(in: .whitespaces)
+    let digits = t.filter(\.isNumber)
+    if t.hasPrefix("+") { return digits.count >= 8 ? "+" + digits : nil }
+    if digits.count == 11 && digits.hasPrefix("1") { return "+" + digits }
+    return digits.count == 10 ? "+1" + digits : nil
+}
+
 private func dkPrompt(_ s: String) -> Text { Text(s).foregroundColor(DK.text2) }
 
 private struct DKDivider: View {
@@ -53,8 +62,10 @@ private struct DKDivider: View {
 struct SignInView: View {
     @ObservedObject private var auth = AuthManager.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var identifier = ""          // one box: phone or email
     @State private var email = ""
     @State private var code = ""
+    @State private var phoneFlow = false
     @FocusState private var emailFocused: Bool
     @FocusState private var codeFocused: Bool
 
@@ -123,6 +134,7 @@ struct SignInView: View {
                             auth.magicLinkSent = false
                             auth.authError = nil
                             email = ""
+                            identifier = ""
                             code = ""
                         }
                         .font(.footnote)
@@ -132,48 +144,47 @@ struct SignInView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 40)
                     .onAppear { codeFocused = true }
+                } else if phoneFlow {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Enter your code")
+                            .font(.title2.weight(.bold))
+                            .foregroundColor(DK.text)
+                        PhoneCodeForm(adding: false, lockedHint: "Use Apple, Google or email instead.",
+                                      initialPhone: identifier, autoSend: true)
+                        Button("Use a different number or email") {
+                            phoneFlow = false
+                            identifier = ""
+                            emailFocused = true
+                        }
+                        .font(.footnote)
+                        .foregroundColor(DK.text2)
+                        .frame(minHeight: 44)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 32)
                 } else {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Log in")
                             .font(.largeTitle.weight(.bold))
                             .foregroundColor(DK.text)
-                        Text("We'll email you a code. No password needed.")
+                        Text("Sign in or create an account. No password needed.")
                             .font(.subheadline)
                             .foregroundColor(DK.text2)
                             .padding(.top, 6)
                             .padding(.bottom, 24)
 
-                        TextField("Email", text: $email, prompt: dkPrompt("your@email.com"))
-                            .keyboardType(.emailAddress)
-                            .textContentType(.emailAddress)
-                            .autocapitalization(.none)
-                            .disableAutocorrection(true)
-                            .focused($emailFocused)
-                            .dkField()
-
-                        if let err = auth.authError {
-                            Text(err)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .padding(.top, 8)
-                        }
-
-                        Button(action: sendLink) {
-                            HStack {
-                                if auth.isSigningIn {
-                                    ProgressView()
-                                        .progressViewStyle(.circular)
-                                        .tint(.black)
-                                } else {
-                                    Text("Continue")
-                                }
+                        Button(action: signInWithApple) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "apple.logo")
+                                Text("Continue with Apple")
                             }
-                            .dkPrimary(enabled: isValidEmail)
+                            .font(.body.weight(.semibold))
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: DK.radius))
                         }
-                        .disabled(!isValidEmail || auth.isSigningIn)
-                        .padding(.top, 14)
-
-                        DKDivider(label: "or").padding(.vertical, 20)
+                        .disabled(auth.isSigningIn)
 
                         Button(action: signInWithGoogle) {
                             HStack(spacing: 10) {
@@ -187,10 +198,44 @@ struct SignInView: View {
                             .overlay(RoundedRectangle(cornerRadius: DK.radius).stroke(DK.stroke, lineWidth: 1))
                         }
                         .disabled(auth.isSigningIn)
+                        .padding(.top, 10)
 
-                        DKDivider(label: "or use phone").padding(.vertical, 20)
+                        DKDivider(label: "or").padding(.vertical, 20)
 
-                        PhoneCodeForm(adding: false, lockedHint: "Use email or Google above instead.")
+                        TextField("Phone or email", text: $identifier, prompt: dkPrompt("Phone or email"))
+                            .keyboardType(.emailAddress)       // shows @ and digits; phone numbers are still easy to type
+                            .textContentType(.username)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                            .submitLabel(.continue)
+                            .focused($emailFocused)
+                            .onSubmit { continueTapped() }
+                            .dkField()
+
+                        if let err = auth.authError {
+                            Text(err)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(.top, 8)
+                        }
+
+                        Button(action: continueTapped) {
+                            HStack {
+                                if auth.isSigningIn {
+                                    ProgressView().progressViewStyle(.circular).tint(.black)
+                                } else {
+                                    Text("Continue")
+                                }
+                            }
+                            .dkPrimary(enabled: canContinue)
+                        }
+                        .disabled(!canContinue || auth.isSigningIn)
+                        .padding(.top, 14)
+
+                        Text("We'll text or email you a 6-digit code.")
+                            .font(.footnote)
+                            .foregroundColor(DK.text2)
+                            .padding(.top, 10)
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 20)
@@ -221,16 +266,27 @@ struct SignInView: View {
         }
     }
 
-    private var isValidEmail: Bool {
-        let e = email.trimmingCharacters(in: .whitespaces)
-        return e.contains("@") && e.contains(".")
+    private var idTrimmed: String { identifier.trimmingCharacters(in: .whitespaces) }
+    private var isEmailInput: Bool { idTrimmed.contains("@") }
+    private var canContinue: Bool {
+        isEmailInput ? (idTrimmed.contains(".") && idTrimmed.count > 4) : normalizedE164(idTrimmed) != nil
     }
 
-    private func sendLink() {
-        let trimmed = email.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
+    /// One box: "@" means email code, otherwise a phone number.
+    private func continueTapped() {
+        guard canContinue else { return }
         emailFocused = false
-        Task { await auth.sendMagicLink(email: trimmed) }
+        if isEmailInput {
+            email = idTrimmed
+            Task { await auth.sendMagicLink(email: idTrimmed) }
+        } else {
+            phoneFlow = true
+        }
+    }
+
+    private func signInWithApple() {
+        emailFocused = false
+        Task { await auth.signInWithApple() }
     }
 
     private func signInWithGoogle() {
@@ -253,6 +309,8 @@ struct SignInView: View {
 struct PhoneCodeForm: View {
     let adding: Bool            // true = attach phone to the signed-in account; false = sign in by phone
     let lockedHint: String
+    var initialPhone: String = ""   // sign-in screen passes the number already typed
+    var autoSend: Bool = false      // ...and sends the code right away
 
     @ObservedObject private var auth = AuthManager.shared
     @State private var phone = ""
@@ -281,14 +339,7 @@ struct PhoneCodeForm: View {
         return max(1, Int(ceil((first + Self.windowSecs - Date().timeIntervalSince1970) / 60)))
     }
 
-    /// US numbers by default: 10 digits -> +1XXXXXXXXXX; anything starting with + is used as typed.
-    private var e164: String? {
-        let t = phone.trimmingCharacters(in: .whitespaces)
-        let digits = t.filter(\.isNumber)
-        if t.hasPrefix("+") { return "+" + digits }
-        if digits.count == 11 && digits.hasPrefix("1") { return "+" + digits }
-        return digits.count == 10 ? "+1" + digits : nil
-    }
+    private var e164: String? { normalizedE164(phone) }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -312,7 +363,10 @@ struct PhoneCodeForm: View {
                         .keyboardType(.numberPad)
                         .textContentType(.oneTimeCode)
                         .disabled(busy)
-                        .onChange(of: code) { _, v in code = String(v.filter(\.isNumber).prefix(6)) }
+                        .onChange(of: code) { _, v in
+                            code = String(v.filter(\.isNumber).prefix(6))
+                            if code.count == 6 && !busy { Task { await verify() } }   // auto-submit
+                        }
                         .dkField()
                 }
 
@@ -345,6 +399,12 @@ struct PhoneCodeForm: View {
 
             if let error = error {
                 Text(error).font(.caption).foregroundColor(.red).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .task {
+            if autoSend && phone.isEmpty && !initialPhone.isEmpty {
+                phone = initialPhone
+                await send()
             }
         }
         .task(id: cooldown) {

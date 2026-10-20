@@ -320,6 +320,8 @@ struct PhoneCodeForm: View {
     @State private var error: String?
     @State private var cooldown = 0
     @State private var wrong = 0
+    @State private var inUse = false      // adding a phone another account already owns
+    @State private var reported = false
     @State private var sends: [Double] = PhoneCodeForm.recentSends()
 
     private static let maxSends = 3
@@ -343,7 +345,22 @@ struct PhoneCodeForm: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            if locked && !codeStage {
+            if inUse {
+                Text("That number is already linked to another Dumpster account. If it's yours, send this to us and we'll match it to this account.")
+                    .font(.footnote)
+                    .foregroundColor(DK.text2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(DK.field)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                Button(action: { reportPhoneInUse() }) {
+                    Text(reported ? "Sent. We'll sort it out." : "This is my number: send to support")
+                        .dkPrimary(enabled: !reported)
+                }
+                .disabled(reported)
+                Button("Use a different number") { inUse = false; codeStage = false; phone = ""; error = nil }
+                    .font(.footnote).foregroundColor(DK.text2)
+            } else if locked && !codeStage {
                 Text("Too many codes requested. Try again in about \(minutesLeft) min. \(lockedHint)")
                     .font(.footnote)
                     .foregroundColor(DK.text2)
@@ -414,6 +431,27 @@ struct PhoneCodeForm: View {
         }
     }
 
+    /// Files a bug-bin report (same endpoint the web app uses) so the number can be matched to this account.
+    private func reportPhoneInUse() {
+        reported = true
+        let number = e164 ?? phone
+        Task {
+            guard let url = URL(string: "https://dumpster-web-manus.vercel.app/api/bug-report") else { return }
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let jwt = AuthManager.shared.jwt { req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization") }
+            let body: [String: Any] = [
+                "source": "phone-in-use",
+                "message": "Can't verify phone: number already used by another account",
+                "user_agent": "Dumpster iOS",
+                "context": ["phone": number, "note": "User says the number is theirs; link or free it for their signed-in account."],
+            ]
+            req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+            _ = try? await URLSession.shared.data(for: req)
+        }
+    }
+
     private var canSubmit: Bool { codeStage ? code.count == 6 : e164 != nil }
 
     private func send() async {
@@ -423,7 +461,14 @@ struct PhoneCodeForm: View {
         busy = true
         let err = await auth.sendPhoneCode(phone: number, adding: adding)
         busy = false
-        if let err = err { error = err; return }
+        if let err = err {
+            if adding, err.range(of: "already|registered|exists|in use|taken", options: [.regularExpression, .caseInsensitive]) != nil {
+                inUse = true
+            } else {
+                error = err
+            }
+            return
+        }
         UserDefaults.standard.set(Self.recentSends() + [Date().timeIntervalSince1970], forKey: Self.key)
         sends = Self.recentSends()
         code = ""; wrong = 0; cooldown = Self.cooldownSecs; codeStage = true

@@ -469,6 +469,7 @@ struct AISettingsTabView: View {
 
     // AI Rules editor state
     @State private var draftRule: String = ""
+    @State private var showConnections = false
     @State private var openRule: Int? = nil
     @FocusState private var newRuleFocused: Bool
     @State private var savedToast: Bool = false
@@ -505,6 +506,24 @@ struct AISettingsTabView: View {
             CabinetSectionHeader("AI RULES", icon: "list.bullet.rectangle")
             aiRulesCard
                 .padding(.horizontal, 24)
+
+            // Connections — friends, their profiles, comments on their dumps
+            CabinetSectionHeader("CONNECTIONS", icon: "person.2")
+            Button { showConnections = true } label: {
+                HStack {
+                    Text("Find friends, view profiles, comment on dumps")
+                        .font(.system(size: 13)).foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12)).foregroundColor(.white.opacity(0.3))
+                }
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.04)))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+            .sheet(isPresented: $showConnections) {
+                NavigationStack { ConnectionsView() }.preferredColorScheme(.dark)
+            }
 
             // Dump Styles
             CabinetSectionHeader("DUMP STYLES", icon: "square.stack.3d.up")

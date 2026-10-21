@@ -72,6 +72,81 @@ final class ScrubService {
     /// Quota check + network call. Throws `ScrubError` on any failure.
     func scrub(profileURL: String, resultsLimit: Int = 12) async throws -> ScrubResult {
         try ensureUnderQuota()
+        let decoded = try await fetchScrub(profileURL: profileURL, resultsLimit: resultsLimit)
+        recordSuccess()
+        return decoded
+    }
+
+    // MARK: - Onboarding entry point (free)
+
+    struct LinkResult {
+        let ok: Bool
+        let handle: String
+        /// Plain-English reason when ok == false. Show as-is.
+        let error: String?
+        /// false if profiles.instagram_handle column isn't live yet; taste profile still saved.
+        let linked: Bool
+    }
+
+    /// "@name" / "name" / instagram.com/name/... -> "name", nil if not a profile handle.
+    static func parseHandle(_ input: String) -> String? {
+        let s = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pats = ["instagram\\.com/([A-Za-z0-9._]+)", "^@?([A-Za-z0-9._]{1,30})$"]
+        for p in pats {
+            if let r = try? NSRegularExpression(pattern: p, options: .caseInsensitive),
+               let m = r.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)),
+               let range = Range(m.range(at: 1), in: s) {
+                let h = String(s[range])
+                let reserved = ["p", "reel", "reels", "tv", "stories", "explore", "accounts", "direct", "about", "s"]
+                return reserved.contains(h.lowercased()) ? nil : h
+            }
+        }
+        return nil
+    }
+
+    /// SINGLE ENTRY POINT for onboarding: call right after the handle is entered.
+    /// Validates -> FREE scrub (no credits, no per-device monthly cap) -> saves style +
+    /// playbook (Valet reads both via LLMService.userContextBlock; cloud-synced) ->
+    /// links the handle on profiles.instagram_handle. Never throws.
+    func linkInstagramAndBuildTaste(handle input: String) async -> LinkResult {
+        guard let handle = Self.parseHandle(input) else {
+            return LinkResult(ok: false, handle: "", error: "That doesn't look like an Instagram handle. Enter it like @yourname.", linked: false)
+        }
+        do {
+            let r = try await fetchScrub(profileURL: handle, resultsLimit: 12)
+            let d = UserDefaults.standard
+            func merge(_ old: String, _ new: String) -> String {
+                let o = old.trimmingCharacters(in: .whitespacesAndNewlines)
+                return String((o.isEmpty ? new : o + "\n\n" + new).prefix(750))
+            }
+            d.set(merge(d.string(forKey: "ai_style_profile") ?? "", r.description), forKey: "ai_style_profile")
+            if !r.engagementPlaybook.isEmpty {
+                d.set(merge(d.string(forKey: "ai_engagement_playbook") ?? "", r.engagementPlaybook), forKey: "ai_engagement_playbook")
+            }
+            d.set(handle, forKey: "ig_handle")
+            var linked = false
+            if let uid = await AuthManager.shared.userId, let jwt = await AuthManager.shared.jwt {
+                AIProfileSync.shared.scheduleSave(userId: uid, jwt: jwt)
+                linked = await patchHandle(handle, userId: uid, jwt: jwt)
+            }
+            return LinkResult(ok: true, handle: handle, error: nil, linked: linked)
+        } catch {
+            return LinkResult(ok: false, handle: handle, error: error.localizedDescription, linked: false)
+        }
+    }
+
+    private func patchHandle(_ handle: String, userId: String, jwt: String) async -> Bool {
+        guard let url = URL(string: "\(SupabaseClient.url)/rest/v1/profiles?id=eq.\(userId)") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        SupabaseClient.shared.authHeaders(jwt: jwt).forEach { req.setValue($1, forHTTPHeaderField: $0) }
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["instagram_handle": handle])
+        guard let (_, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse else { return false }
+        return (200..<300).contains(http.statusCode)
+    }
+
+    private func fetchScrub(profileURL: String, resultsLimit: Int) async throws -> ScrubResult {
 
         // The production endpoint sits behind the credit gate — needs a signed-in session.
         guard let jwt = await AuthManager.shared.jwt else {
@@ -88,12 +163,13 @@ final class ScrubService {
             "resultsLimit": resultsLimit
         ])
 
+        req.timeoutInterval = 70 // server budget is ~55s
         let data: Data, response: URLResponse
         do {
             (data, response) = try await URLSession.shared.data(for: req)
         } catch {
             await CreditManager.shared.noteAIResponse(nil)   // may have been charged; re-read
-            throw error
+            throw ScrubError(message: "Can't reach Dumpster right now. Check your connection and try again.")
         }
 
         guard let http = response as? HTTPURLResponse else {
@@ -108,12 +184,12 @@ final class ScrubService {
             throw ScrubError(message: "Not enough credits for an Instagram scrub (\(CreditManager.Cost.igScrub) credits). Get more credits and try again.")
         }
         if http.statusCode != 200 {
-            let detail = Self.extractError(from: data) ?? "Unknown error (HTTP \(http.statusCode))"
-            throw ScrubError(message: detail)
+            throw ScrubError(message: Self.extractError(from: data) ?? Self.fallbackMessage(http.statusCode))
         }
 
-        let decoded = try JSONDecoder().decode(ScrubResult.self, from: data)
-        recordSuccess()
+        guard let decoded = try? JSONDecoder().decode(ScrubResult.self, from: data) else {
+            throw ScrubError(message: "Got an unreadable answer from the server. Try again.")
+        }
         return decoded
     }
 
@@ -151,17 +227,20 @@ final class ScrubService {
 
     // MARK: - Helpers
 
+    private static func fallbackMessage(_ status: Int) -> String {
+        switch status {
+        case 401: return "Sign in to your Dumpster account, then try again."
+        case 429: return "Too many tries. Wait a few minutes and try again."
+        case 502, 504: return "Instagram took too long to answer. Try again in a minute."
+        default: return "Couldn't read that profile (error \(status)). Try again in a minute."
+        }
+    }
+
+    /// Server errors are plain English already; show as-is. HTML/gateway bodies are ignored.
     private static func extractError(from data: Data) -> String? {
-        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return String(data: data, encoding: .utf8)
-        }
-        if let err = obj["error"] as? String {
-            if let detail = obj["detail"] as? String, !detail.isEmpty {
-                return "\(err): \(detail)"
-            }
-            return err
-        }
-        return nil
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let err = obj["error"] as? String, !err.isEmpty else { return nil }
+        return err
     }
 }
 

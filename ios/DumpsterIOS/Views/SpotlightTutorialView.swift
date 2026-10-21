@@ -68,7 +68,17 @@ struct SpotlightTutorialView: View {
             ],
             frame: CGRect(x: 0.655, y: 0.305, width: 0.095, height: 0.044)
         ),
-        // 4 — Done (centered card, no spotlight)
+        // 4 — Invite a friend (centered card; the invite link lives in the credits sheet)
+        TutorialStep(
+            title: "Invite a Friend",
+            bullets: [
+                "Tap your credits, then Invite a friend",
+                "Earn 10 credits for each friend who finishes setup",
+                "Enough for a new AI dump"
+            ],
+            frame: nil
+        ),
+        // 5 — Done (centered card, no spotlight)
         TutorialStep(
             title: "You're All Set!",
             bullets: [
@@ -307,6 +317,7 @@ struct SpotlightTutorialView: View {
     }
 
     private func dismiss() {
+        if step >= steps.count - 1 { Task { await ReferralManager.shared.claimAfterOnboarding() } }
         withAnimation(.easeOut(duration: 0.2)) { isPresented = false }
     }
 }

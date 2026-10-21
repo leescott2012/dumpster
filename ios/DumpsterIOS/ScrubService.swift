@@ -126,7 +126,7 @@ final class ScrubService {
             d.set(handle, forKey: "ig_handle")
             var linked = false
             if let uid = await AuthManager.shared.userId, let jwt = await AuthManager.shared.jwt {
-                AIProfileSync.shared.scheduleSave(userId: uid, jwt: jwt)
+                await AIProfileSync.shared.scheduleSave(userId: uid, jwt: jwt)
                 linked = await patchHandle(handle, userId: uid, jwt: jwt)
             }
             return LinkResult(ok: true, handle: handle, error: nil, linked: linked)

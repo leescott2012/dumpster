@@ -104,6 +104,9 @@ struct PhotoPoolView: View {
             if await PhotoDupes.hashMissingPhotos(items) {
                 dupHashVersion += 1
             }
+            // On-device place names for photos with GPS (new imports + backfill).
+            await PlaceNamer.shared.fill(allPhotos)
+            try? modelContext.save()
         }
     }
 

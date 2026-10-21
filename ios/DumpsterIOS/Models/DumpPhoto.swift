@@ -33,6 +33,9 @@ final class DumpPhoto {
     var pixelWidth: Int?
     var pixelHeight: Int?
     var fileSize: Int?           // bytes
+    /// On-device reverse-geocoded place TEXT (e.g. "Nikki Beach, Miami"). Derived locally
+    /// from lat/lng by PlaceNamer; coordinates themselves are never sent anywhere.
+    var placeName: String?
 
     /// Computed: full URL to the image file inside the app sandbox.
     var imageURL: URL {
@@ -40,8 +43,14 @@ final class DumpPhoto {
         return docs.appendingPathComponent(localPath)
     }
 
+    /// Labels plus the place text (never coordinates) for AI caption/Valet context.
+    var promptLabels: [String] {
+        guard let place = placeName, !place.isEmpty else { return labels }
+        return ["taken at \(place)"] + labels
+    }
+
     /// One-line summary injected into AI prompts, matching web's metaLine() format.
-    /// e.g. "[taken 2024-09-12 14:32 · iPhone 14 Pro · 37.78,-122.41]"
+    /// e.g. "[taken 2024-09-12 14:32 · iPhone 14 Pro · Nikki Beach, Miami]"
     var metaLine: String? {
         var parts: [String] = []
         if let d = takenAt {
@@ -50,9 +59,8 @@ final class DumpPhoto {
             parts.append("taken \(fmt.string(from: d))")
         }
         if let cam = camera { parts.append(cam) }
-        if let la = lat, let lo = lng {
-            parts.append(String(format: "%.2f,%.2f", la, lo))
-        }
+        // Place text only; raw coordinates must never reach a prompt (privacy rule).
+        if let place = placeName, !place.isEmpty { parts.append(place) }
         guard !parts.isEmpty else { return nil }
         return "[" + parts.joined(separator: " · ") + "]"
     }

@@ -26,6 +26,7 @@ struct ScrubInstagramSheet: View {
     @State private var editablePlaybook: String = ""
     @State private var activeTab: ResultTab = .style
     @State private var resolvedHandle: String = ""
+    @State private var styleSaved = false
 
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
 
@@ -405,6 +406,20 @@ struct ScrubInstagramSheet: View {
                     .padding(.horizontal, 24)
                 }
 
+                // Save as Dump Style (free: reuses this scrub's result, no extra credits)
+                Button { saveAsDumpStyle() } label: {
+                    Text(styleSaved ? "SAVED AS DUMP STYLE" : "SAVE AS DUMP STYLE @\(styleHandle)")
+                        .font(.system(size: 11, weight: .heavy))
+                        .tracking(1.4)
+                        .foregroundColor(gold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .overlay(Capsule().strokeBorder(gold.opacity(0.5), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .disabled(styleHandle.isEmpty || styleSaved)
+                .padding(.horizontal, 24)
+
                 // Apply buttons
                 HStack(spacing: 10) {
                     Button { appendToProfile() } label: {
@@ -520,6 +535,37 @@ struct ScrubInstagramSheet: View {
             topPosts: []
         )
         phase = .review
+    }
+
+    private var styleHandle: String {
+        resolvedHandle.trimmingCharacters(in: CharacterSet(charactersIn: "@/ ")).lowercased()
+    }
+
+    /// Saves this account's style as a Dump Style named "@handle" (profile = style + playbook, rules empty).
+    /// Free: no network call. Same name replaces the old one.
+    private func saveAsDumpStyle() {
+        let name = "@" + styleHandle
+        let body = [editableResult, editablePlaybook]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }.joined(separator: "\n\n")
+        let profile = String(body.prefix(AIProfileLimits.tasteProfileMax))
+        var styles = DumpStyle.load()
+        if let i = styles.firstIndex(where: { $0.name == name }) {
+            styles[i].profile = profile
+            styles[i].updatedAt = DumpStyle.nowISO()
+        } else {
+            var n = DumpStyle.new()
+            n.name = name
+            n.profile = profile
+            styles.append(n)
+        }
+        DumpStyle.save(styles)
+        if let uid = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt {
+            AIProfileSync.shared.scheduleSave(userId: uid, jwt: jwt)
+        }
+        NotificationCenter.default.post(name: .dumpStylesChanged, object: nil)
+        styleSaved = true
+        HapticManager.shared.playAdded()
     }
 
     private func replaceProfile() {

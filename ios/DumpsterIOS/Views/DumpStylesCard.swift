@@ -52,6 +52,7 @@ struct DumpStylesCard: View {
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.04)))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(gold.opacity(0.18), lineWidth: 1))
+        .onReceive(NotificationCenter.default.publisher(for: .dumpStylesChanged)) { _ in styles = DumpStyle.load() }
     }
 
     // MARK: - Actions (each one persists + schedules a cloud save)

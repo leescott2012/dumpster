@@ -307,7 +307,7 @@ struct OnboardingView: View {
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(white: 0.16)))
             .padding(.bottom, 18)
 
-            PhotosPicker(selection: $pickerItems, maxSelectionCount: 50, selectionBehavior: .ordered, matching: .images) {
+            PhotosPicker(selection: $pickerItems, selectionBehavior: .ordered, matching: .images) {
                 HStack(spacing: 8) {
                     Image(systemName: "square.and.arrow.up").font(.system(size: 14))
                     Text("Choose photos").font(.system(size: 14, weight: .semibold))

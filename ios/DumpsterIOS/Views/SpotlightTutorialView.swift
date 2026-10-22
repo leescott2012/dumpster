@@ -8,7 +8,7 @@ import SwiftUI
 
 enum TourTarget: String {
     case menuButton, cabinetAI, scrub, dumpStyles, cabinetBack, cabinetClose
-    case dumpMenu, photoDots, autoGen, newDump, pool
+    case dumpMenu, photoDots, autoGen, newDump, pool, friends, yourStyle
 }
 
 struct TourAnchorKey: PreferenceKey {
@@ -36,7 +36,8 @@ extension View {
 // MARK: - Steps
 
 private struct TourStep {
-    let target: TourTarget
+    /// nil = info-only step (no real control to ring on iOS, e.g. inside a sheet): card + Next.
+    let target: TourTarget?
     let title: String
     let body: String
     /// true = the tour catches the tap (it would open a sheet / create something mid-tour).
@@ -57,15 +58,19 @@ struct SpotlightTutorialView: View {
 
     private let gold = Color(red: 0.784, green: 0.663, blue: 0.431)
 
+    // Web's 16 steps minus: Recycle x2 (no Recycle on iOS), Pick a photo and Invite a friend (no stable anchor yet).
+    // "Friends" sits after "Close the menu": on iOS the Friends button is in the home header, not the menu.
     private let steps: [TourStep] = [
         TourStep(target: .menuButton, title: "Menu", body: "Everything lives in the menu. Tap it.", swallow: false),
         TourStep(target: .cabinetAI, title: "AI Tools", body: "Your AI helpers live here. Tap to open.", swallow: false),
-        TourStep(target: .scrub, title: "Scrubs", body: "Pull photos and your style from an Instagram account.", swallow: true),
-        TourStep(target: .dumpStyles, title: "Dump Styles", body: "Save named recipes so every dump comes out your way. Tap to look.", swallow: false),
+        TourStep(target: .yourStyle, title: "Your style", body: "Your style profile comes from your Instagram. Tap Build to read it (free). Valet and every dump use it.", swallow: false),
+        TourStep(target: .scrub, title: "Instagram Scrub", body: "Pull photos from any public account. It also saves that account's style as a Dump Style, right below.", swallow: true),
+        TourStep(target: .dumpStyles, title: "Dump Styles", body: "Looks you borrowed from scrubs. Turn one on and every dump comes out that way. Tap to look.", swallow: false),
         TourStep(target: .cabinetBack, title: "Back", body: "Tap the arrow to head back.", swallow: false),
         TourStep(target: .cabinetClose, title: "Close the menu", body: "Tap the X to head back.", swallow: false),
-        TourStep(target: .dumpMenu, title: "Valet", body: "Your AI assistant. Tap the dots, then Valet, to reorder and set the vibe.", swallow: true),
-        TourStep(target: .photoDots, title: "Recycle", body: "Tap a photo's dots to swap it for a fresh one from your pool.", swallow: true),
+        TourStep(target: .friends, title: "Friends", body: "Find friends, peek at their dumps, leave comments.", swallow: true),
+        TourStep(target: .dumpMenu, title: "Valet", body: "Meet your Valet. Tap the \u{22EF} button on a dump, then pick Valet.", swallow: true),
+        TourStep(target: nil, title: "Valet is your AI assistant", body: "Chat with it to reorder photos, swap shots and set the vibe for this dump. It already knows your style and rules.", swallow: false),
         TourStep(target: .autoGen, title: "Auto Gen", body: "One tap builds your best carousel from your pool.", swallow: true),
         TourStep(target: .newDump, title: "New Dump", body: "Start an empty dump and fill it yourself.", swallow: true),
         TourStep(target: .pool, title: "The Pool", body: "Your unused photos wait here. Videos and captions have pools too. Tap it.", swallow: false),
@@ -101,14 +106,15 @@ struct SpotlightTutorialView: View {
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
         }
         .onReceive(NotificationCenter.default.publisher(for: .tourTapped)) { note in
-            guard step >= 0, let raw = note.object as? String, raw == steps[step].target.rawValue else { return }
+            guard step >= 0, let raw = note.object as? String, raw == steps[step].target?.rawValue else { return }
             advanceSoon()
         }
         .task(id: step) {
             missing = false
+            if step >= 0, steps[step].target == nil { missing = true; return }   // info-only step: Next right away
             if step >= 0, steps[step].target == .pool { appState.scrollToPool = UUID() }
             try? await Task.sleep(nanoseconds: 2_500_000_000)
-            if step >= 0, anchors[steps[step].target] == nil { missing = true }
+            if step >= 0, let t = steps[step].target, anchors[t] == nil { missing = true }
         }
     }
 
@@ -139,7 +145,7 @@ struct SpotlightTutorialView: View {
     @ViewBuilder
     private func spotlight(geo: GeometryProxy) -> some View {
         let s = steps[step]
-        if let anchor = anchors[s.target] {
+        if let t = s.target, let anchor = anchors[t] {
             let r = geo[anchor].insetBy(dx: -8, dy: -8)
             let upper = r.midY < geo.size.height / 2
             ZStack {
@@ -228,116 +234,6 @@ struct SpotlightTutorialView: View {
     }
 
     private func dismiss() {
-        if step >= steps.count - 1 { Task { await ReferralManager.shared.claimAfterOnboarding() } }
         withAnimation(.easeOut(duration: 0.2)) { isPresented = false }
-    }
-}
-
-// MARK: - Instagram gate (lives here so the Xcode project needs no new file reference)
-
-
-/// First-run gate: every new user must enter a valid Instagram handle and the
-/// profile scrub must succeed before they can continue. Not skippable.
-/// Reuses ScrubService (same endpoint as the Scrub sheet) and writes the result
-/// into the AI style profile, so the taste profile starts pre-filled.
-struct InstagramGateView: View {
-    @Binding var isDone: Bool
-    @ObservedObject private var auth = AuthManager.shared
-    @AppStorage("ai_style_profile") private var styleProfile = ""
-    @AppStorage("dumpster_ig_handle") private var savedHandle = ""
-
-    @State private var input = ""
-    @State private var busy = false
-    @State private var errorText: String?
-    @State private var showSignIn = false
-
-    private let gold = Color(red: 0.784, green: 0.663, blue: 0.431)
-
-    /// "@name", "name" or an instagram.com/name link -> "name"; nil if invalid.
-    static func handle(from raw: String) -> String? {
-        let pattern = "^(?:https?://)?(?:www\\.)?(?:instagram\\.com/)?@?([A-Za-z0-9._]{1,30})/?(?:\\?.*)?$"
-        guard let re = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return nil }
-        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        let range = NSRange(s.startIndex..., in: s)
-        guard let m = re.firstMatch(in: s, range: range), let r = Range(m.range(at: 1), in: s) else { return nil }
-        return String(s[r])
-    }
-
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Your Instagram")
-                    .font(.system(size: 26, weight: .heavy)).foregroundColor(.white)
-                Text("Dumpster reads your account to learn your style, so your captions and carousels sound like you. Required.")
-                    .font(.system(size: 14)).foregroundColor(.white.opacity(0.65))
-                TextField("@yourhandle", text: $input)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .foregroundColor(.white)
-                    .padding(14)
-                    .background(Color(white: 0.09))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.12)))
-                if let errorText {
-                    Text(errorText).font(.system(size: 13)).foregroundColor(.red.opacity(0.9))
-                }
-                Button { Task { await run() } } label: {
-                    HStack {
-                        if busy { ProgressView().tint(.black) }
-                        Text(busy ? "Reading your profile" : "Continue")
-                            .font(.system(size: 14, weight: .heavy))
-                    }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity).padding(.vertical, 14)
-                    .background(gold.opacity(busy ? 0.6 : 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                .disabled(busy)
-                Button {
-                    SocialStore.shared.markInstagramLater()
-                    withAnimation { isDone = true }
-                } label: {
-                    Text("Later")
-                        .font(.system(size: 14, weight: .semibold)).foregroundColor(.white.opacity(0.7))
-                        .frame(maxWidth: .infinity).padding(.vertical, 12)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.18)))
-                }
-                .disabled(busy)
-                Text("We'll remind you once a day until your Instagram is linked.")
-                    .font(.system(size: 11)).foregroundColor(.white.opacity(0.4)).frame(maxWidth: .infinity)
-                if !auth.isSignedIn {
-                    Button("Sign in first") { showSignIn = true }
-                        .font(.system(size: 13, weight: .semibold)).foregroundColor(gold)
-                }
-            }
-            .padding(28).frame(maxWidth: 400)
-        }
-        .sheet(isPresented: $showSignIn) { SignInView() }
-    }
-
-    private func run() async {
-        guard let h = Self.handle(from: input) else {
-            errorText = "That doesn't look like an Instagram handle. Use @name or your profile link."
-            return
-        }
-        errorText = nil
-        busy = true
-        defer { busy = false }
-        do {
-            let result = try await ScrubService.shared.scrub(profileURL: "https://instagram.com/" + h)
-            let pieces = [result.description, result.engagementPlaybook].filter { !$0.isEmpty }.joined(separator: "\n\n")
-            guard !pieces.isEmpty else {
-                errorText = "Nothing usable came back. Check the handle (it must be public) and try again."
-                return
-            }
-            styleProfile = TasteMerge.merge(existing: styleProfile, scrubbed: pieces, handle: h)
-            savedHandle = h
-            SocialStore.shared.markInstagramLinked(h)
-            withAnimation { isDone = true }
-        } catch {
-            errorText = (error as? ScrubService.ScrubError)?.message
-                ?? "Couldn't scrub that profile. Check the handle (it must be public) and try again."
-        }
     }
 }

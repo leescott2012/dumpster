@@ -246,6 +246,19 @@ final class SocialStore: ObservableObject {
         _ = try await call("PATCH", "dm", body: ["with": id, "action": block ? "block" : "unblock"])
     }
 
+    // MARK: Username (same endpoint as web OnboardingFlow: GET availability, PATCH save)
+
+    /// GET /api/check-username?username= -> {available, reason?}
+    func checkUsername(_ username: String) async throws -> (available: Bool, reason: String?) {
+        let j = try await call("GET", "check-username", query: ["username": username])
+        return ((j["available"] as? Bool) ?? false, j["reason"] as? String)
+    }
+
+    /// PATCH /api/check-username {username, avatar_icon, avatar_color}; 409 = taken.
+    func saveUsername(_ username: String, icon: String, color: String) async throws {
+        _ = try await call("PATCH", "check-username", body: ["username": username, "avatar_icon": icon, "avatar_color": color])
+    }
+
     // MARK: Instagram "Later" (auth user metadata, same keys as web: ig_pending / ig_handle)
 
     private let pendingKey = "ig_pending_unsynced"

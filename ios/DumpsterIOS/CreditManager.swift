@@ -47,6 +47,7 @@ final class CreditManager: ObservableObject {
     enum Cost {
         static let scanRequest = 12   // per /api/ai-label request (server cap 12 photos each)
         static let igScrub = 5
+        static let aiChat = 1         // Valet message; Recycle's AI pick rides the same /api/ai-chat
         static let scanBatchPhotos = 12
         static func scan(photoCount: Int) -> Int {
             photoCount <= 0 ? 0 : ((photoCount + scanBatchPhotos - 1) / scanBatchPhotos) * scanRequest

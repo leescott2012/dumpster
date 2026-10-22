@@ -40,6 +40,7 @@ struct PhotoCardView: View {
     var onDismissDuplicate: (() -> Void)? = nil
 
     @EnvironmentObject var appState: AppState
+    @Environment(\.modelContext) private var modelContext
     @State private var showMenu = false
     @State private var showPhotoMenu = false
     @State private var isDragging = false
@@ -57,6 +58,7 @@ struct PhotoCardView: View {
             if isSelected { selectedOverlay }
             descriptionGradient
             badgeLayer
+            starBadge
         }
         .frame(width: size.width, height: size.height)
         .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -88,6 +90,10 @@ struct PhotoCardView: View {
                 isDumpContext: isDumpContext,
                 isDuplicate: isDuplicate,
                 onRecycle: onRecycle,
+                onToggleStar: {
+                    photo.starred.toggle()
+                    try? modelContext.save()
+                },
                 onLightbox: { appState.lightboxPhotoId = photo.id },
                 onCrop: { onCrop?() },
                 onSaveToPhotos: { if let cb = onSaveToPhotos { cb() } else { saveToPhotoLibrary() } },
@@ -202,6 +208,27 @@ struct PhotoCardView: View {
                 }
             }
             Spacer()
+        }
+    }
+
+    /// Gold star, top-left — web PhotoCard "Gold star badge" (a star, never a number).
+    @ViewBuilder
+    private var starBadge: some View {
+        if photo.starred {
+            VStack {
+                HStack {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(appState.accentColor)
+                        .frame(width: 22, height: 22)
+                        .background(Color.black.opacity(0.75))
+                        .clipShape(Circle())
+                        .padding(7)
+                    Spacer()
+                }
+                Spacer()
+            }
+            .allowsHitTesting(false)
         }
     }
 

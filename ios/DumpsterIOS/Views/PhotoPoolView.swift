@@ -46,7 +46,13 @@ struct PhotoPoolView: View {
             case .huji:   result = result.filter { $0.isHuji }
             case .used:   break
             case .videos: result = result.filter { isVideo($0.filename) }
+            case .starred: result = result.filter { $0.starred }
             }
+        }
+
+        // Web parity: in the unfiltered view starred photos float to the top (stable).
+        if !appState.activeFilters.contains(.starred) {
+            result = result.filter { $0.starred } + result.filter { !$0.starred }
         }
 
         let q = appState.poolSearchQuery.trimmingCharacters(in: .whitespaces).lowercased()
@@ -115,6 +121,11 @@ struct PhotoPoolView: View {
     @State private var showPoolMenu = false
     @State private var isRescanning = false
 
+    /// Starred photos still in the pool (not in a dump) — the number the Starred chip filters to.
+    private var starredCount: Int {
+        allPhotos.filter { $0.starred && !VideoStore.isVideoPath($0.localPath) && !usedPhotoIDs.contains($0.id) }.count
+    }
+
     private var unusedCount: Int { allPhotos.count - usedPhotoIDs.count }
 
     private var heroHeader: some View {
@@ -169,6 +180,11 @@ struct PhotoPoolView: View {
 
             pillButton(label: "All", icon: nil, isSelected: appState.activeFilters.isEmpty) {
                 appState.activeFilters.removeAll()
+            }
+
+            pillButton(label: starredCount > 0 ? "★ Starred \(starredCount)" : "★ Starred", icon: nil,
+                       isSelected: appState.activeFilters.contains(.starred)) {
+                toggleFilter(.starred)
             }
 
             pillButton(label: "Used", icon: nil, isSelected: appState.activeFilters.contains(.used)) {

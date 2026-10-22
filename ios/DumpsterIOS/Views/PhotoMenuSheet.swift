@@ -7,6 +7,7 @@ struct PhotoMenuSheet: View {
     let isDumpContext: Bool
     var isDuplicate: Bool = false
     var onRecycle: (() -> Void)? = nil   // dump photos only
+    var onToggleStar: () -> Void = {}
     var onLightbox: () -> Void = {}
     var onCrop: () -> Void = {}
     var onSaveToPhotos: () -> Void = {}
@@ -35,6 +36,10 @@ struct PhotoMenuSheet: View {
                     }
                     Divider().background(Color.white.opacity(0.07))
                 }
+                menuItem(icon: photo.starred ? "star.slash" : "star", label: photo.starred ? "Unfavorite" : "Favorite", tint: .white) {
+                    onToggleStar(); dismiss()
+                }
+                Divider().background(Color.white.opacity(0.07))
                 menuItem(icon: "arrow.up.left.and.arrow.down.right", label: "Lightbox", tint: .white) {
                     onLightbox(); dismiss()
                 }
@@ -95,7 +100,7 @@ struct PhotoMenuSheet: View {
                 Spacer()
             }
         }
-        .presentationDetents([.height((isDuplicate ? 328 : 280) + (isDumpContext && onRecycle != nil ? 50 : 0))])
+        .presentationDetents([.height((isDuplicate ? 378 : 330) + (isDumpContext && onRecycle != nil ? 50 : 0))])
         .presentationDragIndicator(.hidden)
         .preferredColorScheme(.dark)
     }

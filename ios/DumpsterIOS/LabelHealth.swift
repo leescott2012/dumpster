@@ -197,13 +197,24 @@ final class LabelHealthManager: ObservableObject {
     private var lastRun = Date.distantPast
     private var debounce: Task<Void, Never>?
 
-    private init() {
-        if let data = UserDefaults.standard.data(forKey: Self.key),
-           let s = try? JSONDecoder().decode(LabelHealthStore.self, from: data) {
-            store = s
-        } else {
-            store = LabelHealthStore()
-        }
+    /// Bumped on account switch so a run that started for the previous account stops touching state.
+    private var generation = 0
+
+    private init() { store = Self.loadStore() }
+
+    private static func loadStore() -> LabelHealthStore {
+        if let data = UserDefaults.standard.data(forKey: key),
+           let s = try? JSONDecoder().decode(LabelHealthStore.self, from: data) { return s }
+        return LabelHealthStore()
+    }
+
+    /// Account switched: UserDefaults now hold the new account's data — reload and drop any in-flight run.
+    func reloadForAccountChange() {
+        generation += 1
+        debounce?.cancel()
+        fix = .idle
+        lastRun = .distantPast
+        store = Self.loadStore()
     }
 
     // MARK: Persistence
@@ -347,6 +358,7 @@ final class LabelHealthManager: ObservableObject {
         guard let jwt = AuthManager.shared.jwt, fix != .running, !isPaused else { return }
         if !force && Date().timeIntervalSince(lastRun) < LabelHealthConst.runEvery { return }
         lastRun = Date()
+        let gen = generation
 
         let snap = Self.snapshot(allPhotos()).filter { !$0.isVideo }
         let byId = Dictionary(uniqueKeysWithValues: snap.map { ($0.id, $0) })
@@ -365,7 +377,9 @@ final class LabelHealthManager: ObservableObject {
         var i = 0
         while i < queue.count && requests < LabelHealthConst.requestsPerRun {
             let chunk = queue[i..<min(i + LabelHealthConst.batch, queue.count)].map { (id: $0.id, relativePath: $0.path) }
-            switch await LabelService.shared.request(photos: Array(chunk), jwt: jwt, auto: true, audit: false) {
+            let result = await LabelService.shared.request(photos: Array(chunk), jwt: jwt, auto: true, audit: false)
+            guard gen == generation else { return }
+            switch result {
             case .ok(let r): applyAI(r)
             case .quota(let daily): handle(quota: daily); return
             case .failed: fix = .idle; return
@@ -377,7 +391,9 @@ final class LabelHealthManager: ObservableObject {
             let sample = LabelMetrics.auditSample(Self.snapshot(allPhotos()), store.info, n: min(LabelHealthConst.batch, auditLeft))
             if !sample.isEmpty {
                 let items = sample.map { (id: $0.id, relativePath: $0.path) }
-                switch await LabelService.shared.request(photos: items, jwt: jwt, auto: true, audit: true) {
+                let result = await LabelService.shared.request(photos: items, jwt: jwt, auto: true, audit: true)
+                guard gen == generation else { return }
+                switch result {
                 case .ok(let r): recordAudit(r, photos: byId)
                 case .quota(let daily): handle(quota: daily); return
                 case .failed: fix = .idle; return

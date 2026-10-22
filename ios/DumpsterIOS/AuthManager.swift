@@ -41,8 +41,8 @@ final class AuthManager: ObservableObject {
     var jwt: String? { session?.accessToken }
 
     // MARK: - Keychain keys
-    private static let keychainService = "com.leescott.dumpster.ios.auth"
-    private static let sessionKey = "supabase_session"
+    nonisolated private static let keychainService = "com.leescott.dumpster.ios.auth"
+    nonisolated private static let sessionKey = "supabase_session"
 
     // MARK: - OAuth
     private let webAuthContextProvider = WebAuthContextProvider()
@@ -109,6 +109,8 @@ final class AuthManager: ObservableObject {
     }
 
     private func completeSignIn(_ newSession: SupabaseSession) async {
+        // Open this account's own local data BEFORE publishing the session (see AccountSwitcher).
+        AccountSwitcher.shared.switchTo(userId: newSession.userId)
         session = newSession
         saveSessionToKeychain(newSession)
         magicLinkSent = false
@@ -172,6 +174,8 @@ final class AuthManager: ObservableObject {
         }
         session = nil
         deleteSessionFromKeychain()
+        AccountSwitcher.shared.switchTo(userId: nil)   // back to the guest folder; the account's data stays parked
+        CreditManager.shared.refresh()                 // signed out -> balance 0
         CrashReporter.shared.setUser(id: nil)
     }
 
@@ -184,10 +188,13 @@ final class AuthManager: ObservableObject {
             let refreshed = try await SupabaseClient.shared.refreshSession(refreshToken: stored.refreshToken)
             session = refreshed
             saveSessionToKeychain(refreshed)
+        } catch is URLError {
+            return   // offline / timeout: keep the session so the account's data doesn't vanish; retry next launch
         } catch {
             // Refresh failed → session is dead, clear it
             session = nil
             deleteSessionFromKeychain()
+            AccountSwitcher.shared.switchTo(userId: nil)
         }
     }
 
@@ -205,7 +212,10 @@ final class AuthManager: ObservableObject {
         SecItemAdd(attrs as CFDictionary, nil)
     }
 
-    private func loadSessionFromKeychain() -> SupabaseSession? {
+    private func loadSessionFromKeychain() -> SupabaseSession? { Self.readStoredSession() }
+
+    /// Synchronous Keychain read, usable before AuthManager exists (AccountSwitcher needs the owner at launch).
+    nonisolated static func readStoredSession() -> SupabaseSession? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: Self.keychainService,

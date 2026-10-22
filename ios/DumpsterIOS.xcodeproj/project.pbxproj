@@ -44,6 +44,7 @@
 		B011D0C00000000000000001 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000001 /* AuthManager.swift */; };
 		B011D0C00000000000000002 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000002 /* SupabaseClient.swift */; };
 		B011D0C00000000000000003 /* AIProfileSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000003 /* AIProfileSync.swift */; };
+		B011D0C0000000000000A001 /* AccountData.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE00000000000000A1 /* AccountData.swift */; };
 		B011D0C00000000000000005 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000005 /* SignInView.swift */; };
 		B011D0C00000000000000006 /* SyncAccountCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000006 /* SyncAccountCard.swift */; };
 		B011D0C00000000000000007 /* BugReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000007 /* BugReportSheet.swift */; };
@@ -132,6 +133,7 @@
 		CC22DD33EE44FF55AA66BB78 /* DumpChatSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpChatSheet.swift; sourceTree = "<group>"; };
 		D0C0FFEE0000000000000001 /* AuthManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		D0C0FFEE0000000000000002 /* SupabaseClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
+		D0C0FFEE00000000000000A1 /* AccountData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccountData.swift; sourceTree = "<group>"; };
 		D0C0FFEE0000000000000003 /* AIProfileSync.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AIProfileSync.swift; sourceTree = "<group>"; };
 		D0C0FFEE0000000000000005 /* SignInView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		D0C0FFEE0000000000000006 /* SyncAccountCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncAccountCard.swift; sourceTree = "<group>"; };
@@ -276,6 +278,7 @@
 				D0C0FFEE0000000000000001 /* AuthManager.swift */,
 				D0C0FFEE0000000000000002 /* SupabaseClient.swift */,
 				D0C0FFEE0000000000000003 /* AIProfileSync.swift */,
+				D0C0FFEE00000000000000A1 /* AccountData.swift */,
 				D0C0FFEE0000000000000009 /* Analytics.swift */,
 				3BEC8A6E8CED6C5D71D1B72C /* Models */,
 				B7092703833006DB08AE3502 /* Utilities */,
@@ -458,6 +461,7 @@
 				B011D0C00000000000000001 /* AuthManager.swift in Sources */,
 				B011D0C00000000000000002 /* SupabaseClient.swift in Sources */,
 				B011D0C00000000000000003 /* AIProfileSync.swift in Sources */,
+				B011D0C0000000000000A001 /* AccountData.swift in Sources */,
 				B011D0C00000000000000005 /* SignInView.swift in Sources */,
 				B011D0C00000000000000006 /* SyncAccountCard.swift in Sources */,
 				B011D0C00000000000000007 /* BugReportSheet.swift in Sources */,

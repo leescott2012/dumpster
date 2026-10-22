@@ -32,6 +32,7 @@
 		925E6F2365D0473D98F167C5 /* ConfettiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA341A66087474A8CB27607 /* ConfettiView.swift */; };
 		9E2EED52E28C46B9AE8D816E /* DumpFlipIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */; };
 		9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */; };
+		A1C0FEC0DEAD00000000CA02 /* CaptionSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FEC0DEAD00000000CA01 /* CaptionSheetView.swift */; };
 		A1A2A3A4B5B6B7B8C9C0D1D2 /* AITasteExample.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E2E3E4F5F6A7A8B9B0C1C2 /* AITasteExample.swift */; };
 		AA01BB02CC03DD04EE05FF06 /* PhotoMenuSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01BB02CC03DD04EE05FF07 /* PhotoMenuSheet.swift */; };
 		AA11000000000000000000A2 /* LabelHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000000000000A1 /* LabelHealth.swift */; };
@@ -92,6 +93,7 @@
 		18FB4008CEC5180C6AC6B7EE /* DumpPhoto.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpPhoto.swift; sourceTree = "<group>"; };
 		202A316C5E1892E09EBE6F49 /* LightboxView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LightboxView.swift; sourceTree = "<group>"; };
 		223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCaptionBubble.swift; sourceTree = "<group>"; };
+		A1C0FEC0DEAD00000000CA01 /* CaptionSheetView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptionSheetView.swift; sourceTree = "<group>"; };
 		230A26BB7172434E549C9A9D /* UndoManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UndoManager.swift; sourceTree = "<group>"; };
 		23A5101A689318A2375DE509 /* PoolFilterMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PoolFilterMenu.swift; sourceTree = "<group>"; };
 		35245FF235DF426CBE4AC3C9 /* AutoGenFilters.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoGenFilters.swift; sourceTree = "<group>"; };
@@ -212,6 +214,7 @@
 				F3115232C67E460CA16F1007 /* Dump3DCarouselView.swift */,
 				AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */,
 				223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */,
+				A1C0FEC0DEAD00000000CA01 /* CaptionSheetView.swift */,
 				AA11000000000000000000B1 /* LabelHealthSheet.swift */,
 				702838F65FF68DD79CFE568A /* MainAppView.swift */,
 				6773F78BA7CBCB0A7D7DE45E /* SpotlightTutorialView.swift */,
@@ -441,6 +444,7 @@
 				E23526264EAF4A65A1FB719B /* Dump3DCarouselView.swift in Sources */,
 				9E2EED52E28C46B9AE8D816E /* DumpFlipIntroView.swift in Sources */,
 				9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */,
+				A1C0FEC0DEAD00000000CA02 /* CaptionSheetView.swift in Sources */,
 				AA11000000000000000000B2 /* LabelHealthSheet.swift in Sources */,
 				710B8108FF1ED0318E925C2D /* MainAppView.swift in Sources */,
 				0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */,

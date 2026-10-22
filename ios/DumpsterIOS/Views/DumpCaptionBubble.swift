@@ -1,138 +1,130 @@
 import SwiftUI
+import SwiftData
 
-/// Floating caption-results overlay anchored to a dump card.
-/// Shows up to 10 caption options after `LLMService.generateCaptions`.
-/// Tap a caption to copy; tap backdrop or swipe down to dismiss.
+/// Caption bubble on a dump card (native twin of the web DumpStrip caption bubble):
+/// "<VIBE> · n/3 CAPTIONS" header, copy, prev/next, tap the text to edit in place.
+/// Reads the dump's saved captions (DumpCaption rows with dumpId == dump.id, oldest first);
+/// edits are written straight back to the caption row.
 struct DumpCaptionBubble: View {
 
-    let result: LLMService.CaptionResult
-    let onDismiss: () -> Void
-    let onSaveCaption: ((String) -> Void)?
+    let dump: PhotoDump
+
+    @Query private var captions: [DumpCaption]
 
     @EnvironmentObject var appState: AppState
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var cs
-    var dumpTitle: String = ""
-    @State private var copiedIndex: Int?
-    @State private var savedLine = false
-    @State private var dragY: CGFloat = 0
+    @State private var idx = 0
+    @State private var copied = false
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var focused: Bool
 
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.5)
-                .ignoresSafeArea()
-                .onTapGesture { onDismiss() }
-
-            VStack(spacing: 0) {
-                Spacer()
-                bubble
-                    .offset(y: max(0, dragY))
-                    .gesture(
-                        DragGesture()
-                            .onChanged { dragY = $0.translation.height }
-                            .onEnded { v in
-                                if v.translation.height > 80 { onDismiss() }
-                                else { withAnimation(.spring()) { dragY = 0 } }
-                            }
-                    )
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 24)
-            }
-        }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
-    }
-
-    private var bubble: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Grab handle
-            HStack {
-                Spacer()
-                Capsule()
-                    .fill(Theme.text3(appState.colorMode, cs))
-                    .frame(width: 40, height: 4)
-                Spacer()
-            }
-            .padding(.top, 8)
-            .padding(.bottom, 12)
-
-            // Header
-            HStack {
-                Text(result.dumpTitle.uppercased())
-                    .font(.system(size: 11, weight: .heavy))
-                    .tracking(1.5)
-                    .foregroundColor(appState.accentColor)
-                Spacer()
-                Text(result.vibe)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Theme.text2(appState.colorMode, cs))
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
-
-            if savedLine {
-                Text("Copied · Saved to \(dumpTitle.isEmpty ? result.dumpTitle : dumpTitle)")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(appState.accentColor)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 6)
-            }
-
-            Divider()
-                .background(Theme.border(appState.colorMode, cs))
-
-            // Captions list
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(result.captions.enumerated()), id: \.offset) { idx, caption in
-                        captionRow(idx: idx, text: caption)
-                        if idx < result.captions.count - 1 {
-                            Divider().background(Theme.border(appState.colorMode, cs).opacity(0.4))
-                        }
-                    }
-                }
-            }
-            .frame(maxHeight: 380)
-        }
-        .background(Theme.bg1(appState.colorMode, cs))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Theme.border(appState.colorMode, cs), lineWidth: 1)
+    init(dump: PhotoDump) {
+        self.dump = dump
+        let id: String? = dump.id
+        _captions = Query(
+            filter: #Predicate<DumpCaption> { $0.dumpId == id && !$0.deleted && !$0.banned },
+            sort: \DumpCaption.createdAt
         )
     }
 
-    private func captionRow(idx: Int, text: String) -> some View {
-        Button {
-            UIPasteboard.general.string = text
-            onSaveCaption?(text)
-            savedLine = onSaveCaption != nil
-            withAnimation(.easeOut(duration: 0.15)) { copiedIndex = idx }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-                if copiedIndex == idx { copiedIndex = nil }
-            }
-        } label: {
-            HStack(alignment: .top, spacing: 10) {
-                Text("\(idx + 1)")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(appState.accentColor)
-                    .frame(width: 18, alignment: .leading)
-                Text(text)
-                    .font(.system(size: 13))
-                    .foregroundColor(Theme.text(appState.colorMode, cs))
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if copiedIndex == idx {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(appState.accentColor)
-                } else {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 12))
-                        .foregroundColor(Theme.text3(appState.colorMode, cs))
+    var body: some View {
+        if !captions.isEmpty {
+            let total = captions.count
+            let i = min(idx, total - 1)
+            let current = captions[i]
+
+            HStack(alignment: .top, spacing: 13) {
+                Rectangle().fill(appState.accentColor).frame(width: 3)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text(header(i, total))
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundColor(appState.accentColor)
+                        Spacer(minLength: 0)
+                        iconButton(copied ? "checkmark" : "doc.on.doc", label: "Copy caption",
+                                   tint: copied ? .green : Theme.text2(appState.colorMode, cs)) {
+                            UIPasteboard.general.string = current.text
+                            copied = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { copied = false }
+                        }
+                        if total > 1 {
+                            iconButton("chevron.left", label: "Previous caption") { step(-1, total) }
+                            iconButton("chevron.right", label: "Next caption") { step(1, total) }
+                        }
+                    }
+
+                    if editing {
+                        TextField("Caption", text: $draft, axis: .vertical)
+                            .font(.system(size: 14))
+                            .foregroundColor(Theme.text(appState.colorMode, cs))
+                            .focused($focused)
+                            .padding(8)
+                            .background(Theme.bg2(appState.colorMode, cs))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        HStack(spacing: 16) {
+                            Button("Save") { commit(current) }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(appState.accentColor)
+                            Button("Cancel") { editing = false }
+                                .font(.system(size: 12))
+                                .foregroundColor(Theme.text2(appState.colorMode, cs))
+                        }
+                    } else {
+                        Text(current.text)
+                            .font(.system(size: 14).italic())
+                            .foregroundColor(Theme.text2(appState.colorMode, cs))
+                            .lineSpacing(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("tap to edit")
+                            .font(.system(size: 10))
+                            .tracking(0.6)
+                            .foregroundColor(Theme.text3(appState.colorMode, cs))
+                    }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())
+            .onTapGesture {
+                guard !editing else { return }
+                draft = current.text
+                editing = true
+                focused = true
+            }
         }
+    }
+
+    private func header(_ i: Int, _ total: Int) -> String {
+        let v = (dump.vibe ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return ((v.isEmpty ? "" : v + " · ") + "\(i + 1)/\(total) captions").uppercased()
+    }
+
+    private func step(_ d: Int, _ total: Int) {
+        editing = false
+        idx = (min(idx, total - 1) + d + total) % total
+    }
+
+    private func commit(_ cap: DumpCaption) {
+        let t = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !t.isEmpty && t != cap.text {
+            cap.text = t
+            try? modelContext.save()
+        }
+        editing = false
+    }
+
+    private func iconButton(_ name: String, label: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: name)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(tint ?? Theme.text2(appState.colorMode, cs))
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }

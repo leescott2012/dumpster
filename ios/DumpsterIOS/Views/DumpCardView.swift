@@ -52,9 +52,7 @@ struct DumpCardView: View {
     @State private var editingTitle = false
     @State private var titleDraft = ""
     @State private var showDeleteConfirm = false
-    @State private var captionResult: LLMService.CaptionResult?
-    @State private var isGenerating = false
-    @State private var captionError: String?
+    @State private var showCaptionSheet = false
     @State private var showDumpMenu = false
     @State private var showChatSheet = false
     @State private var show3DPreview = false
@@ -76,6 +74,8 @@ struct DumpCardView: View {
         VStack(alignment: .leading, spacing: 12) {
             header
             tagBreadcrumb
+            DumpCaptionBubble(dump: dump)
+                .padding(.horizontal, 14)
             carousel
             progressBar
             actionRow
@@ -97,11 +97,11 @@ struct DumpCardView: View {
         .sheet(isPresented: $showDumpMenu) {
             DumpMenuSheet(
                 dump: dump,
-                isGenerating: isGenerating,
+                isGenerating: false,
                 photosEmpty: photos.isEmpty,
                 hasCaptions: dumpHasCaptions,
                 onChat: { showChatSheet = true },
-                onCaptions: { Task { await generateCaptions() } },
+                onCaptions: { showCaptionSheet = true },
                 onShare: shareDump,
                 onPreview3D: { show3DPreview = true },
                 onInstagram: { /* handle instagram */ },
@@ -110,6 +110,9 @@ struct DumpCardView: View {
                 onRate: rateDump,
                 onArchive: toggleArchive
             )
+        }
+        .sheet(isPresented: $showCaptionSheet) {
+            CaptionSheetView(initialDumpID: dump.id, allPhotos: allPhotos, tasteExamples: tasteExamples)
         }
         .sheet(isPresented: $showChatSheet) {
             DumpChatSheet(
@@ -131,20 +134,6 @@ struct DumpCardView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Photos will remain in your pool.")
-        }
-        .overlay(alignment: .bottom) {
-            if let result = captionResult {
-                DumpCaptionBubble(
-                    result: result,
-                    onDismiss: { withAnimation { captionResult = nil } },
-                    onSaveCaption: { text in
-                        let cap = DumpCaption(text: text, style: "ai", dumpId: dump.id)
-                        modelContext.insert(cap)
-                        try? modelContext.save()
-                    },
-                    dumpTitle: dump.title
-                )
-            }
         }
     }
 
@@ -498,14 +487,6 @@ struct DumpCardView: View {
                     .foregroundColor(.red.opacity(0.8))
             }
             Spacer()
-            if let err = captionError {
-                Text(err)
-                    .font(.system(size: 10))
-                    .foregroundColor(Theme.removeText)
-                    .lineLimit(1)
-            } else if isGenerating {
-                ProgressView().scaleEffect(0.7).tint(appState.accentColor)
-            }
         }
         .padding(.horizontal, 14)
     }
@@ -542,44 +523,6 @@ struct DumpCardView: View {
         root.present(av, animated: true)
         // Dashboard: a dump's photos were exported/shared.
         Analytics.track(.dumpExported, metadata: ["photo_count": images.count])
-    }
-
-    @MainActor
-    private func generateCaptions() async {
-        guard !photos.isEmpty else { return }
-        captionError = nil
-        isGenerating = true
-        defer { isGenerating = false }
-
-        let topCategory = photos
-            .map { $0.category.uppercased() }
-            .reduce(into: [String: Int]()) { acc, c in acc[c, default: 0] += 1 }
-            .max { $0.value < $1.value }?.key ?? "LIFESTYLE"
-
-        // Detailed per-photo AI descriptions (from LabelService/Claude, or Vision
-        // fallback) -- captions were previously grounded only in the coarse
-        // category bucket, ignoring what's actually pictured. Capped so a large
-        // dump doesn't blow up the prompt.
-        var seenLabels = Set<String>()
-        let labels = photos.flatMap { $0.promptLabels }
-            .filter { seenLabels.insert($0).inserted }
-            .prefix(20)
-            .map { $0 }
-
-        let taste = AITasteExample.promptBlock(from: tasteExamples) + AITasteExample.captionVoiceBlock()
-
-        do {
-            let result = try await LLMService.shared.generateCaption(
-                for: dump.title,
-                category: topCategory,
-                tasteBlock: taste,
-                labels: labels
-            )
-            HapticManager.shared.playSuccess()
-            withAnimation(.spring()) { captionResult = result }
-        } catch {
-            captionError = FriendlyError.message(for: error, tags: ["op": "caption_generate", "dumpId": dump.id])
-        }
     }
 
     private func recordTasteExample(positive: Bool) {

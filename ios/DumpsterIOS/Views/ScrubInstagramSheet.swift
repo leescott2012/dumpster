@@ -27,6 +27,9 @@ struct ScrubInstagramSheet: View {
     @State private var activeTab: ResultTab = .style
     @State private var resolvedHandle: String = ""
     @State private var styleSaved = false
+    @State private var undoProfile: String? = nil
+    @State private var confirmOtherAccount = false
+    @State private var profileFull = false
 
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
 
@@ -422,8 +425,8 @@ struct ScrubInstagramSheet: View {
 
                 // Apply buttons
                 HStack(spacing: 10) {
-                    Button { appendToProfile() } label: {
-                        Text("APPEND")
+                    Button { tapBuildFromInstagram() } label: {
+                        Text(undoProfile != nil ? "ADDED" : "BUILD FROM INSTAGRAM")
                             .font(.system(size: 11, weight: .heavy))
                             .tracking(1.4)
                             .foregroundColor(gold)
@@ -446,7 +449,31 @@ struct ScrubInstagramSheet: View {
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 24)
+                .padding(.bottom, undoProfile == nil ? 24 : 6)
+
+                if undoProfile != nil {
+                    Button { undoBuild() } label: {
+                        Text("UNDO")
+                            .font(.system(size: 11, weight: .heavy)).tracking(1.4)
+                            .foregroundColor(.white.opacity(0.7))
+                            .frame(maxWidth: .infinity).padding(.vertical, 10)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, 18)
+                }
+            }
+            .alert("Taste Profile is about YOU", isPresented: $confirmOtherAccount) {
+                Button("Save as Dump Style") { saveAsDumpStyle() }
+                Button("Add anyway") { appendToProfile() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("@\(styleHandle) isn't your linked account. Save it as a Dump Style instead?")
+            }
+            .alert("Taste Profile is full", isPresented: $profileFull) {
+                Button("Save as Dump Style") { saveAsDumpStyle() }
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Trim your profile a bit to make room, or save this as a Dump Style.")
             }
         }
     }
@@ -583,18 +610,32 @@ struct ScrubInstagramSheet: View {
         dismiss()
     }
 
+    /// Wrong-account guard: the Taste Profile describes the user, so a handle that isn't theirs is offered as a Dump Style.
+    private func tapBuildFromInstagram() {
+        let d = UserDefaults.standard
+        let linked = (d.string(forKey: "ig_handle") ?? d.string(forKey: "dumpster_ig_handle") ?? "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@/ ")).lowercased()
+        if !linked.isEmpty && linked != styleHandle { confirmOtherAccount = true } else { appendToProfile() }
+    }
+
+    /// Writes ONE labeled block (see TasteMerge); a rebuild replaces it and never touches the user's own text.
     private func appendToProfile() {
         let trimmedStyle = editableResult.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedPlay  = editablePlaybook.trimmingCharacters(in: .whitespacesAndNewlines)
-        let combinedStyle = (currentProfile.trimmingCharacters(in: .whitespacesAndNewlines) + "\n\n" + trimmedStyle)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let combinedPlay = (enginePlaybook.trimmingCharacters(in: .whitespacesAndNewlines) + "\n\n" + trimmedPlay)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        currentProfile = String(combinedStyle.prefix(AIProfileLimits.tasteProfileMax))
-        enginePlaybook = String(combinedPlay.prefix(750))
+        let before = currentProfile
+        let after = TasteMerge.merge(existing: before, scrubbed: trimmedStyle, handle: styleHandle)
+        if after == TasteMerge.stripIgBlock(before) {
+            profileFull = true
+            return
+        }
+        if undoProfile == nil { undoProfile = before }
+        currentProfile = after
         activeScrubId = ""
         HapticManager.shared.playAdded()
-        dismiss()
+    }
+
+    private func undoBuild() {
+        if let u = undoProfile { currentProfile = u }
+        undoProfile = nil
     }
 
     private func engagementSummary(_ p: ScrubService.ScrubResult.TopPost) -> String {

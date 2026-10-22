@@ -33,6 +33,7 @@
 		AA11000000000000000000A2 /* LabelHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000000000000A1 /* LabelHealth.swift */; };
 		AA11000000000000000000B2 /* LabelHealthSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000000000000B1 /* LabelHealthSheet.swift */; };
 		AA11BB22CC33DD44EE55FF66 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF11EE22DD33CC44BB55AA66 /* HapticManager.swift */; };
+		AA22CC33DD44EE55FF6600A1 /* TasteMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55006677A1 /* TasteMerge.swift */; };
 		AA22CC33DD44EE55FF660077 /* ScrubService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55006677AA /* ScrubService.swift */; };
 		AA33DD44EE55FF6600778899 /* ScrubInstagramSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF33EE44FF55006677889900 /* ScrubInstagramSheet.swift */; };
 		B011D0C00000000000000001 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0FFEE0000000000000001 /* AuthManager.swift */; };
@@ -150,6 +151,7 @@
 		F2690B2B2FA5BC44000AA4F6 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F3115232C67E460CA16F1007 /* Dump3DCarouselView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Dump3DCarouselView.swift; sourceTree = "<group>"; };
 		FF11EE22DD33CC44BB55AA66 /* HapticManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
+		FF22DD33EE44FF55006677A1 /* TasteMerge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TasteMerge.swift; sourceTree = "<group>"; };
 		FF22DD33EE44FF55006677AA /* ScrubService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScrubService.swift; sourceTree = "<group>"; };
 		FF33EE44FF55006677889900 /* ScrubInstagramSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScrubInstagramSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -247,6 +249,7 @@
 				98621440A0F44C6DA46AFACB /* AutoGenAdvancedView.swift */,
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* PhotoAnalyzer.swift */,
 				FF22DD33EE44FF55006677AA /* ScrubService.swift */,
+				FF22DD33EE44FF55006677A1 /* TasteMerge.swift */,
 				4B4FBAB204DBA8CB45149F47 /* Info.plist */,
 				6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */,
 				4BEB2D6552AFB6AB0311814B /* CreditManager.swift */,
@@ -401,6 +404,7 @@
 				0026E79D334EDE569AAA154D /* UndoManager.swift in Sources */,
 				AA11BB22CC33DD44EE55FF66 /* HapticManager.swift in Sources */,
 				AA22CC33DD44EE55FF660077 /* ScrubService.swift in Sources */,
+				AA22CC33DD44EE55FF6600A1 /* TasteMerge.swift in Sources */,
 				AA33DD44EE55FF6600778899 /* ScrubInstagramSheet.swift in Sources */,
 				588620A22292D4023E98DC50 /* PhotoCardView.swift in Sources */,
 				AA01BB02CC03DD04EE05FF06 /* PhotoMenuSheet.swift in Sources */,

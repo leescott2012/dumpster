@@ -319,8 +319,7 @@ struct InstagramGateView: View {
                 errorText = "Nothing usable came back. Check the handle (it must be public) and try again."
                 return
             }
-            let merged = styleProfile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? pieces : styleProfile + "\n\n" + pieces
-            styleProfile = String(merged.prefix(AIProfileLimits.tasteProfileMax))
+            styleProfile = TasteMerge.merge(existing: styleProfile, scrubbed: pieces, handle: h)
             savedHandle = h
             withAnimation { isDone = true }
         } catch {

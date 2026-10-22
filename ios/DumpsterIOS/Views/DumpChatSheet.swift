@@ -438,7 +438,10 @@ struct DumpChatSheet: View {
                 let assistantMsg = DumpChatMessage(
                     dumpId: dump.id,
                     role: "assistant",
-                    text: response.reply,
+                    // Valet sometimes echoes markdown bold and internal photo ids; neither belongs in a chat bubble.
+                    text: response.reply
+                        .replacingOccurrences(of: "\\s*\\[[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,}\\]", with: "", options: .regularExpression)
+                        .replacingOccurrences(of: "**", with: ""),
                     actionsJSON: actionsJSON
                 )
                 assistantMsg.proposed = askFirst && hasActions

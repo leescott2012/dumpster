@@ -60,6 +60,7 @@ struct DumpCardView: View {
     @State private var show3DPreview = false
     @State private var draggingPhotoId: String? = nil
     @State private var highlightedPhotoId: String? = nil
+    @State private var recyclePhoto: DumpPhoto? = nil
 
     private var photos: [DumpPhoto] {
         let byID = Dictionary(uniqueKeysWithValues: allPhotos.map { ($0.id, $0) })
@@ -117,6 +118,9 @@ struct DumpCardView: View {
                 poolPhotos: poolPhotos,
                 tasteExamples: tasteExamples
             )
+        }
+        .sheet(item: $recyclePhoto) { photo in
+            RecycleSheet(dump: dump, photo: photo, allPhotos: allPhotos, tasteExamples: tasteExamples)
         }
         .fullScreenCover(isPresented: $show3DPreview) {
             Dump3DCarouselView(dump: dump, photos: photos)
@@ -308,8 +312,13 @@ struct DumpCardView: View {
                         onRemoveFromDump: { removePhoto(photo) },
                         onCrop: {
                             appState.cropPhotoId = photo.id
+                        },
+                        onRecycle: {
+                            // Let the photo menu finish dismissing before the next sheet presents.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { recyclePhoto = photo }
                         }
                     )
+                    .tourAnchor(.photoCard)
                     .onDrag {
                         draggingPhotoId = photo.id
                         return NSItemProvider(object: photo.id as NSString)

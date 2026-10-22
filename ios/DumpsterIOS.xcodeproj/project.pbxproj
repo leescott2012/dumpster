@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA01BB02CC03DD04EE0A0002 /* RecycleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01BB02CC03DD04EE0A0001 /* RecycleSheet.swift */; };
 		AA22CC33DD44EE55FF6600B3 /* SocialViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55007788B3 /* SocialViews.swift */; };
 		AA22CC33DD44EE55FF6600B2 /* SocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55007788B2 /* SocialService.swift */; };
 		AA22CC33DD44EE55FF6600B1 /* SocialLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55007788B1 /* SocialLogic.swift */; };
@@ -84,6 +85,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AA01BB02CC03DD04EE0A0001 /* RecycleSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecycleSheet.swift; sourceTree = "<group>"; };
 		FF22DD33EE44FF55007788B3 /* SocialViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialViews.swift; sourceTree = "<group>"; };
 		FF22DD33EE44FF55007788B2 /* SocialService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialService.swift; sourceTree = "<group>"; };
 		FF22DD33EE44FF55007788B1 /* SocialLogic.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialLogic.swift; sourceTree = "<group>"; };
@@ -196,6 +198,7 @@
 			children = (
 				DBEC3288F059A41256981069 /* PhotoCardView.swift */,
 				AA01BB02CC03DD04EE05FF07 /* PhotoMenuSheet.swift */,
+				AA01BB02CC03DD04EE0A0001 /* RecycleSheet.swift */,
 				BB11CC22DD33EE44FF550012 /* OnboardingView.swift */,
 				23A5101A689318A2375DE509 /* PoolFilterMenu.swift */,
 				D774F0000000000000000A1 /* VideoSheet.swift */,
@@ -419,6 +422,7 @@
 				AA22CC33DD44EE55FF6600B1 /* SocialLogic.swift in Sources */,
 				AA33DD44EE55FF6600778899 /* ScrubInstagramSheet.swift in Sources */,
 				588620A22292D4023E98DC50 /* PhotoCardView.swift in Sources */,
+				AA01BB02CC03DD04EE0A0002 /* RecycleSheet.swift in Sources */,
 				AA01BB02CC03DD04EE05FF06 /* PhotoMenuSheet.swift in Sources */,
 				BB11CC22DD33EE44FF550011 /* OnboardingView.swift in Sources */,
 				2E360841D8A252DFB82BE410 /* PoolFilterMenu.swift in Sources */,

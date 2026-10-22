@@ -8,7 +8,7 @@ import SwiftUI
 
 enum TourTarget: String {
     case menuButton, cabinetAI, scrub, dumpStyles, cabinetBack, cabinetClose
-    case dumpMenu, photoDots, autoGen, newDump, pool, friends, yourStyle
+    case dumpMenu, photoCard, photoDots, autoGen, newDump, pool, friends, yourStyle
 }
 
 struct TourAnchorKey: PreferenceKey {
@@ -58,7 +58,7 @@ struct SpotlightTutorialView: View {
 
     private let gold = Color(red: 0.784, green: 0.663, blue: 0.431)
 
-    // Web's 16 steps minus: Recycle x2 (no Recycle on iOS), Pick a photo and Invite a friend (no stable anchor yet).
+    // Web's 16 steps minus "Invite a friend" (iOS has no credits badge on the home screen) plus the iOS-only "Back".
     // "Friends" sits after "Close the menu": on iOS the Friends button is in the home header, not the menu.
     private let steps: [TourStep] = [
         TourStep(target: .menuButton, title: "Menu", body: "Everything lives in the menu. Tap it.", swallow: false),
@@ -71,6 +71,9 @@ struct SpotlightTutorialView: View {
         TourStep(target: .friends, title: "Friends", body: "Find friends, peek at their dumps, leave comments.", swallow: true),
         TourStep(target: .dumpMenu, title: "Valet", body: "Meet your Valet. Tap the \u{22EF} button on a dump, then pick Valet.", swallow: true),
         TourStep(target: nil, title: "Valet is your AI assistant", body: "Chat with it to reorder photos, swap shots and set the vibe for this dump. It already knows your style and rules.", swallow: false),
+        TourStep(target: .photoCard, title: "Pick a photo", body: "Tap any photo in a dump. Its \u{22EF} button appears when it's selected.", swallow: false),
+        TourStep(target: .photoDots, title: "Recycle", body: "Now tap the \u{22EF} on the photo to open its menu.", swallow: true),
+        TourStep(target: nil, title: "Recycle swaps a photo", body: "Recycle replaces this photo with a fresh one from your pool of unused photos. Same spot, new shot.", swallow: false),
         TourStep(target: .autoGen, title: "Auto Gen", body: "One tap builds your best carousel from your pool.", swallow: true),
         TourStep(target: .newDump, title: "New Dump", body: "Start an empty dump and fill it yourself.", swallow: true),
         TourStep(target: .pool, title: "The Pool", body: "Your unused photos wait here. Videos and captions have pools too. Tap it.", swallow: false),

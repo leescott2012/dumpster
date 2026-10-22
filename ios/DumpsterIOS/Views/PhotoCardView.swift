@@ -36,6 +36,7 @@ struct PhotoCardView: View {
     var onDelete: (() -> Void)? = nil
     var onSaveToPhotos: (() -> Void)? = nil
     var onCrop: (() -> Void)? = nil
+    var onRecycle: (() -> Void)? = nil
     var onDismissDuplicate: (() -> Void)? = nil
 
     @EnvironmentObject var appState: AppState
@@ -86,6 +87,7 @@ struct PhotoCardView: View {
                 photo: photo,
                 isDumpContext: isDumpContext,
                 isDuplicate: isDuplicate,
+                onRecycle: onRecycle,
                 onLightbox: { appState.lightboxPhotoId = photo.id },
                 onCrop: { onCrop?() },
                 onSaveToPhotos: { if let cb = onSaveToPhotos { cb() } else { saveToPhotoLibrary() } },

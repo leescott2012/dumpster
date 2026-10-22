@@ -94,6 +94,9 @@ final class AIProfileSync {
         }
     }
 
+    /// Drop a queued upload (called when the active account changes).
+    func cancelPendingSave() { saveTask?.cancel(); saveTask = nil }
+
     // MARK: - Debounced save
 
     /// Call after any mutation to taste_profile, ai_rules, or caption pool.

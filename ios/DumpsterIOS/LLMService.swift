@@ -797,6 +797,14 @@ final class LLMService: ObservableObject {
 
         @MainActor static var isAvailable: Bool { AuthManager.shared.jwt != nil }
 
+        /// Single-use refund token the server sends with a charged ai-suggest (X-Refund-Token).
+        /// Spent via refundSuggest() if the user discards the dump instead of creating it.
+        @MainActor static var lastSuggestRefundToken: String?
+
+        static func refundSuggest(_ token: String) async {
+            _ = try? await post("ai-suggest-refund", ["token": token], timeout: 20)
+        }
+
         /// POST JSON to `api/<path>` with the user's JWT. Returns the 200 body.
         static func post(_ path: String, _ body: [String: Any], timeout: TimeInterval = 60) async throws -> Data {
             guard let jwt = await AuthManager.shared.jwt else {
@@ -817,6 +825,10 @@ final class LLMService: ObservableObject {
             }
             guard let http = response as? HTTPURLResponse else { throw LLMError.invalidResponse }
             await CreditManager.shared.noteAIResponse(http)
+            if path == "ai-suggest", http.statusCode == 200 {
+                let t = http.value(forHTTPHeaderField: "X-Refund-Token")
+                await MainActor.run { lastSuggestRefundToken = t }
+            }
             if http.statusCode == 402 { throw LLMError.insufficientCredits }
             guard http.statusCode == 200 else {
                 let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String

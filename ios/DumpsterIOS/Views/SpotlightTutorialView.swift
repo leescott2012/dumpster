@@ -8,7 +8,7 @@ import SwiftUI
 
 enum TourTarget: String {
     case menuButton, cabinetAI, scrub, dumpStyles, cabinetBack, cabinetClose
-    case dumpMenu, photoCard, photoDots, autoGen, newDump, pool, friends, yourStyle
+    case dumpMenu, photoCard, photoDots, autoGen, newDump, pool, friends, yourStyle, credits
 }
 
 struct TourAnchorKey: PreferenceKey {
@@ -58,7 +58,7 @@ struct SpotlightTutorialView: View {
 
     private let gold = Color(red: 0.784, green: 0.663, blue: 0.431)
 
-    // Web's 16 steps minus "Invite a friend" (iOS has no credits badge on the home screen) plus the iOS-only "Back".
+    // Web's 16 steps plus the iOS-only "Back".
     // "Friends" sits after "Close the menu": on iOS the Friends button is in the home header, not the menu.
     private let steps: [TourStep] = [
         TourStep(target: .menuButton, title: "Menu", body: "Everything lives in the menu. Tap it.", swallow: false),
@@ -77,6 +77,8 @@ struct SpotlightTutorialView: View {
         TourStep(target: .autoGen, title: "Auto Gen", body: "One tap builds your best carousel from your pool.", swallow: true),
         TourStep(target: .newDump, title: "New Dump", body: "Start an empty dump and fill it yourself.", swallow: true),
         TourStep(target: .pool, title: "The Pool", body: "Your unused photos wait here. Videos and captions have pools too. Tap it.", swallow: false),
+        // Not swallowed: the tap really opens the credits sheet (invite link), then the tour ends. Mirrors web #81.
+        TourStep(target: .credits, title: "Invite a friend", body: "Tap your credits to share your invite link. Earn 10 credits for each friend who finishes setup, enough for a new AI dump.", swallow: false),
     ]
 
     var body: some View {
@@ -233,7 +235,11 @@ struct SpotlightTutorialView: View {
     }
 
     private func advance() {
-        if step >= steps.count - 1 { dismiss() } else { withAnimation(.easeInOut(duration: 0.2)) { step += 1 } }
+        if step >= steps.count - 1 {
+            // Last step ("Invite a friend"): open the credits sheet whether reached by tapping the pill or Next.
+            if AuthManager.shared.isSignedIn { CreditManager.shared.showOutOfCredits = true }
+            dismiss()
+        } else { withAnimation(.easeInOut(duration: 0.2)) { step += 1 } }
     }
 
     private func dismiss() {

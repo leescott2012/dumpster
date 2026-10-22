@@ -22,6 +22,7 @@ struct MainAppView: View {
     @Query private var allPhotos: [DumpPhoto]
     @Query(sort: \AITasteExample.createdAt, order: .reverse) private var tasteExamples: [AITasteExample]
 
+    @ObservedObject private var auth = AuthManager.shared
     @State private var poolTabSegmentWidth: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pillDragOffset: CGFloat = 0
@@ -85,6 +86,11 @@ struct MainAppView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Spacer()
+            if auth.isSignedIn {
+                iconButton("person.2") { SocialStore.shared.openFriends = true }
+                    .accessibilityLabel("Friends")
+                NotificationBellButton()
+            }
             iconButton("gearshape") {
                 appState.showSettings = true
             }

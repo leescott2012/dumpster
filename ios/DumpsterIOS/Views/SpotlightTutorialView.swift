@@ -294,6 +294,18 @@ struct InstagramGateView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .disabled(busy)
+                Button {
+                    SocialStore.shared.markInstagramLater()
+                    withAnimation { isDone = true }
+                } label: {
+                    Text("Later")
+                        .font(.system(size: 14, weight: .semibold)).foregroundColor(.white.opacity(0.7))
+                        .frame(maxWidth: .infinity).padding(.vertical, 12)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.18)))
+                }
+                .disabled(busy)
+                Text("We'll remind you once a day until your Instagram is linked.")
+                    .font(.system(size: 11)).foregroundColor(.white.opacity(0.4)).frame(maxWidth: .infinity)
                 if !auth.isSignedIn {
                     Button("Sign in first") { showSignIn = true }
                         .font(.system(size: 13, weight: .semibold)).foregroundColor(gold)
@@ -321,6 +333,7 @@ struct InstagramGateView: View {
             }
             styleProfile = TasteMerge.merge(existing: styleProfile, scrubbed: pieces, handle: h)
             savedHandle = h
+            SocialStore.shared.markInstagramLinked(h)
             withAnimation { isDone = true }
         } catch {
             errorText = (error as? ScrubService.ScrubError)?.message

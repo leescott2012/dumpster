@@ -124,6 +124,7 @@ final class ScrubService {
                 d.set(merge(d.string(forKey: "ai_engagement_playbook") ?? "", r.engagementPlaybook), forKey: "ai_engagement_playbook")
             }
             d.set(handle, forKey: "ig_handle")
+            await SocialStore.shared.markInstagramLinked(handle)
             var linked = false
             if let uid = await AuthManager.shared.userId, let jwt = await AuthManager.shared.jwt {
                 await AIProfileSync.shared.scheduleSave(userId: uid, jwt: jwt)

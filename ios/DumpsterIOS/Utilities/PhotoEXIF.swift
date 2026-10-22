@@ -1,5 +1,6 @@
 import Foundation
 import ImageIO
+import CoreLocation
 import UniformTypeIdentifiers
 
 /// EXIF / photo-metadata extraction (NATIVE_PORT.md §B).
@@ -114,5 +115,55 @@ enum PhotoEXIF {
         } else {
             photo.camera = [make, model].filter { !$0.isEmpty }.joined(separator: " ")
         }
+    }
+}
+
+/// On-device place naming. Privacy: coordinates go ONLY to Apple's own reverse geocoder
+/// (CLGeocoder, the OS location service) -- never to our server, Apify or any third-party
+/// geocoder -- and only the resulting place TEXT is stored/fed to AI prompts.
+@MainActor
+final class PlaceNamer {
+    static let shared = PlaceNamer()
+    private let geocoder = CLGeocoder()
+    private var cache: [String: String] = [:]   // rounded coordinate -> place text ("" = none found)
+    private var lastCall = Date.distantPast
+    private var running = false
+
+    /// Fills `placeName` for photos that have GPS but no name yet. Serialized and
+    /// throttled (Apple limits geocoder requests); failures are silent and retried next launch.
+    func fill(_ photos: [DumpPhoto]) async {
+        guard !running else { return }
+        running = true
+        defer { running = false }
+        for photo in photos where photo.placeName == nil {
+            guard let lat = photo.lat, let lng = photo.lng else { continue }
+            let key = String(format: "%.3f,%.3f", lat, lng)   // ~110 m
+            if let hit = cache[key] {
+                if !hit.isEmpty { photo.placeName = hit }
+                continue
+            }
+            // >= 1.5 s between lookups (~40/min, under Apple's 50/min cap).
+            let wait = 1.5 - Date().timeIntervalSince(lastCall)
+            if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+            lastCall = Date()
+            do {
+                let marks = try await geocoder.reverseGeocodeLocation(CLLocation(latitude: lat, longitude: lng))
+                let name = marks.first.flatMap(Self.describe) ?? ""
+                cache[key] = name
+                if !name.isEmpty { photo.placeName = name }
+            } catch {
+                // Throttled / offline: stop quietly, try again next time.
+                if let code = (error as? CLError)?.code, code == .network { return }
+            }
+        }
+    }
+
+    /// "Venue, City" when Apple knows a point of interest, else "Neighborhood, City".
+    static func describe(_ m: CLPlacemark) -> String? {
+        let area = m.locality ?? m.administrativeArea
+        let first = m.areasOfInterest?.first ?? m.subLocality
+        var out: [String] = []
+        for p in [first, area].compactMap({ $0 }) where !p.isEmpty && out.last != p { out.append(p) }
+        return out.isEmpty ? nil : out.joined(separator: ", ")
     }
 }

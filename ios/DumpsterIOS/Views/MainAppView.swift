@@ -23,6 +23,7 @@ struct MainAppView: View {
     @Query(sort: \AITasteExample.createdAt, order: .reverse) private var tasteExamples: [AITasteExample]
 
     @ObservedObject private var auth = AuthManager.shared
+    @ObservedObject private var credits = CreditManager.shared
     @State private var poolTabSegmentWidth: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pillDragOffset: CGFloat = 0
@@ -87,6 +88,7 @@ struct MainAppView: View {
         HStack(spacing: 8) {
             Spacer()
             if auth.isSignedIn {
+                creditsPill
                 iconButton("person.2") { SocialStore.shared.openFriends = true }
                     .accessibilityLabel("Friends")
                     .tourAnchor(.friends)
@@ -97,6 +99,29 @@ struct MainAppView: View {
             }
         }
         .padding(.horizontal, 14)
+    }
+
+    /// Compact credits pill (mirror of web CreditsBadge): bolt + live balance; opens the credits sheet (invite card inside).
+    private var creditsPill: some View {
+        let low = credits.hasLoaded && credits.balance <= 5
+        let tint: Color = !credits.hasLoaded ? Theme.text2(appState.colorMode, cs)
+            : credits.balance == 0 ? Color(red: 0.97, green: 0.44, blue: 0.44)
+            : low ? Color(red: 0.98, green: 0.58, blue: 0.24) : appState.accentColor
+        return Button { credits.showOutOfCredits = true } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "bolt.fill").font(.system(size: 11, weight: .bold))
+                Text(credits.hasLoaded ? "\(credits.balance)" : "\u{2013}")
+                    .font(.system(size: 13, weight: .heavy))
+                    .lineLimit(1).minimumScaleFactor(0.7)
+            }
+            .foregroundColor(tint)
+            .padding(.horizontal, 9)
+            .frame(height: 32)
+            .background(tint.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .accessibilityLabel(credits.hasLoaded ? "\(credits.balance) credits. Open credits" : "Credits")
+        .tourAnchor(.credits)
     }
 
     private func iconButton(_ symbol: String, action: @escaping () -> Void) -> some View {

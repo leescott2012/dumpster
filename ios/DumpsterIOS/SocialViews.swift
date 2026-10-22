@@ -349,43 +349,25 @@ struct DMThreadView: View {
 // MARK: - Public / Private row for the dump options sheet. Mirrors web DumpActionSheet's toggle row:
 // optimistic flip, reverted if the server refuses. Self-contained so DumpMenuSheet only needs one line.
 
+/// iOS dumps stay on this device (Lee's decision: nothing is uploaded from iOS), so there is no share switch here.
+/// Web-made dumps can still be public; friends see those in their profile sheet below.
 struct DumpPublicToggleRow: View {
     let dump: PhotoDump
-    @State private var busy = false
-    @State private var error: String?
-    private let green = Color(red: 0.29, green: 0.87, blue: 0.5)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 14) {
-                Image(systemName: dump.isPublic ? "globe" : "lock")
-                    .font(.system(size: 16))
-                    .foregroundColor(dump.isPublic ? green : .white)
-                    .frame(width: 24)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(dump.isPublic ? "Public" : "Private").font(.system(size: 16)).foregroundColor(.white)
-                    Text(dump.isPublic ? "Visible to your connections" : "Only you can see this")
-                        .font(.system(size: 12)).foregroundColor(.white.opacity(0.5))
-                }
-                Spacer()
-                Toggle("", isOn: Binding(get: { dump.isPublic }, set: { flip(to: $0) }))
-                    .labelsHidden().tint(green).disabled(busy)
+        HStack(spacing: 14) {
+            Image(systemName: "lock")
+                .font(.system(size: 16))
+                .foregroundColor(.white)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Private").font(.system(size: 16)).foregroundColor(.white)
+                Text("Stays on this device")
+                    .font(.system(size: 12)).foregroundColor(.white.opacity(0.5))
             }
-            if let error {
-                Text(error).font(.system(size: 11.5)).foregroundColor(.red.opacity(0.9)).padding(.leading, 38)
-            }
+            Spacer()
         }
         .padding(.horizontal, 24).padding(.vertical, 12)
-    }
-
-    private func flip(to next: Bool) {
-        dump.isPublic = next          // optimistic
-        error = nil; busy = true
-        Task {
-            do { try await SocialStore.shared.setDumpPublic(dumpId: dump.id, isPublic: next) }
-            catch { dump.isPublic = !next; self.error = error.localizedDescription }   // revert
-            busy = false
-        }
     }
 }
 

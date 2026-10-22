@@ -100,6 +100,7 @@ struct ContentView: View {
     @State private var isExpanded = false
     @State private var showAppIntro = true
     @AppStorage("dumpster_onboardingDone") private var onboardingDone = false
+    @AppStorage("dumpster_igDone") private var igDone = false
     @Query private var allPhotos: [DumpPhoto]
     private let impact = UIImpactFeedbackGenerator(style: .medium)
 
@@ -147,9 +148,9 @@ struct ContentView: View {
                     .zIndex(31)
             }
 
-            if appState.showOnboarding {
-                SpotlightTutorialView(isPresented: $appState.showOnboarding)
-                    .zIndex(40)
+            if !igDone && !onboardingDone {
+                InstagramGateView(isDone: $igDone)
+                    .zIndex(41)
                     .transition(.opacity)
             }
 
@@ -174,6 +175,13 @@ struct ContentView: View {
             }
         }
         .background(Color.black)
+        .overlayPreferenceValue(TourAnchorKey.self) { anchors in
+            if appState.showOnboarding && !showAppIntro && (igDone || onboardingDone) {
+                SpotlightTutorialView(isPresented: $appState.showOnboarding, anchors: anchors)
+                    .environmentObject(appState)
+                    .transition(.opacity)
+            }
+        }
         .onAppear {
             isExpanded = true
             if !onboardingDone { appState.showOnboarding = true }

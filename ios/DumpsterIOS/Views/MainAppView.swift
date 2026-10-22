@@ -47,6 +47,7 @@ struct MainAppView: View {
                         .padding(.top, 18)
                         .padding(.bottom, 4)
                     poolTabSwitcher
+                        .tourAnchor(.pool)
                         .id("poolTop")
                     poolContent
                     Color.clear.frame(height: 80)
@@ -120,6 +121,7 @@ struct MainAppView: View {
                 iconButton("line.3.horizontal") {
                     appState.showFileCabinet = true
                 }
+                .tourAnchor(.menuButton)
                 .padding(.top, 6)
             }
             Text("Rearrange photos, build new dumps, and experiment with different flows. Tap a photo to select it. Tap + to add from the pool.")
@@ -315,6 +317,7 @@ struct MainAppView: View {
                 .clipShape(Capsule())
                 .shadow(color: appState.accentColor.opacity(0.3), radius: 8, x: 0, y: 3)
             }
+            .tourAnchor(.autoGen)
 
             Button(action: createNewDump) {
                 HStack(spacing: 7) {
@@ -331,6 +334,7 @@ struct MainAppView: View {
                 .overlay(Capsule().strokeBorder(appState.accentColor, lineWidth: 1.2))
                 .contentShape(Capsule())
             }
+            .tourAnchor(.newDump)
         }
         .padding(.horizontal, 20)
     }

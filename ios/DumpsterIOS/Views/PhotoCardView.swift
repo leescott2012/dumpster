@@ -195,6 +195,7 @@ struct PhotoCardView: View {
                             .background(Color.black.opacity(0.55))
                             .clipShape(Circle())
                     }
+                    .tourAnchor(.photoDots)
                     .padding(6)
                 }
             }

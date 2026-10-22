@@ -228,6 +228,7 @@ struct SpotlightTutorialView: View {
     }
 
     private func dismiss() {
+        if step >= steps.count - 1 { Task { await ReferralManager.shared.claimAfterOnboarding() } }
         withAnimation(.easeOut(duration: 0.2)) { isPresented = false }
     }
 }

@@ -396,19 +396,24 @@ final class LLMService: ObservableObject {
 
     // MARK: - Generate Caption by title + category
 
-    func generateCaption(for dumpTitle: String, category: String, tasteBlock: String = "", labels: [String] = []) async throws -> CaptionResult {
+    func generateCaption(for dumpTitle: String, category: String, tasteBlock: String = "", labels: [String] = [],
+                         tone: CaptionTone? = nil, about: String = "") async throws -> CaptionResult {
         // No own key: use Dumpster's server AI (signed-in users, credit-charged by the server).
         if !hasAnyAPIKey {
             guard await ServerAI.isAvailable else { return LLMService.fallbackCaptions(for: category, title: dumpTitle) }
-            return try await serverCaption(title: dumpTitle, category: category, tasteBlock: tasteBlock, labels: labels)
+            return try await serverCaption(title: dumpTitle, category: category, tasteBlock: tasteBlock, labels: labels, tone: tone, about: about)
         }
 
         let context = userContextBlock(tasteBlock: tasteBlock)
         let system = "You are an AI photo dump curator. Write 3 aesthetic captions for a photo dump. Respond with JSON: {\"captions\":[\"...\",\"...\",\"...\"],\"vibe\":\"...\"}\(context)"
-        var user = "Title: \(dumpTitle)\nCategory: \(category)\nStyle: \(captionStyle.rawValue)\n\(captionStyle.promptModifier)"
+        let styleLine = tone.map { "Style: \($0.label)\n\($0.promptModifier)" }
+            ?? "Style: \(captionStyle.rawValue)\n\(captionStyle.promptModifier)"
+        var user = "Title: \(dumpTitle)\nCategory: \(category)\n\(styleLine)"
         if !labels.isEmpty {
             user += "\nWhat's actually in these photos (use this, not just the category, to make captions specific): \(labels.joined(separator: "; "))"
         }
+        let aboutText = about.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !aboutText.isEmpty { user += "\nUser instructions (follow these carefully):\n\(aboutText)" }
 
         let request = LLMRequest(systemPrompt: system, userPrompt: user, temperature: 0.8, maxTokens: 500)
         let response = try await generate(request: request)
@@ -865,17 +870,27 @@ final class LLMService: ObservableObject {
         }
     }
 
-    private func serverCaption(title: String, category: String, tasteBlock: String, labels: [String]) async throws -> CaptionResult {
+    private func serverCaption(title: String, category: String, tasteBlock: String, labels: [String],
+                               tone: CaptionTone?, about: String) async throws -> CaptionResult {
         await MainActor.run { isGenerating = true; lastError = nil }
         defer { Task { @MainActor in isGenerating = false } }
-        var prompt = "Style: \(captionStyle.rawValue). \(captionStyle.promptModifier)"
-        if !labels.isEmpty { prompt += "\nWhat's in the photos: \(labels.joined(separator: "; "))" }
-        prompt += userContextBlock(tasteBlock: tasteBlock)
-        let data = try await ServerAI.post("ai-caption", [
-            "dumpTitle": title,
-            "category": category,
-            "userPrompt": prompt,
-        ])
+        var body: [String: Any] = ["dumpTitle": title, "category": category]
+        let aboutText = about.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let tone {
+            // Same fields the web sends: tone + tasteBlock (profile, style, rules, taste) + userPrompt (about text).
+            body["tone"] = tone.serverValue
+            var prompt = aboutText
+            if !labels.isEmpty { prompt += (prompt.isEmpty ? "" : "\n") + "What's in the photos: \(labels.joined(separator: "; "))" }
+            if !prompt.isEmpty { body["userPrompt"] = prompt }
+            let ctx = userContextBlock(tasteBlock: tasteBlock).replacingOccurrences(of: "\n\n---\n", with: "", options: .anchored)
+            if !ctx.isEmpty { body["tasteBlock"] = ctx }
+        } else {
+            var prompt = "Style: \(captionStyle.rawValue). \(captionStyle.promptModifier)"
+            if !labels.isEmpty { prompt += "\nWhat's in the photos: \(labels.joined(separator: "; "))" }
+            prompt += userContextBlock(tasteBlock: tasteBlock)
+            body["userPrompt"] = prompt
+        }
+        let data = try await ServerAI.post("ai-caption", body)
         guard let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let caps = j["captions"] as? [String], !caps.isEmpty else { throw LLMError.parseFailed }
         return CaptionResult(dumpTitle: title, captions: caps, vibe: (j["vibe"] as? String) ?? "curated")

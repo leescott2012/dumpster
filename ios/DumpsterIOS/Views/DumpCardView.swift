@@ -181,6 +181,7 @@ struct DumpCardView: View {
                         .background(Theme.bg2(appState.colorMode, cs))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
+                .tourAnchor(.dumpMenu)
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {

@@ -59,6 +59,9 @@ struct AISuggestView: View {
     @State private var isAutoCount: Bool = false
     // Maps AnalyzedPhoto.filename → existing DumpPhoto.id (pool source)
     @State private var poolPhotoMap: [String: String] = [:]
+    /// Refund token for the server-generated dump on screen; spent if the user
+    /// leaves or regenerates without creating it (web parity: refund on reject).
+    @State private var refundToken: String?
 
     // MARK: - Advanced filters (NATIVE_PORT.md §C — port of web's AutoGenAdvanced.tsx)
     @State private var filters: AutoGenFilters = .empty
@@ -112,6 +115,7 @@ struct AISuggestView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
+                .onDisappear { Task { await refundRejected() } }
 
             VStack(spacing: 0) {
                 // Header
@@ -548,11 +552,19 @@ struct AISuggestView: View {
 
     /// Server suggest costs this many credits (server/creditGate.ts ai_suggest). Display/gating only;
     /// the server does the actual charge.
-    private static let serverSuggestCost = 25
+    private static let serverSuggestCost = 8
+
+    @MainActor
+    private func refundRejected() async {
+        guard let t = refundToken else { return }
+        refundToken = nil
+        await LLMService.ServerAI.refundSuggest(t)
+    }
 
     @MainActor
     private func serverClusters(loaded: [(UIImage, URL)], map: [String: String]) async -> [PhotoCluster]? {
         guard LLMService.ServerAI.isAvailable, CreditManager.shared.balance >= Self.serverSuggestCost else { return nil }
+        await refundRejected()   // regenerating = rejecting the previous dump
         let byId = Dictionary(allPhotos.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var analyzed: [String: AnalyzedPhoto] = [:]
         var sample: [LLMService.SuggestPhoto] = []
@@ -569,6 +581,7 @@ struct AISuggestView: View {
         let taste = AITasteExample.promptBlock(from: []) + AITasteExample.captionVoiceBlock()
         do {
             let found = try await llmService.serverSuggest(photos: sample, targetCount: isAutoCount ? nil : maxPhotosPerDump, tasteBlock: taste)
+            refundToken = LLMService.ServerAI.lastSuggestRefundToken
             guard let c = found.first else { return nil }
             let photos = c.photoIds.compactMap { analyzed[$0] }
             guard photos.count >= 2 else { return nil }
@@ -583,6 +596,7 @@ struct AISuggestView: View {
     // MARK: - Create Dumps
 
     private func createDumps() {
+        refundToken = nil   // kept — no refund
         isCreating = true
         appState.showStatus("Creating dump...", duration: 10)
 

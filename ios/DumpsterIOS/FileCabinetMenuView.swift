@@ -133,7 +133,11 @@ struct FileCabinetMenuView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(Array(CabinetTab.allCases.enumerated()), id: \.element.id) { index, tab in
-                        tabFolder(tab: tab, index: index)
+                        if tab == .aiSettings {
+                            tabFolder(tab: tab, index: index).tourAnchor(.cabinetAI)
+                        } else {
+                            tabFolder(tab: tab, index: index)
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -184,6 +188,7 @@ struct FileCabinetMenuView: View {
                     .frame(width: 40, height: 40)
                     .background(Circle().fill(subtleBorder))
             }
+            .tourAnchor(.cabinetClose)
         }
         .padding(.horizontal, 24)
         .padding(.top, 70)
@@ -351,6 +356,7 @@ struct FileCabinetMenuView: View {
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(gold.opacity(0.12)))
             }
+            .tourAnchor(.cabinetBack)
 
             Spacer()
 
@@ -509,6 +515,7 @@ struct AISettingsTabView: View {
             // Dump Styles
             CabinetSectionHeader("DUMP STYLES", icon: "square.stack.3d.up")
             DumpStylesCard(appState: appState)
+                .tourAnchor(.dumpStyles)
                 .padding(.horizontal, 24)
 
             // Active Provider Status
@@ -636,6 +643,7 @@ struct AISettingsTabView: View {
             .overlay(Capsule().strokeBorder(gold.opacity(0.45), lineWidth: 1))
         }
         .buttonStyle(.plain)
+        .tourAnchor(.scrub)
     }
 
     private var scrubLibraryCard: some View {

@@ -495,25 +495,26 @@ struct AISettingsTabView: View {
             SyncAccountCard()
                 .padding(.horizontal, 24)
 
-            // AI Style Profile
-            CabinetSectionHeader("AI STYLE PROFILE", icon: "person.text.rectangle")
+            // AI Taste Profile — describes the user
+            CabinetSectionHeader("AI TASTE PROFILE", icon: "person.text.rectangle")
+            sectionNote("Who you are. Valet, captions and Auto Gen read this.")
             styleProfileCard
                 .padding(.horizontal, 24)
 
-            // Scrub Library
-            if !savedScrubs.isEmpty {
-                CabinetSectionHeader("SCRUB LIBRARY", icon: "bookmark")
-                scrubLibraryCard
-                    .padding(.horizontal, 24)
-            }
-
-            // AI Rules
+            // AI Rules (belongs with the profile)
             CabinetSectionHeader("AI RULES", icon: "list.bullet.rectangle")
             aiRulesCard
                 .padding(.horizontal, 24)
 
-            // Dump Styles
+            // Instagram Scrub — directly above Dump Styles
+            CabinetSectionHeader("INSTAGRAM SCRUB", icon: "bookmark")
+            sectionNote("Pull photos or a whole account's style from Instagram.")
+            scrubLibraryCard
+                .padding(.horizontal, 24)
+
+            // Dump Styles — formed from scrubs
             CabinetSectionHeader("DUMP STYLES", icon: "square.stack.3d.up")
+            sectionNote("Looks you borrowed from scrubs. Turn one on to apply it.")
             DumpStylesCard(appState: appState)
                 .tourAnchor(.dumpStyles)
                 .padding(.horizontal, 24)
@@ -549,6 +550,12 @@ struct AISettingsTabView: View {
         }
     }
 
+    private func sectionNote(_ t: String) -> some View {
+        Text(t).font(.system(size: 12)).foregroundColor(tertiaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24).padding(.bottom, 6)
+    }
+
     // MARK: - Active Provider Banner
 
     @State private var showPaywallFromAISettings = false
@@ -567,7 +574,6 @@ struct AISettingsTabView: View {
             styleProfileEditor
 
             HStack(spacing: 8) {
-                generateFromInstagramButton
                 Spacer()
                 Text("\(styleProfile.count)/\(AIProfileLimits.tasteProfileMax)")
                     .font(.system(size: 10, design: .monospaced))
@@ -633,7 +639,7 @@ struct AISettingsTabView: View {
             HStack(spacing: 6) {
                 Image(systemName: SubscriptionManager.shared.isPro ? "sparkles" : "lock.fill")
                     .font(.system(size: 10, weight: .bold))
-                Text("Generate from Instagram")
+                Text("Scrub Instagram")
                     .font(.system(size: 11, weight: .heavy))
                     .tracking(0.8)
             }
@@ -648,11 +654,14 @@ struct AISettingsTabView: View {
 
     private var scrubLibraryCard: some View {
         VStack(spacing: 8) {
-            Text("Past scrubs — tap to re-apply without paying.")
-                .font(.system(size: 12))
-                .foregroundColor(tertiaryText)
-                .lineSpacing(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack { generateFromInstagramButton; Spacer() }
+            if !savedScrubs.isEmpty {
+                Text("Past scrubs — tap to re-apply without paying.")
+                    .font(.system(size: 12))
+                    .foregroundColor(tertiaryText)
+                    .lineSpacing(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             ForEach(savedScrubs) { scrub in
                 scrubLibraryRow(scrub)

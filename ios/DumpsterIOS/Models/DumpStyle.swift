@@ -7,6 +7,10 @@ enum AIProfileLimits {
     static let tastePrefMax = 160
 }
 
+extension Notification.Name {
+    static let dumpStylesChanged = Notification.Name("dumpStylesChanged")
+}
+
 /// Named, reusable dump recipe. Port of DumpStyle in client/src/lib/captionPool.ts.
 /// Persisted as JSON in UserDefaults ("dump_styles") + active id ("active_dump_style"),
 /// synced via AIProfileSync (user_ai_profile.dump_styles / active_dump_style).

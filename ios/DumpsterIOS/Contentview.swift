@@ -101,6 +101,8 @@ struct ContentView: View {
     @State private var showAppIntro = true
     @AppStorage("dumpster_onboardingDone") private var onboardingDone = false
     @AppStorage("dumpster_igDone") private var igDone = false
+    @ObservedObject private var auth = AuthManager.shared
+    @ObservedObject private var social = SocialStore.shared
     @Query private var allPhotos: [DumpPhoto]
     private let impact = UIImpactFeedbackGenerator(style: .medium)
 
@@ -185,6 +187,17 @@ struct ContentView: View {
         .onAppear {
             isExpanded = true
             if !onboardingDone { appState.showOnboarding = true }
+        }
+        .onAppear { if auth.isSignedIn { social.startPolling() } }
+        .onChange(of: auth.isSignedIn) { _, on in if on { social.startPolling() } else { social.stopPolling() } }
+        .sheet(isPresented: $social.openFriends) {
+            FriendsView(isPresented: $social.openFriends).environmentObject(appState)
+        }
+        .onChange(of: social.openTasteProfile) { _, on in
+            if on { social.openTasteProfile = false; appState.showFileCabinet = true }   // Scrub/Taste lives in the file cabinet
+        }
+        .onChange(of: social.openCredits) { _, on in
+            if on { social.openCredits = false; CreditManager.shared.showOutOfCredits = true }
         }
         .fullScreenCover(isPresented: $appState.showSettings) {
             SettingsView(isPresented: $appState.showSettings)

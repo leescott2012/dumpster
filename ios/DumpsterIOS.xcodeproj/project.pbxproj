@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA22CC33DD44EE55FF6600B3 /* SocialViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55007788B3 /* SocialViews.swift */; };
+		AA22CC33DD44EE55FF6600B2 /* SocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55007788B2 /* SocialService.swift */; };
+		AA22CC33DD44EE55FF6600B1 /* SocialLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55007788B1 /* SocialLogic.swift */; };
 		0026E79D334EDE569AAA154D /* UndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A26BB7172434E549C9A9D /* UndoManager.swift */; };
 		0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81E7E5BB2905556C06187290 /* DebugSeeder.swift */; };
 		0EFF5AE87F175E278D167941 /* CreditManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BEB2D6552AFB6AB0311814B /* CreditManager.swift */; };
@@ -81,6 +84,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		FF22DD33EE44FF55007788B3 /* SocialViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialViews.swift; sourceTree = "<group>"; };
+		FF22DD33EE44FF55007788B2 /* SocialService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialService.swift; sourceTree = "<group>"; };
+		FF22DD33EE44FF55007788B1 /* SocialLogic.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialLogic.swift; sourceTree = "<group>"; };
 		18FB4008CEC5180C6AC6B7EE /* DumpPhoto.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpPhoto.swift; sourceTree = "<group>"; };
 		202A316C5E1892E09EBE6F49 /* LightboxView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LightboxView.swift; sourceTree = "<group>"; };
 		223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpCaptionBubble.swift; sourceTree = "<group>"; };
@@ -250,6 +256,9 @@
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* PhotoAnalyzer.swift */,
 				FF22DD33EE44FF55006677AA /* ScrubService.swift */,
 				FF22DD33EE44FF55006677A1 /* TasteMerge.swift */,
+				FF22DD33EE44FF55007788B3 /* SocialViews.swift */,
+				FF22DD33EE44FF55007788B2 /* SocialService.swift */,
+				FF22DD33EE44FF55007788B1 /* SocialLogic.swift */,
 				4B4FBAB204DBA8CB45149F47 /* Info.plist */,
 				6AD3CCC05D6CCC053A6A8DEE /* Assets.xcassets */,
 				4BEB2D6552AFB6AB0311814B /* CreditManager.swift */,
@@ -405,6 +414,9 @@
 				AA11BB22CC33DD44EE55FF66 /* HapticManager.swift in Sources */,
 				AA22CC33DD44EE55FF660077 /* ScrubService.swift in Sources */,
 				AA22CC33DD44EE55FF6600A1 /* TasteMerge.swift in Sources */,
+				AA22CC33DD44EE55FF6600B3 /* SocialViews.swift in Sources */,
+				AA22CC33DD44EE55FF6600B2 /* SocialService.swift in Sources */,
+				AA22CC33DD44EE55FF6600B1 /* SocialLogic.swift in Sources */,
 				AA33DD44EE55FF6600778899 /* ScrubInstagramSheet.swift in Sources */,
 				588620A22292D4023E98DC50 /* PhotoCardView.swift in Sources */,
 				AA01BB02CC03DD04EE05FF06 /* PhotoMenuSheet.swift in Sources */,

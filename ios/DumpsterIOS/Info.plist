@@ -40,6 +40,8 @@
 	</array>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>DUMPSTER saves analyzed photos to build your dumps.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>DUMPSTER finds the original of a photo in your library so you can open it in Photos.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

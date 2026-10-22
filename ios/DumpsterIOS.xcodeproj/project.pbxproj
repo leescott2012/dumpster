@@ -57,6 +57,7 @@
 		D1D2D3D4E5E6F7F8A9A0B1B2 /* CrashReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E2E3E4F5F6A7A8B9B0C1C3 /* CrashReporter.swift */; };
 		D5A1000000000000000000B1 /* DumpStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A1000000000000000000A1 /* DumpStyle.swift */; };
 		D5A1000000000000000000B2 /* DumpStylesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A1000000000000000000A2 /* DumpStylesCard.swift */; };
+		D5A1000000000000000000B9 /* ConnectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A1000000000000000000A9 /* ConnectionsView.swift */; };
 		D687086BE070123EAB8776E3 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */; };
 		D771F0000000000000000B1 /* VideoItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D771F0000000000000000A1 /* VideoItem.swift */; };
 		D772F0000000000000000B1 /* VideoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D772F0000000000000000A1 /* VideoStore.swift */; };
@@ -133,6 +134,7 @@
 		D4E1EFF72D39C18BA5DBDEF2 /* AppEnums.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppEnums.swift; sourceTree = "<group>"; };
 		D5A1000000000000000000A1 /* DumpStyle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpStyle.swift; sourceTree = "<group>"; };
 		D5A1000000000000000000A2 /* DumpStylesCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpStylesCard.swift; sourceTree = "<group>"; };
+		D5A1000000000000000000A9 /* ConnectionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConnectionsView.swift; sourceTree = "<group>"; };
 		D771F0000000000000000A1 /* VideoItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoItem.swift; sourceTree = "<group>"; };
 		D772F0000000000000000A1 /* VideoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStore.swift; sourceTree = "<group>"; };
 		D773F0000000000000000A1 /* VideoPoolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPoolView.swift; sourceTree = "<group>"; };
@@ -195,6 +197,7 @@
 				C08A4384BC616EBDE1702D74 /* PhotoPoolView.swift */,
 				A61564A55124AA0946A46F09 /* CaptionPoolView.swift */,
 				D5A1000000000000000000A2 /* DumpStylesCard.swift */,
+				D5A1000000000000000000A9 /* ConnectionsView.swift */,
 				473F28E8A98C2B5E91A4C4CA /* DumpCardView.swift */,
 				202A316C5E1892E09EBE6F49 /* LightboxView.swift */,
 				7FA341A66087474A8CB27607 /* ConfettiView.swift */,
@@ -415,6 +418,7 @@
 				8D6DA427EE2682893A8F3B19 /* PhotoPoolView.swift in Sources */,
 				F09412A62E2FB43EFB3E4BF4 /* CaptionPoolView.swift in Sources */,
 				D5A1000000000000000000B2 /* DumpStylesCard.swift in Sources */,
+				D5A1000000000000000000B9 /* ConnectionsView.swift in Sources */,
 				DBF61DCC27BD7EFC2BECBD43 /* DumpCardView.swift in Sources */,
 				E0A7AAA1E3B6AAA770B95DF1 /* LightboxView.swift in Sources */,
 				925E6F2365D0473D98F167C5 /* ConfettiView.swift in Sources */,

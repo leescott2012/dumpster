@@ -13,6 +13,7 @@ struct PhotoMenuSheet: View {
     var onRescan: () -> Void = {}
     var onRemove: () -> Void = {}     // remove from dump OR delete from pool
     @Environment(\.dismiss) private var dismiss
+    @State private var showFind = false
 
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
 
@@ -38,6 +39,10 @@ struct PhotoMenuSheet: View {
                 Divider().background(Color.white.opacity(0.07))
                 menuItem(icon: "square.and.arrow.down", label: "Save to Photos", tint: .white) {
                     onSaveToPhotos(); dismiss()
+                }
+                Divider().background(Color.white.opacity(0.07))
+                menuItem(icon: "magnifyingglass", label: "Find in Photos", tint: .white) {
+                    showFind = true
                 }
                 if isDuplicate {
                     Divider().background(Color.white.opacity(0.07))
@@ -88,9 +93,29 @@ struct PhotoMenuSheet: View {
                 Spacer()
             }
         }
-        .presentationDetents([.height(isDuplicate ? 328 : 280)])
+        .presentationDetents([.height(isDuplicate ? 378 : 330)])
         .presentationDragIndicator(.hidden)
         .preferredColorScheme(.dark)
+        .alert("Find in Photos", isPresented: $showFind) {
+            Button("Open Photos") {
+                if let u = URL(string: "photos-redirect://") { UIApplication.shared.open(u) }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text(findMessage) }
+    }
+
+    /// iOS can't open a specific photo inside the Photos app, so show exactly when/where it was
+    /// taken, then open Photos so the user can scroll straight to it.
+    private var findMessage: String {
+        guard let t = photo.takenAt else {
+            return "This photo has no saved date (likely a screenshot or edited image). Look near when you imported it."
+        }
+        let f = DateFormatter(); f.dateFormat = "EEE, MMM d, yyyy 'at' h:mm a"
+        var lines = ["Taken " + f.string(from: t)]
+        if let lat = photo.lat, let lng = photo.lng { lines.append(String(format: "Near %.3f, %.3f", lat, lng)) }
+        lines.append("In Photos, scroll to that date.")
+        return lines.joined(separator: "\n")
     }
 
     private func menuItem(icon: String, label: String, tint: Color, action: @escaping () -> Void) -> some View {

@@ -32,7 +32,7 @@ struct FileCabinetMenuView: View {
 
     enum CabinetTab: Int, CaseIterable, Identifiable {
         case aiSettings = 0
-        case myDumps = 1
+        case friends = 1
         case photoPool = 2
         case appearance = 3
         case aboutHelp = 4
@@ -42,7 +42,7 @@ struct FileCabinetMenuView: View {
         var title: String {
             switch self {
             case .aiSettings: return "AI SETTINGS"
-            case .myDumps:    return "MY DUMPS"
+            case .friends:    return "FRIENDS"
             case .photoPool:  return "PHOTO POOL"
             case .appearance: return "APPEARANCE"
             case .aboutHelp:  return "ABOUT / HELP"
@@ -52,7 +52,7 @@ struct FileCabinetMenuView: View {
         var icon: String {
             switch self {
             case .aiSettings: return "brain.head.profile"
-            case .myDumps:    return "tray.full"
+            case .friends:    return "person.2"
             case .photoPool:  return "photo.on.rectangle.angled"
             case .appearance: return "paintbrush"
             case .aboutHelp:  return "questionmark.circle"
@@ -62,7 +62,7 @@ struct FileCabinetMenuView: View {
         var tabColor: Color {
             switch self {
             case .aiSettings: return Color(hex: "#C8A96E")
-            case .myDumps:    return Color(hex: "#A8C8A0")
+            case .friends:    return Color(hex: "#A8C8A0")
             case .photoPool:  return Color(hex: "#A0B8C8")
             case .appearance: return Color(hex: "#C8A0C0")
             case .aboutHelp:  return Color(hex: "#C8B8A0")
@@ -132,7 +132,7 @@ struct FileCabinetMenuView: View {
             // File Cabinet Body
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(Array(CabinetTab.allCases.enumerated()), id: \.element.id) { index, tab in
+                    ForEach(Array(CabinetTab.allCases.filter { $0 != .photoPool }.enumerated()), id: \.element.id) { index, tab in
                         tabFolder(tab: tab, index: index)
                     }
                 }
@@ -290,8 +290,8 @@ struct FileCabinetMenuView: View {
                 return "\(provider.displayName) active"
             }
             return "No API keys configured"
-        case .myDumps:
-            return "\(appState.dumpCount) dumps saved"
+        case .friends:
+            return "Profiles · Comments"
         case .photoPool:
             return "Upload & label settings"
         case .appearance:
@@ -316,8 +316,8 @@ struct FileCabinetMenuView: View {
                         switch tab {
                         case .aiSettings:
                             AISettingsTabView(llmService: llmService, appState: appState)
-                        case .myDumps:
-                            MyDumpsTabView(appState: appState)
+                        case .friends:
+                            FriendsTabView()
                         case .photoPool:
                             PhotoPoolTabView()
                         case .appearance:
@@ -333,6 +333,14 @@ struct FileCabinetMenuView: View {
                     .padding(.bottom, 60)
                 }
             }
+            // Swipe from the left edge = back to the folder list.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20).onEnded { v in
+                    if v.startLocation.x < 32, v.translation.width > 70, abs(v.translation.height) < 80 {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { selectedTab = nil }
+                    }
+                }
+            )
             .background(darkBg.ignoresSafeArea())
         }
     }
@@ -2370,5 +2378,34 @@ struct AboutHelpTabView: View {
                         .stroke(cardBorder, lineWidth: 1)
                 )
         )
+    }
+}
+
+
+// MARK: Friends tab — connections, friend profiles, comments on their dumps
+
+struct FriendsTabView: View {
+    @State private var showConnections = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Find friends, see their public dumps, and leave ideas in the comments.")
+                .font(.system(size: 13)).foregroundColor(.white.opacity(0.6)).lineSpacing(3)
+            Button { showConnections = true } label: {
+                HStack {
+                    Image(systemName: "person.2")
+                    Text("Open Friends").font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                }
+                .foregroundColor(Color(hex: "#C8A96E"))
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.05)))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(24)
+        .sheet(isPresented: $showConnections) {
+            NavigationStack { ConnectionsView() }.preferredColorScheme(.dark)
+        }
     }
 }

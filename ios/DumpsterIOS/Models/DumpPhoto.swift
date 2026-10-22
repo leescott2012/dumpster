@@ -14,6 +14,7 @@ final class DumpPhoto {
     var starred: Bool
     var isHuji: Bool
     var createdAt: Date
+    var assetId: String?             // PHAsset.localIdentifier of the original in the user's Photos library (for Find in Photos)
     var dupeDismissed: Bool = false   // true once user marks a flagged possible-duplicate as "not actually a duplicate"
 
     // MARK: - EXIF / Photo metadata (NATIVE_PORT.md §5)

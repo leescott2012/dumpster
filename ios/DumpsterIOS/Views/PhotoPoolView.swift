@@ -14,6 +14,9 @@ struct PhotoPoolView: View {
 
     @State private var showSearchField = false
     @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var importDone = 0
+    @State private var importTotal = 0
+    @State private var importStart = Date()
     // Ordered (not a Set) so pick order is preserved for the ordinal badge —
     // matches web's `selectedIds: string[]` + `selectedIds.indexOf(photo.id)`
     // (client/src/components/PhotoPool.tsx / PhotoCard.tsx selectionIndex).
@@ -91,6 +94,7 @@ struct PhotoPoolView: View {
             if poolIsEmpty { emptyStateHero } else { grid }
         }
         .background(Theme.bg(appState.colorMode, cs).ignoresSafeArea())
+        .overlay(alignment: .bottom) { importProgressBar }
         .onChange(of: pickerItems) { _, newItems in
             Task { await importPickedPhotos(newItems) }
         }
@@ -104,6 +108,32 @@ struct PhotoPoolView: View {
             if await PhotoDupes.hashMissingPhotos(items) {
                 dupHashVersion += 1
             }
+        }
+    }
+
+    // MARK: - Import progress (count + time left)
+
+    @ViewBuilder
+    private var importProgressBar: some View {
+        if importTotal > 0 {
+            let elapsed = Date().timeIntervalSince(importStart)
+            let left = importDone < 2 ? nil : Int(ceil(elapsed / Double(importDone) * Double(importTotal - importDone)))
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Adding photos \(importDone) of \(importTotal)")
+                    Spacer()
+                    Text(left.map { "about \(max(1, $0))s left" } ?? "estimating…").foregroundColor(.white.opacity(0.5))
+                }
+                .font(.system(size: 12))
+                .foregroundColor(.white)
+                ProgressView(value: Double(importDone), total: Double(max(importTotal, 1)))
+                    .tint(appState.accentColor)
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1).opacity(0.97)))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.12), lineWidth: 1))
+            .padding(.horizontal, 16).padding(.bottom, 16)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 
@@ -387,7 +417,8 @@ struct PhotoPoolView: View {
                 selection: $pickerItems,
                 maxSelectionCount: 50,
                 selectionBehavior: .ordered,
-                matching: .images
+                matching: .images,
+                photoLibrary: .shared()   // gives each pick its Photos-library itemIdentifier (Find in Photos)
             ) {
                 HStack(spacing: 7) {
                     Image(systemName: "plus")
@@ -489,7 +520,8 @@ struct PhotoPoolView: View {
                 selection: $pickerItems,
                 maxSelectionCount: 50,
                 selectionBehavior: .ordered,
-                matching: .images
+                matching: .images,
+                photoLibrary: .shared()   // gives each pick its Photos-library itemIdentifier (Find in Photos)
             ) {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 40))
@@ -504,6 +536,8 @@ struct PhotoPoolView: View {
 
     private func importPickedPhotos(_ items: [PhotosPickerItem]) async {
         var added = 0
+        importStart = Date(); importDone = 0; importTotal = items.count
+        defer { importTotal = 0 }
         // Batches of 50: each batch's Data/decoded buffers are released (autoreleasepool)
         // and saved before the next starts, so a big pick doesn't balloon memory.
         let batchSize = 50
@@ -515,12 +549,14 @@ struct PhotoPoolView: View {
                 let photo: DumpPhoto? = autoreleasepool {
                     guard let localPath = PhotoStorageManager.shared.saveImageData(data) else { return nil }
                     let p = DumpPhoto(localPath: localPath, filename: (localPath as NSString).lastPathComponent)
+                    p.assetId = item.itemIdentifier
                     // Extract EXIF from the original bytes we just saved (§B) — order
                     // matters, this must happen before any future downscale step strips it.
                     PhotoEXIF.populate(p, from: data)
                     return p
                 }
                 if let photo { modelContext.insert(photo); added += 1 }
+                importDone += 1
             }
             try? modelContext.save()
         }

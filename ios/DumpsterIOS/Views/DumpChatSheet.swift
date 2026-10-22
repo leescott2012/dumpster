@@ -121,10 +121,6 @@ struct DumpChatSheet: View {
                                     .fill(Color(white: 0.12))
                                     .frame(width: 48, height: 48)
                             }
-                            Text("\(idx + 1)")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.white.opacity(0.6))
-                                .padding(2)
                         }
                     }
                 }

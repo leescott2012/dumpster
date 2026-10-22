@@ -506,31 +506,37 @@ struct PhotoPoolView: View {
     }
 
     private func importPickedPhotos(_ items: [PhotosPickerItem]) async {
-        var added = 0
-        // Batches of 50: each batch's Data/decoded buffers are released (autoreleasepool)
-        // and saved before the next starts, so a big pick doesn't balloon memory.
-        let batchSize = 50
-        for start in stride(from: 0, to: items.count, by: batchSize) {
-            for item in items[start..<min(start + batchSize, items.count)] {
-                // Save the ORIGINAL bytes verbatim — full resolution, original
-                // format, and EXIF preserved (no UIImage decode/re-encode).
-                guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
-                let photo: DumpPhoto? = autoreleasepool {
-                    guard let localPath = PhotoStorageManager.shared.saveImageData(data) else { return nil }
-                    let p = DumpPhoto(localPath: localPath, filename: (localPath as NSString).lastPathComponent)
-                    // Extract EXIF from the original bytes we just saved (§B) — order
-                    // matters, this must happen before any future downscale step strips it.
-                    PhotoEXIF.populate(p, from: data)
-                    return p
-                }
-                if let photo { modelContext.insert(photo); added += 1 }
-            }
-            try? modelContext.save()
-        }
+        await importPickedPhotoItems(items, into: modelContext)
         pickerItems.removeAll()
-        // Dashboard: photos landed in the pool.
-        if added > 0 { Analytics.track(.photoUploaded, metadata: ["count": added]) }
     }
+}
+
+/// Shared import path (pool picker + onboarding): saves original bytes + EXIF into the pool.
+@MainActor
+func importPickedPhotoItems(_ items: [PhotosPickerItem], into modelContext: ModelContext) async {
+    var added = 0
+    // Batches of 50: each batch's Data/decoded buffers are released (autoreleasepool)
+    // and saved before the next starts, so a big pick doesn't balloon memory.
+    let batchSize = 50
+    for start in stride(from: 0, to: items.count, by: batchSize) {
+        for item in items[start..<min(start + batchSize, items.count)] {
+            // Save the ORIGINAL bytes verbatim — full resolution, original
+            // format, and EXIF preserved (no UIImage decode/re-encode).
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            let photo: DumpPhoto? = autoreleasepool {
+                guard let localPath = PhotoStorageManager.shared.saveImageData(data) else { return nil }
+                let p = DumpPhoto(localPath: localPath, filename: (localPath as NSString).lastPathComponent)
+                // Extract EXIF from the original bytes we just saved (§B) — order
+                // matters, this must happen before any future downscale step strips it.
+                PhotoEXIF.populate(p, from: data)
+                return p
+            }
+            if let photo { modelContext.insert(photo); added += 1 }
+        }
+        try? modelContext.save()
+    }
+    // Dashboard: photos landed in the pool.
+    if added > 0 { Analytics.track(.photoUploaded, metadata: ["count": added]) }
 }
 
 /// Blur/opacity/upward-offset entrance, replayed each time the view re-appears —

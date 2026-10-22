@@ -89,6 +89,7 @@ struct MainAppView: View {
             if auth.isSignedIn {
                 iconButton("person.2") { SocialStore.shared.openFriends = true }
                     .accessibilityLabel("Friends")
+                    .tourAnchor(.friends)
                 NotificationBellButton()
             }
             iconButton("gearshape") {

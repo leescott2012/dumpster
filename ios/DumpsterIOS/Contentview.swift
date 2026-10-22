@@ -100,10 +100,16 @@ struct ContentView: View {
     @State private var isExpanded = false
     @State private var showAppIntro = true
     @AppStorage("dumpster_onboardingDone") private var onboardingDone = false
-    @AppStorage("dumpster_igDone") private var igDone = false
+    /// Blocking first-run flow state: nil = not decided yet, else (has username).
+    @State private var onboardingHasUsername: Bool?
+    @State private var showFirstRun = false
+    /// "Group them for me" opens Auto Gen first; the tour starts when it closes.
+    @State private var tourAfterAutoGen = false
     @ObservedObject private var auth = AuthManager.shared
     @ObservedObject private var social = SocialStore.shared
     @Query private var allPhotos: [DumpPhoto]
+    @Query private var allDumps: [PhotoDump]
+    @Environment(\.modelContext) private var modelContext
     private let impact = UIImpactFeedbackGenerator(style: .medium)
 
     var body: some View {
@@ -150,8 +156,11 @@ struct ContentView: View {
                     .zIndex(31)
             }
 
-            if !igDone && !onboardingDone {
-                InstagramGateView(isDone: $igDone)
+            if showFirstRun {
+                OnboardingView(hasUsername: onboardingHasUsername ?? false,
+                               poolCount: allPhotos.filter { !VideoStore.isVideoPath($0.localPath) }.count,
+                               onFinish: finishFirstRun)
+                    .environmentObject(appState)
                     .zIndex(41)
                     .transition(.opacity)
             }
@@ -178,7 +187,7 @@ struct ContentView: View {
         }
         .background(Color.black)
         .overlayPreferenceValue(TourAnchorKey.self) { anchors in
-            if appState.showOnboarding && !showAppIntro && (igDone || onboardingDone) {
+            if appState.showOnboarding && !showAppIntro && !showFirstRun {
                 SpotlightTutorialView(isPresented: $appState.showOnboarding, anchors: anchors)
                     .environmentObject(appState)
                     .transition(.opacity)
@@ -186,10 +195,13 @@ struct ContentView: View {
         }
         .onAppear {
             isExpanded = true
-            if !onboardingDone { appState.showOnboarding = true }
         }
         .onAppear { if auth.isSignedIn { social.startPolling() } }
+        .task(id: auth.userId) { await decideFirstRun() }
         .onChange(of: auth.isSignedIn) { _, on in if on { social.startPolling() } else { social.stopPolling() } }
+        .onChange(of: appState.showAISuggest) { _, open in
+            if !open && tourAfterAutoGen { tourAfterAutoGen = false; appState.showOnboarding = true }
+        }
         .sheet(isPresented: $social.openFriends) {
             FriendsView(isPresented: $social.openFriends).environmentObject(appState)
         }
@@ -207,6 +219,39 @@ struct ContentView: View {
         }
         .onChange(of: appState.showOnboarding) { _, showing in
             if !showing { onboardingDone = true }
+        }
+    }
+
+    // MARK: - First-run onboarding (mirror of web Home.tsx `onboardingOpen`)
+
+    private func doneKey(_ uid: String) -> String { "dumpster_onboarding_completed_\(uid)" }
+
+    /// Show the flow for a signed-in user whose profile has no onboarding_completed_at.
+    private func decideFirstRun() async {
+        guard let uid = auth.userId else { showFirstRun = false; return }
+        if UserDefaults.standard.bool(forKey: doneKey(uid)) { return }   // already finished on this device
+        guard let p = await OnboardingGate.load() else { return }        // can't tell: never trap the user
+        if p.completed { UserDefaults.standard.set(true, forKey: doneKey(uid)); return }
+        onboardingHasUsername = p.hasUsername
+        withAnimation { showFirstRun = true }
+    }
+
+    /// Web: save taste, start Auto Gen or an empty dump, stamp onboarding_completed_at, claim referral, then the tour.
+    /// (Web's optional phone-verification step is skipped on iOS.)
+    private func finishFirstRun(useAI: Bool) {
+        if let uid = auth.userId { UserDefaults.standard.set(true, forKey: doneKey(uid)) }
+        Task { await ReferralManager.shared.claimAfterOnboarding() }   // sets profiles.onboarding_completed_at, then claims
+        withAnimation { showFirstRun = false }
+        if useAI {
+            tourAfterAutoGen = true
+            appState.showAISuggest = true
+        } else {
+            let nextNum = (allDumps.map { $0.num }.max() ?? 0) + 1
+            let dump = PhotoDump(num: nextNum, title: "New Dump", photoIDs: [], isAIGenerated: false)
+            modelContext.insert(dump)
+            try? modelContext.save()
+            appState.activeDumpId = dump.id
+            appState.showOnboarding = true
         }
     }
 

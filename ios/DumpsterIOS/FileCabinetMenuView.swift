@@ -499,6 +499,7 @@ struct AISettingsTabView: View {
             CabinetSectionHeader("AI TASTE PROFILE", icon: "person.text.rectangle")
             sectionNote("Who you are. Valet, captions and Auto Gen read this.")
             styleProfileCard
+                .tourAnchor(.yourStyle)
                 .padding(.horizontal, 24)
 
             // AI Rules (belongs with the profile)

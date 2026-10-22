@@ -67,9 +67,6 @@ struct MainAppView: View {
                 : .dark)
             .onAppear {
                 appState.dumpCount = dumps.count
-                #if DEBUG
-                DebugSeeder.seedIfEmpty(context: modelContext)
-                #endif
             }
             .onChange(of: dumps.count) { _, new in appState.dumpCount = new }
             .onChange(of: appState.scrollToPool) { _, trigger in

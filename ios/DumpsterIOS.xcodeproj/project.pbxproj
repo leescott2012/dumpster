@@ -12,7 +12,6 @@
 		AA22CC33DD44EE55FF6600B2 /* SocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55007788B2 /* SocialService.swift */; };
 		AA22CC33DD44EE55FF6600B1 /* SocialLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22DD33EE44FF55007788B1 /* SocialLogic.swift */; };
 		0026E79D334EDE569AAA154D /* UndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A26BB7172434E549C9A9D /* UndoManager.swift */; };
-		0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81E7E5BB2905556C06187290 /* DebugSeeder.swift */; };
 		0EFF5AE87F175E278D167941 /* CreditManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BEB2D6552AFB6AB0311814B /* CreditManager.swift */; };
 		1E84D1DFE6FF62704A4DA1A7 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 942EA7AB9A670BD8CC090DEF /* PaywallView.swift */; };
 		2E360841D8A252DFB82BE410 /* PoolFilterMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A5101A689318A2375DE509 /* PoolFilterMenu.swift */; };
@@ -111,7 +110,6 @@
 		72B29D6079112B364B7740AA /* PhotoCropView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoCropView.swift; sourceTree = "<group>"; };
 		7CDAE5D31CDC43CE3505C7B6 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7FA341A66087474A8CB27607 /* ConfettiView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfettiView.swift; sourceTree = "<group>"; };
-		81E7E5BB2905556C06187290 /* DebugSeeder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugSeeder.swift; sourceTree = "<group>"; };
 		942EA7AB9A670BD8CC090DEF /* PaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		976F59813A22C1FE20995D5D /* FileCabinetMenuView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileCabinetMenuView.swift; sourceTree = "<group>"; };
 		98621440A0F44C6DA46AFACB /* AutoGenAdvancedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoGenAdvancedView.swift; sourceTree = "<group>"; };
@@ -237,7 +235,6 @@
 				5FAFC6DDDE09CA03CD99446E /* FormulaEngine.swift */,
 				35245FF235DF426CBE4AC3C9 /* AutoGenFilters.swift */,
 				230A26BB7172434E549C9A9D /* UndoManager.swift */,
-				81E7E5BB2905556C06187290 /* DebugSeeder.swift */,
 				FF11EE22DD33CC44BB55AA66 /* HapticManager.swift */,
 				D0C0FFEE0000000000000008 /* InstagramExporter.swift */,
 				D0C0FFEE000000000000000A /* PhotoDupes.swift */,
@@ -447,7 +444,6 @@
 				A1C0FEC0DEAD00000000CA02 /* CaptionSheetView.swift in Sources */,
 				AA11000000000000000000B2 /* LabelHealthSheet.swift in Sources */,
 				710B8108FF1ED0318E925C2D /* MainAppView.swift in Sources */,
-				0EF54C249DE6DB89D4FB240C /* DebugSeeder.swift in Sources */,
 				4FA9614A1AC84564DABB074C /* SpotlightTutorialView.swift in Sources */,
 				A1A2A3A4B5B6B7B8C9C0D1D2 /* AITasteExample.swift in Sources */,
 				D5A1000000000000000000B1 /* DumpStyle.swift in Sources */,

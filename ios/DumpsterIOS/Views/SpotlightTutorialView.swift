@@ -54,7 +54,6 @@ struct SpotlightTutorialView: View {
 
     @State private var step = -1 // -1 = welcome card
     @State private var missing = false
-    @State private var pulse = false
 
     private let gold = Color(red: 0.784, green: 0.663, blue: 0.431)
 
@@ -107,9 +106,6 @@ struct SpotlightTutorialView: View {
             }
         }
         .ignoresSafeArea()
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .tourTapped)) { note in
             guard step >= 0, let raw = note.object as? String, raw == steps[step].target?.rawValue else { return }
             advanceSoon()
@@ -167,18 +163,17 @@ struct SpotlightTutorialView: View {
                         .onTapGesture { advanceSoon() }
                 }
 
-                RoundedRectangle(cornerRadius: min(r.width, r.height) > 60 ? 16 : r.height / 2)
-                    .strokeBorder(gold, lineWidth: 2)
-                    .frame(width: r.width, height: r.height)
-                    .shadow(color: gold.opacity(0.8), radius: pulse ? 16 : 6)
-                    .scaleEffect(pulse ? 1.05 : 1.0)
+                // Web parity (GuidedTour.tsx tourPulse/tourBob): steady gold glow + an expanding, fading ring every 1.6s,
+                // and an arrow that bobs toward the target. Each has its OWN animation started on appear (re-keyed per step) —
+                // a single shared `pulse` flag flipped once at tour start never animated rings that appear later.
+                TourGlowRing(size: r.size, corner: min(r.width, r.height) > 60 ? 16 : r.height / 2, gold: gold)
+                    .id("ring-\(step)")
                     .position(x: r.midX, y: r.midY)
                     .allowsHitTesting(false)
 
-                Image(systemName: upper ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
-                    .font(.system(size: 22)).foregroundColor(gold)
-                    .shadow(color: gold.opacity(0.8), radius: 6)
-                    .offset(y: pulse ? (upper ? 6 : -6) : 0)
+                TourBobArrow(systemName: upper ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill",
+                             toward: upper ? -1 : 1, gold: gold)
+                    .id("arrow-\(step)")
                     .position(x: r.midX, y: upper ? r.maxY + 22 : r.minY - 22)
                     .allowsHitTesting(false)
 
@@ -244,5 +239,50 @@ struct SpotlightTutorialView: View {
 
     private func dismiss() {
         withAnimation(.easeOut(duration: 0.2)) { isPresented = false }
+    }
+}
+
+// MARK: - Glow + bounce (mirrors web GuidedTour keyframes)
+
+/// Gold ring with a constant glow and a second ring that expands and fades every 1.6s (web `tourPulse`).
+private struct TourGlowRing: View {
+    let size: CGSize
+    let corner: CGFloat
+    let gold: Color
+    @State private var go = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: corner)
+                .strokeBorder(gold.opacity(go ? 0 : 0.7), lineWidth: 2)
+                .scaleEffect(go ? 1.0 + 36 / max(size.width, size.height) : 1.0)
+            RoundedRectangle(cornerRadius: corner)
+                .strokeBorder(gold, lineWidth: 2)
+                .shadow(color: gold.opacity(0.55), radius: 9)
+        }
+        .frame(width: size.width, height: size.height)
+        .onAppear {
+            go = false
+            withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) { go = true }
+        }
+    }
+}
+
+/// Arrow that bobs 7pt toward the target, 1s cycle (web `tourBob`).
+private struct TourBobArrow: View {
+    let systemName: String
+    let toward: CGFloat   // -1 = up, +1 = down
+    let gold: Color
+    @State private var bob = false
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 22)).foregroundColor(gold)
+            .shadow(color: gold.opacity(0.8), radius: 6)
+            .offset(y: bob ? 7 * toward : 0)
+            .onAppear {
+                bob = false
+                withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) { bob = true }
+            }
     }
 }

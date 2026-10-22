@@ -346,11 +346,7 @@ final class LLMService: ObservableObject {
         let modelOverride = activeProvider == .claude ? "claude-sonnet-4-5" : nil
         let raw = try await generate(request: request, provider: activeProvider, modelOverride: modelOverride)
 
-        let clean = raw.replacingOccurrences(of: "```json", with: "")
-            .replacingOccurrences(of: "```", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let data = clean.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let json = Self.parseModelJSON(raw),
               let label = json["label"] as? String
         else { throw LLMError.parseFailed }
         let category = (json["category"] as? String)?.uppercased() ?? "LIFESTYLE"
@@ -572,16 +568,51 @@ final class LLMService: ObservableObject {
         return text
     }
 
-    // MARK: - Response Parsing
+    // MARK: - Tolerant model JSON
 
-    private func parseCaptionResponse(_ content: String, dumpTitle: String) -> CaptionResult {
-        let clean = content
+    /// Parses a JSON object from model text. Models sometimes wrap JSON in ``` fences, add prose, or "self-correct"
+    /// with a second block (web ai-caption 502'd in prod on exactly that). Tries the whole text, then the first
+    /// balanced {...} that parses. Parity with web server/parseModelJson.ts.
+    static func parseModelJSON(_ raw: String) -> [String: Any]? {
+        let stripped = raw
             .replacingOccurrences(of: "```json", with: "")
             .replacingOccurrences(of: "```", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        func obj(_ s: String) -> [String: Any]? {
+            guard let d = s.data(using: .utf8) else { return nil }
+            return (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]
+        }
+        if let o = obj(stripped) { return o }
+        let chars = Array(stripped)
+        var start = 0
+        while start < chars.count {
+            guard let s = chars[start...].firstIndex(of: "{") else { break }
+            var depth = 0, inStr = false, esc = false
+            var i = s
+            while i < chars.count {
+                let c = chars[i]
+                if inStr {
+                    if esc { esc = false } else if c == "\\" { esc = true } else if c == "\"" { inStr = false }
+                } else if c == "\"" { inStr = true }
+                else if c == "{" { depth += 1 }
+                else if c == "}" {
+                    depth -= 1
+                    if depth == 0 {
+                        if let o = obj(String(chars[s...i])) { return o }
+                        break
+                    }
+                }
+                i += 1
+            }
+            start = s + 1
+        }
+        return nil
+    }
 
-        guard let data = clean.data(using: .utf8),
-              let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+    // MARK: - Response Parsing
+
+    private func parseCaptionResponse(_ content: String, dumpTitle: String) -> CaptionResult {
+        guard let parsed = Self.parseModelJSON(content),
               let captions = parsed["captions"] as? [String] else {
             return CaptionResult(dumpTitle: dumpTitle, captions: [content.trimmingCharacters(in: .whitespacesAndNewlines)], vibe: "creative")
         }
@@ -698,6 +729,7 @@ final class LLMService: ObservableObject {
         - If the user is just chatting or asking questions, respond naturally — don't force actions.
         - When you do take actions, ALSO include taste_update actions to remember preferences.
         - Dump max is 20 photos.
+        - POSITIONS ARE 0-BASED: the photo list above is numbered from 1 for reading, but "position" (swap_in) and "index" (swap_out) count from 0. First photo = 0, second = 1. To lead with a photo use position 0; to remove the photo numbered N in the list use index N-1.
         - When the dump's aesthetic has gaps, use ONE suggest_missing action listing the shots it \
         still needs (e.g. a wide establishing shot, a golden-hour closer). Check the pool first: \
         if a shot that fills the gap ALREADY EXISTS in the pool, use swap_in for it instead of \
@@ -722,13 +754,7 @@ final class LLMService: ObservableObject {
     }
 
     private func parseChatResponse(_ content: String) -> DumpChatResponse {
-        let clean = content
-            .replacingOccurrences(of: "```json", with: "")
-            .replacingOccurrences(of: "```", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard let data = clean.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard let json = Self.parseModelJSON(content) else {
             return DumpChatResponse(reply: content.trimmingCharacters(in: .whitespacesAndNewlines), actions: [])
         }
 

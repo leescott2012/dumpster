@@ -85,6 +85,14 @@ final class SupabaseClient {
         return data
     }
 
+    /// `get` asks PostgREST for a single object, but a plain array response (no Accept header honoured,
+    /// proxies, older code paths) is also possible. Accept either shape and return the row.
+    static func firstRow(_ data: Data) -> [String: Any]? {
+        let json = try? JSONSerialization.jsonObject(with: data)
+        if let obj = json as? [String: Any] { return obj }
+        return (json as? [[String: Any]])?.first
+    }
+
     /// POST /rest/v1/<table> with upsert support.
     func upsert(table: String, body: [String: Any], jwt: String) async throws {
         let urlStr = "\(Self.url)/rest/v1/\(table)"

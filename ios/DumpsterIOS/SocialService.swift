@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import CryptoKit
 
 // MARK: - Social (notifications bell + messages)
 //
@@ -45,9 +46,10 @@ struct AppNotification: Identifiable, Equatable {
     }
 }
 
-struct SocialProfile: Hashable {
+struct SocialProfile: Hashable, Identifiable {
     let id: String
     let username: String?
+    var avatarColor: String? = nil
     var handle: String { "@" + (username ?? "someone") }
 }
 
@@ -206,9 +208,81 @@ final class SocialStore: ObservableObject {
         friends = (j["connections"] as? [[String: Any]] ?? []).compactMap { r in
             guard let id = r["id"] as? String, let status = r["status"] as? String,
                   let o = r["other"] as? [String: Any], let oid = o["id"] as? String else { return nil }
-            return FriendRow(connectionId: id, other: SocialProfile(id: oid, username: o["username"] as? String),
+            return FriendRow(connectionId: id, other: SocialProfile(id: oid, username: o["username"] as? String, avatarColor: o["avatar_color"] as? String),
                              status: status, incoming: r["addressee_id"] as? String != oid)
         }
+    }
+
+    // MARK: Dump visibility (PATCH /api/dump-visibility { dumpId, public }) — same route as web setDumpPublic
+
+    /// Mirror of server normId() (api/workspace.ts): UUIDs pass through, anything else becomes the
+    /// stable v5-style UUID the cloud row would carry. Must stay byte-identical to the server.
+    static func cloudDumpId(_ id: String) -> String {
+        if UUID(uuidString: id) != nil { return id.lowercased() }
+        let h = Array(Insecure.SHA1.hash(data: Data(("dumpster:" + id).utf8)).map { String(format: "%02x", $0) }.joined())
+        func s(_ a: Int, _ b: Int) -> String { String(h[a..<b]) }
+        let variant = String(format: "%02x", (Int(s(16, 18), radix: 16)! & 0x3f) | 0x80)
+        return s(0, 8) + "-" + s(8, 12) + "-5" + s(13, 16) + "-" + variant + s(18, 20) + "-" + s(20, 32)
+    }
+
+    /// Owner-only server-side. Throws a readable error; callers revert their optimistic flip.
+    func setDumpPublic(dumpId: String, isPublic: Bool) async throws {
+        do {
+            _ = try await call("PATCH", "dump-visibility", body: ["dumpId": Self.cloudDumpId(dumpId), "public": isPublic])
+        } catch let e as SocialError where e.message.hasPrefix("Dump not found") {
+            // ponytail: iOS does not push dumps to the cloud yet (see PR), so a device-only dump has no row to flag.
+            throw SocialError(message: "This dump isn't in your cloud account yet, so it can't be shared.")
+        }
+    }
+
+    // MARK: Friend profile + dump comments
+
+    struct FriendPhoto: Identifiable { let id: String; let url: URL? }
+    struct FriendDump: Identifiable {
+        let id: String
+        let title: String
+        let subtitle: String?
+        let photos: [FriendPhoto]
+        var commentCount: Int
+    }
+    struct FriendProfile { let displayName: String; var dumps: [FriendDump] }
+    struct DumpComment: Identifiable {
+        let id: String
+        let body: String
+        let mine: Bool
+        let username: String?
+    }
+
+    /// GET /api/connections?mode=profile&userId= — accepted connections only (server 403 otherwise); public dumps only.
+    func profile(of userId: String) async throws -> FriendProfile {
+        let j = try await call("GET", "connections", query: ["mode": "profile", "userId": userId])
+        let dumps = (j["dumps"] as? [[String: Any]] ?? []).compactMap { d -> FriendDump? in
+            guard let id = d["id"] as? String else { return nil }
+            let photos = (d["photos"] as? [[String: Any]] ?? []).compactMap { p -> FriendPhoto? in
+                guard let pid = p["id"] as? String else { return nil }
+                return FriendPhoto(id: pid, url: (p["url"] as? String).flatMap(URL.init(string:)))
+            }
+            let sub = (d["subtitle"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            return FriendDump(id: id, title: d["title"] as? String ?? "Untitled", subtitle: sub,
+                              photos: photos, commentCount: d["commentCount"] as? Int ?? 0)
+        }
+        let name = (j["profile"] as? [String: Any])?["display_name"] as? String ?? ""
+        return FriendProfile(displayName: name, dumps: dumps)
+    }
+
+    /// GET /api/dump-comments?dumpId= (oldest first)
+    func comments(on dumpId: String) async throws -> [DumpComment] {
+        let j = try await call("GET", "dump-comments", query: ["dumpId": dumpId])
+        return (j["comments"] as? [[String: Any]] ?? []).compactMap { c in
+            guard let id = c["id"] as? String else { return nil }
+            return DumpComment(id: id, body: c["body"] as? String ?? "", mine: c["mine"] as? Bool ?? false,
+                               username: (c["author"] as? [String: Any])?["username"] as? String)
+        }
+    }
+
+    /// POST /api/dump-comments { dumpId, body } (server trims + caps at 500)
+    func postComment(on dumpId: String, body: String) async throws {
+        _ = try await call("POST", "dump-comments", body: ["dumpId": dumpId, "body": String(body.prefix(500))])
     }
 
     func respond(_ row: FriendRow, accept: Bool) async {

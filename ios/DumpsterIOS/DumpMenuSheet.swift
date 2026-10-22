@@ -136,6 +136,11 @@ struct DumpMenuSheet: View {
 
                 Divider().background(Color.white.opacity(0.07))
 
+                // Public / Private (mirrors web toggle row)
+                DumpPublicToggleRow(dump: dump)
+
+                Divider().background(Color.white.opacity(0.07))
+
                 // Delete
                 menuItem(icon: "trash", label: "Delete Dump", tint: .red) {
                     onDelete()
@@ -145,7 +150,7 @@ struct DumpMenuSheet: View {
                 Spacer().frame(height: 32)
             }
         }
-        .presentationDetents([.height(620)])
+        .presentationDetents([.height(700)])
         .presentationDragIndicator(.hidden)
     }
 

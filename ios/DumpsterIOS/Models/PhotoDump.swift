@@ -17,6 +17,7 @@ final class PhotoDump {
     var rating: String?           // "up" | "down" | nil — mirrors web Dump.rating
     var archived: Bool = false    // hidden from the main list, restorable (mirrors web archive)
     var vibe: String? = nil       // one-or-two-word caption vibe from the last Generate Captions (mirrors web Dump.vibe)
+    var isPublic: Bool = false    // visible to accepted connections (mirrors web Dump.public); default private
     var createdAt: Date
 
     init(

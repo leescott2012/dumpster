@@ -118,6 +118,7 @@ struct FriendsView: View {
     @ObservedObject private var social = SocialStore.shared
     @EnvironmentObject var appState: AppState
     @State private var thread: SocialProfile?
+    @State private var profileOf: SocialProfile?
     @State private var addName = ""
     @State private var addError: String?
 
@@ -168,12 +169,23 @@ struct FriendsView: View {
                         Text("No friends yet. Add one by username.").font(.system(size: 12)).foregroundColor(.white.opacity(0.5))
                     }
                     ForEach(accepted) { f in
-                        Button { thread = f.other } label: {
-                            HStack {
-                                Text(f.other.handle).foregroundColor(.white)
-                                Spacer()
+                        HStack(spacing: 12) {
+                            Button { thread = f.other } label: {
+                                HStack {
+                                    Text(f.other.handle).foregroundColor(.white)
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.borderless)
+                            Button("View profile") { profileOf = f.other }
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(appState.accentColor).buttonStyle(.borderless)
+                            Button { thread = f.other } label: {
                                 Image(systemName: "bubble.left").foregroundColor(appState.accentColor)
                             }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Message \(f.other.handle)")
                         }
                     }
                     HStack {
@@ -198,6 +210,7 @@ struct FriendsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { isPresented = false }.foregroundColor(appState.accentColor) } }
             .navigationDestination(item: $thread) { p in DMThreadView(other: p).environmentObject(appState) }
+            .sheet(item: $profileOf) { p in FriendProfileSheet(person: p).environmentObject(appState) }
         }
         .preferredColorScheme(.dark)
         .task {
@@ -328,6 +341,273 @@ struct DMThreadView: View {
         Task {
             do { try await social.setBlocked(block, with: other.id); thread.blockedByMe = block }
             catch { self.error = "Blocking isn't available yet." }
+        }
+    }
+}
+
+
+// MARK: - Public / Private row for the dump options sheet. Mirrors web DumpActionSheet's toggle row:
+// optimistic flip, reverted if the server refuses. Self-contained so DumpMenuSheet only needs one line.
+
+struct DumpPublicToggleRow: View {
+    let dump: PhotoDump
+    @State private var busy = false
+    @State private var error: String?
+    private let green = Color(red: 0.29, green: 0.87, blue: 0.5)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 14) {
+                Image(systemName: dump.isPublic ? "globe" : "lock")
+                    .font(.system(size: 16))
+                    .foregroundColor(dump.isPublic ? green : .white)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(dump.isPublic ? "Public" : "Private").font(.system(size: 16)).foregroundColor(.white)
+                    Text(dump.isPublic ? "Visible to your connections" : "Only you can see this")
+                        .font(.system(size: 12)).foregroundColor(.white.opacity(0.5))
+                }
+                Spacer()
+                Toggle("", isOn: Binding(get: { dump.isPublic }, set: { flip(to: $0) }))
+                    .labelsHidden().tint(green).disabled(busy)
+            }
+            if let error {
+                Text(error).font(.system(size: 11.5)).foregroundColor(.red.opacity(0.9)).padding(.leading, 38)
+            }
+        }
+        .padding(.horizontal, 24).padding(.vertical, 12)
+    }
+
+    private func flip(to next: Bool) {
+        dump.isPublic = next          // optimistic
+        error = nil; busy = true
+        Task {
+            do { try await SocialStore.shared.setDumpPublic(dumpId: dump.id, isPublic: next) }
+            catch { dump.isPublic = !next; self.error = error.localizedDescription }   // revert
+            busy = false
+        }
+    }
+}
+
+// MARK: - Friend profile. Mirrors web FriendProfileSheet: hero + stats, public dumps, tap one for the
+// big photo carousel + "Ideas & comments". No photo numbers anywhere.
+
+struct FriendProfileSheet: View {
+    let person: SocialProfile
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var social = SocialStore.shared
+    @State private var profile: SocialStore.FriendProfile?
+    @State private var error: String?
+    @State private var open: SocialStore.FriendDump?
+    @State private var comments: [SocialStore.DumpComment] = []
+    @State private var commentsError: String?
+    @State private var draft = ""
+    @State private var sending = false
+    @State private var sendError: String?
+
+    private var avatar: Color { Color(hex: person.avatarColor ?? "#C8A96E") }
+    private var initial: String { String((person.username ?? "?").prefix(1)).uppercased() }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            topBar
+            Divider().background(Color.white.opacity(0.1))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let open { detail(open) } else { list }
+                }
+                .padding(.horizontal, 20).padding(.vertical, 16)
+            }
+            if open != nil { composer }
+        }
+        .background(Color(white: 0.055).ignoresSafeArea())
+        .preferredColorScheme(.dark)
+        .presentationDetents([.large])
+        .task { await loadProfile() }
+    }
+
+    // MARK: Pieces
+
+    private var topBar: some View {
+        HStack(spacing: 10) {
+            if open != nil {
+                Button { open = nil } label: { Image(systemName: "chevron.left").foregroundColor(.white.opacity(0.6)) }
+                    .accessibilityLabel("Back")
+            }
+            Text(String(initial))
+                .font(.system(size: 12, weight: .bold)).foregroundColor(Color(white: 0.055))
+                .frame(width: 32, height: 32).background(avatar).clipShape(Circle())
+            Text(open?.title ?? person.handle)
+                .font(.system(size: 15, weight: .bold)).foregroundColor(.white).lineLimit(1)
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)).foregroundColor(.white.opacity(0.6))
+                    .frame(width: 30, height: 30).background(Color(white: 0.1)).clipShape(Circle())
+            }
+            .accessibilityLabel("Close")
+        }
+        .padding(.horizontal, 20).padding(.vertical, 14)
+    }
+
+    @ViewBuilder private var list: some View {
+        VStack(spacing: 4) {
+            Text(initial)
+                .font(.system(size: 32, weight: .heavy)).foregroundColor(Color(white: 0.055))
+                .frame(width: 84, height: 84)
+                .background(LinearGradient(colors: [avatar, Color(white: 0.1)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(appState.accentColor, lineWidth: 2))
+                .padding(.bottom, 8)
+            Text(person.handle).font(.system(size: 20, weight: .heavy)).foregroundColor(.white)
+            if let n = profile?.displayName, !n.isEmpty {
+                Text(n).font(.system(size: 13)).foregroundColor(.white.opacity(0.55))
+            }
+            if let p = profile {
+                HStack(spacing: 28) {
+                    stat(p.dumps.count, "Dumps")
+                    stat(p.dumps.reduce(0) { $0 + $1.photos.count }, "Photos")
+                    stat(p.dumps.reduce(0) { $0 + $1.commentCount }, "Comments")
+                }.padding(.top, 12)
+            }
+        }
+        .frame(maxWidth: .infinity).padding(.bottom, 22)
+
+        if let error {
+            Text(error).font(.system(size: 13)).foregroundColor(.white.opacity(0.6))
+        } else if let p = profile {
+            if p.dumps.isEmpty {
+                Text("\(person.handle) hasn't shared any dumps yet.").font(.system(size: 13)).foregroundColor(.white.opacity(0.5))
+            }
+            ForEach(p.dumps) { d in dumpCard(d) }
+        } else {
+            ProgressView().frame(maxWidth: .infinity)
+        }
+    }
+
+    private func stat(_ n: Int, _ label: String) -> some View {
+        VStack(spacing: 2) {
+            Text("\(n)").font(.system(size: 18, weight: .heavy)).foregroundColor(.white)
+            Text(label.uppercased()).font(.system(size: 10)).tracking(0.8).foregroundColor(.white.opacity(0.45))
+        }
+    }
+
+    private func dumpCard(_ d: SocialStore.FriendDump) -> some View {
+        Button { openDump(d) } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(d.photos.prefix(6)) { p in photo(p.url).frame(width: 168, height: 216).clipShape(RoundedRectangle(cornerRadius: 12)) }
+                    }
+                }
+                .padding(.bottom, 12)
+                Text(d.title).font(.system(size: 17, weight: .heavy)).foregroundColor(.white)
+                if let sub = d.subtitle { Text(sub).font(.system(size: 13)).foregroundColor(.white.opacity(0.55)).padding(.top, 2) }
+                Text("\(d.photos.count) photos · " + (d.commentCount > 0 ? "\(d.commentCount) comment\(d.commentCount == 1 ? "" : "s")" : "Tap to comment"))
+                    .font(.system(size: 12, weight: .semibold)).foregroundColor(appState.accentColor).padding(.top, 8)
+            }
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(white: 0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 14)
+    }
+
+    private func photo(_ url: URL?) -> some View {
+        AsyncImage(url: url) { phase in
+            if let img = phase.image { img.resizable().scaledToFill() }
+            else { Color(white: 0.12).overlay(phase.error != nil ? Image(systemName: "photo").foregroundColor(.white.opacity(0.25)) : nil) }
+        }
+    }
+
+    @ViewBuilder private func detail(_ d: SocialStore.FriendDump) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 12) {
+                ForEach(d.photos) { p in
+                    photo(p.url)
+                        .containerRelativeFrame(.horizontal) { w, _ in min(w * 0.82, 420) }
+                        .aspectRatio(4.0 / 5.0, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.viewAligned)
+        .padding(.horizontal, -20).contentMargins(.horizontal, 20, for: .scrollContent)
+        .padding(.bottom, 18)
+
+        Text("IDEAS & COMMENTS").font(.system(size: 10, weight: .bold)).tracking(1).foregroundColor(.white.opacity(0.5)).padding(.bottom, 8)
+        if let commentsError {
+            Text(commentsError).font(.system(size: 12)).foregroundColor(.white.opacity(0.5))
+        } else if comments.isEmpty {
+            Text("No comments yet — leave the first idea.").font(.system(size: 12)).foregroundColor(.white.opacity(0.4))
+        }
+        ForEach(comments) { c in
+            (Text(c.mine ? "You" : "@" + (c.username ?? "someone")).fontWeight(.bold)
+                .foregroundColor(c.mine ? appState.accentColor : .white)
+             + Text("  " + c.body).foregroundColor(.white.opacity(0.9)))
+                .font(.system(size: 13)).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 10)
+        }
+    }
+
+    private var canSend: Bool { !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !sending }
+
+    private var composer: some View {
+        VStack(spacing: 6) {
+            if let sendError { Text(sendError).font(.system(size: 11.5)).foregroundColor(.red.opacity(0.9)) }
+            HStack(spacing: 8) {
+                TextField("Leave an idea for this dump…", text: $draft)
+                    .foregroundColor(.white).padding(.horizontal, 14).padding(.vertical, 11)
+                    .background(Color(white: 0.08)).clipShape(RoundedRectangle(cornerRadius: 12))
+                    .onChange(of: draft) { _, v in if v.count > 500 { draft = String(v.prefix(500)) } }
+                    .onSubmit { send() }
+                Button { send() } label: {
+                    Image(systemName: "paperplane.fill").foregroundColor(canSend ? Color.black : .white.opacity(0.3))
+                        .frame(width: 44, height: 44)
+                        .background(canSend ? appState.accentColor : Color(white: 0.1)).clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(!canSend)
+                .accessibilityLabel("Send comment")
+            }
+        }
+        .padding(.horizontal, 20).padding(.vertical, 12)
+        .background(Color(white: 0.055))
+        .overlay(alignment: .top) { Divider().background(Color.white.opacity(0.1)) }
+    }
+
+    // MARK: Actions
+
+    private func loadProfile() async {
+        do { profile = try await social.profile(of: person.id); error = nil }
+        catch { self.error = "Couldn't load this profile." + ((error as? SocialError).map { " " + $0.message } ?? "") }
+    }
+
+    private func openDump(_ d: SocialStore.FriendDump) {
+        open = d; comments = []; draft = ""; sendError = nil; commentsError = nil
+        Task { await loadComments(d.id) }
+    }
+
+    private func loadComments(_ dumpId: String) async {
+        do { comments = try await social.comments(on: dumpId); commentsError = nil }
+        catch { commentsError = "Couldn't load comments." }
+    }
+
+    private func send() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canSend, let d = open else { return }
+        sending = true; sendError = nil; draft = ""
+        Task {
+            do {
+                try await social.postComment(on: d.id, body: text)
+                await loadComments(d.id)
+                if let i = profile?.dumps.firstIndex(where: { $0.id == d.id }) { profile?.dumps[i].commentCount = comments.count }
+            } catch {
+                draft = text   // keep what they typed
+                sendError = (error as? SocialError)?.message ?? "Couldn't post your comment."
+            }
+            sending = false
         }
     }
 }

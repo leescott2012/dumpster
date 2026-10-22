@@ -181,6 +181,7 @@ struct DumpCardView: View {
                         .background(Theme.bg2(appState.colorMode, cs))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
+                .tourAnchor(.dumpMenu)
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -551,7 +552,7 @@ struct DumpCardView: View {
         // category bucket, ignoring what's actually pictured. Capped so a large
         // dump doesn't blow up the prompt.
         var seenLabels = Set<String>()
-        let labels = photos.flatMap { $0.labels }
+        let labels = photos.flatMap { $0.promptLabels }
             .filter { seenLabels.insert($0).inserted }
             .prefix(20)
             .map { $0 }

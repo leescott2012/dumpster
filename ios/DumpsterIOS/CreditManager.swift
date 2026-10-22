@@ -240,3 +240,60 @@ final class CreditManager: ObservableObject {
         }
     }
 }
+
+// MARK: - Referrals (mirrors web client/src/lib/referral.ts + CreditsSheet)
+
+/// Invite-a-friend: the inviter earns 10 credits when the friend finishes setup.
+/// The server (POST /api/referral-claim) validates and pays; the device never writes credits.
+@MainActor
+final class ReferralManager: ObservableObject {
+    static let shared = ReferralManager()
+    static let webBase = "https://dumpster-web-manus.vercel.app"
+    private let key = "dumpster_ref_code"
+
+    @Published private(set) var myCode: String?
+
+    var myLink: URL? { myCode.flatMap { URL(string: "\(Self.webBase)/?ref=\($0)") } }
+
+    /// Remember a friend's code (deep link dumpster://invite?code=X, or pasted).
+    @discardableResult
+    func capture(code raw: String) -> Bool {
+        let code = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard code.count >= 4, code.count <= 32, code.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else { return false }
+        UserDefaults.standard.set(code, forKey: key)
+        return true
+    }
+
+    func capture(url: URL) {
+        guard url.scheme == "dumpster", url.host == "invite",
+              let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "code" })?.value
+        else { return }
+        capture(code: code)
+    }
+
+    func loadMyCode() async {
+        guard let uid = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt else { return }
+        guard let data = try? await SupabaseClient.shared.get(table: "profiles", query: "id=eq.\(uid)&select=referral_code", jwt: jwt),
+              let row = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]])?.first else { return }
+        myCode = row["referral_code"] as? String
+    }
+
+    /// Call when the invited user finishes setup. Marks onboarding complete (server requires it), then claims.
+    func claimAfterOnboarding() async {
+        guard let uid = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt else { return }
+        try? await SupabaseClient.shared.upsert(
+            table: "profiles",
+            body: ["id": uid, "onboarding_completed_at": ISO8601DateFormatter().string(from: Date())],
+            jwt: jwt)
+        guard let code = UserDefaults.standard.string(forKey: key),
+              let url = URL(string: "\(Self.webBase)/api/referral-claim") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["code": code])
+        guard let (_, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse else { return }  // offline: keep code, retry next time
+        if http.statusCode < 500 { UserDefaults.standard.removeObject(forKey: key) }
+    }
+}

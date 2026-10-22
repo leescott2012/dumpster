@@ -9,6 +9,9 @@ struct PaywallView: View {
     @ObservedObject private var sub     = SubscriptionManager.shared
     @Environment(\.dismiss) private var dismiss
 
+    @ObservedObject private var referral = ReferralManager.shared
+    @State private var friendCode = ""
+    @State private var codeSaved = false
     @State private var selectedPlan: SubscriptionManager.Plan = .all[2] // default to yearly
 
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
@@ -60,6 +63,10 @@ struct PaywallView: View {
                             .padding(.bottom, 28)
                     }
 
+                    inviteCard
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 24)
+
                     // ── One-time credit packs ──
                     sectionLabel(
                         "OR BUY CREDITS",
@@ -103,6 +110,40 @@ struct PaywallView: View {
     }
 
     // MARK: - Pieces
+
+    private var inviteCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("INVITE A FRIEND")
+                .font(.system(size: 11, weight: .bold)).tracking(1.2)
+                .foregroundColor(gold)
+            Text("Earn 10 credits for each friend who finishes setup \u{2014} enough for a new AI dump. Up to 5 friends.")
+                .font(.system(size: 12)).foregroundColor(.white.opacity(0.55))
+            if let link = referral.myLink {
+                ShareLink(item: link, message: Text("Join me on Dumpster")) {
+                    Text("Share invite link")
+                        .font(.system(size: 13, weight: .heavy)).foregroundColor(.black)
+                        .frame(maxWidth: .infinity).padding(.vertical, 11)
+                        .background(gold).clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            HStack {
+                TextField("Got a friend's code?", text: $friendCode)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .font(.system(size: 13)).foregroundColor(.white)
+                Button("Save") { codeSaved = referral.capture(code: friendCode) }
+                    .font(.system(size: 12, weight: .bold)).foregroundColor(gold)
+            }
+            .padding(10).background(Color.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 8))
+            if codeSaved {
+                Text("Saved. Your friend is rewarded when you finish setup.")
+                    .font(.system(size: 11)).foregroundColor(.white.opacity(0.5))
+            }
+        }
+        .padding(14)
+        .background(Color.white.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .task { await referral.loadMyCode() }
+    }
 
     private var header: some View {
         VStack(spacing: 10) {

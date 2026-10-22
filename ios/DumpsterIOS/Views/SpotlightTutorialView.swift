@@ -1,350 +1,331 @@
 import SwiftUI
 
-// MARK: - Data
+// MARK: - Targets + anchor plumbing
+//
+// Mirror of client/src/components/GuidedTour.tsx — keep step order and copy identical.
+// Real controls are tagged with `.tourAnchor(.x)`; the overlay reads their frames
+// through an anchor preference, dims everything else, and waits for the real tap.
 
-struct TutorialStep {
+enum TourTarget: String {
+    case menuButton, cabinetAI, scrub, dumpStyles, cabinetBack, cabinetClose
+    case dumpMenu, photoDots, autoGen, newDump, pool
+}
+
+struct TourAnchorKey: PreferenceKey {
+    static var defaultValue: [TourTarget: Anchor<CGRect>] = [:]
+    static func reduce(value: inout [TourTarget: Anchor<CGRect>], nextValue: () -> [TourTarget: Anchor<CGRect>]) {
+        value.merge(nextValue()) { first, _ in first }
+    }
+}
+
+extension Notification.Name {
+    static let tourTapped = Notification.Name("dumpster.tourTapped")
+}
+
+extension View {
+    /// Tags a real control for the tour and reports taps on it (without blocking them).
+    func tourAnchor(_ target: TourTarget) -> some View {
+        self
+            .anchorPreference(key: TourAnchorKey.self, value: .bounds) { [target: $0] }
+            .simultaneousGesture(TapGesture().onEnded {
+                NotificationCenter.default.post(name: .tourTapped, object: target.rawValue)
+            })
+    }
+}
+
+// MARK: - Steps
+
+private struct TourStep {
+    let target: TourTarget
     let title: String
-    /// Each string becomes a glowing-circle bullet in the card.
-    let bullets: [String]
-    /// Normalized (0–1) oval within screen size. nil = full-scrim centered card.
-    let frame: CGRect?
+    let body: String
+    /// true = the tour catches the tap (it would open a sheet / create something mid-tour).
+    let swallow: Bool
 }
 
 // MARK: - View
 
-/// Spotlight-style tutorial overlay. Sits on top of the live app (not a fullScreenCover),
-/// so the real UI is visible through the glowing oval cutout.
 struct SpotlightTutorialView: View {
 
     @Binding var isPresented: Bool
+    let anchors: [TourTarget: Anchor<CGRect>]
+    @EnvironmentObject private var appState: AppState
 
-    @State private var step = 0
-    @State private var glowPulse: Double = 0.4
+    @State private var step = -1 // -1 = welcome card
+    @State private var missing = false
+    @State private var pulse = false
 
-    private let gold = Color(red: 0.784, green: 0.663, blue: 0.431) // #C8A96E
+    private let gold = Color(red: 0.784, green: 0.663, blue: 0.431)
 
-    // ── Steps ──────────────────────────────────────────────────────
-    // Normalized frames for iPhone 17 Pro (393 × 852 pt).
-    // DI bar reserves ~54 pt at top; content starts after Color.clear(height:50).
-
-    private let steps: [TutorialStep] = [
-        // 0 — Welcome (centered card, no spotlight)
-        TutorialStep(
-            title: "Welcome to Dumpster ✦",
-            bullets: [
-                "Build perfect Instagram carousels fast",
-                "Curate, reorder, and export in minutes",
-                "AI captions built right in"
-            ],
-            frame: nil
-        ),
-        // 1 — Stats chips (narrow oval across the three chips)
-        TutorialStep(
-            title: "Stats at a Glance",
-            bullets: [
-                "Dump count — total carousels in progress",
-                "Photos Used — across all active dumps",
-                "In Pool — still available to add"
-            ],
-            frame: CGRect(x: 0.02, y: 0.226, width: 0.74, height: 0.048)
-        ),
-        // 2 — Dump card (oval around first dump card)
-        TutorialStep(
-            title: "Photo Dumps",
-            bullets: [
-                "Drag photos left/right to reorder",
-                "Tap the title to rename the dump",
-                "Gold bar = sweet spot (10–12 photos)"
-            ],
-            frame: CGRect(x: 0.02, y: 0.295, width: 0.96, height: 0.375)
-        ),
-        // 3 — Sparkles icon (tight circle on the sparkles button)
-        TutorialStep(
-            title: "AI Captions ✦",
-            bullets: [
-                "Generates caption options instantly",
-                "Tap ✦ on any dump to try it",
-                "Add your API key in Main Menu → AI"
-            ],
-            frame: CGRect(x: 0.655, y: 0.305, width: 0.095, height: 0.044)
-        ),
-        // 4 — Done (centered card, no spotlight)
-        TutorialStep(
-            title: "You're All Set!",
-            bullets: [
-                "Scroll down to explore the Photo Pool",
-                "Pinch to resize the grid (S / M / L)",
-                "Tap ≡ anytime to replay this tour"
-            ],
-            frame: nil
-        ),
+    private let steps: [TourStep] = [
+        TourStep(target: .menuButton, title: "Menu", body: "Everything lives in the menu. Tap it.", swallow: false),
+        TourStep(target: .cabinetAI, title: "AI Tools", body: "Your AI helpers live here. Tap to open.", swallow: false),
+        TourStep(target: .scrub, title: "Scrubs", body: "Pull photos and your style from an Instagram account.", swallow: true),
+        TourStep(target: .dumpStyles, title: "Dump Styles", body: "Save named recipes so every dump comes out your way. Tap to look.", swallow: false),
+        TourStep(target: .cabinetBack, title: "Back", body: "Tap the arrow to head back.", swallow: false),
+        TourStep(target: .cabinetClose, title: "Close the menu", body: "Tap the X to head back.", swallow: false),
+        TourStep(target: .dumpMenu, title: "Valet", body: "Your AI assistant. Tap the dots, then Valet, to reorder and set the vibe.", swallow: true),
+        TourStep(target: .photoDots, title: "Recycle", body: "Tap a photo's dots to swap it for a fresh one from your pool.", swallow: true),
+        TourStep(target: .autoGen, title: "Auto Gen", body: "One tap builds your best carousel from your pool.", swallow: true),
+        TourStep(target: .newDump, title: "New Dump", body: "Start an empty dump and fill it yourself.", swallow: true),
+        TourStep(target: .pool, title: "The Pool", body: "Your unused photos wait here. Videos and captions have pools too. Tap it.", swallow: false),
     ]
-
-    // MARK: - Body
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                spotlightLayer(geo: geo)
-                    .id(step)
-                    .transition(.opacity.animation(.easeInOut(duration: 0.28)))
-
-                // Skip button — always top-right
+                if step < 0 {
+                    welcome
+                } else {
+                    spotlight(geo: geo)
+                }
                 VStack {
                     HStack {
                         Spacer()
-                        Button("Skip") { dismiss() }
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.40))
-                            .padding(.top, 68)
-                            .padding(.trailing, 22)
+                        Button { dismiss() } label: {
+                            Text("Skip ✕")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white.opacity(0.8))
+                                .padding(.horizontal, 14).padding(.vertical, 8)
+                                .background(Capsule().fill(Color(white: 0.1)))
+                                .overlay(Capsule().stroke(Color.white.opacity(0.15)))
+                        }
                     }
+                    .padding(.top, 60).padding(.trailing, 16)
                     Spacer()
                 }
             }
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) {
-                glowPulse = 1.0
-            }
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .tourTapped)) { note in
+            guard step >= 0, let raw = note.object as? String, raw == steps[step].target.rawValue else { return }
+            advanceSoon()
+        }
+        .task(id: step) {
+            missing = false
+            if step >= 0, steps[step].target == .pool { appState.scrollToPool = UUID() }
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            if step >= 0, anchors[steps[step].target] == nil { missing = true }
         }
     }
 
-    // MARK: - Spotlight layer
+    // MARK: Welcome
+
+    private var welcome: some View {
+        ZStack {
+            Color.black.opacity(0.88).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Text("Welcome to Dumpster")
+                    .font(.system(size: 24, weight: .heavy)).foregroundColor(.white)
+                Text("A 1-minute tour. Tap the glowing spots to learn by doing.")
+                    .font(.system(size: 14)).foregroundColor(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                Button { withAnimation { step = 0 } } label: {
+                    Text("Start the tour")
+                        .font(.system(size: 14, weight: .heavy)).foregroundColor(.black)
+                        .frame(maxWidth: .infinity).padding(.vertical, 13)
+                        .background(gold).clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .padding(28).frame(maxWidth: 340)
+        }
+    }
+
+    // MARK: Spotlight
 
     @ViewBuilder
-    private func spotlightLayer(geo: GeometryProxy) -> some View {
-        let current = steps[step]
+    private func spotlight(geo: GeometryProxy) -> some View {
+        let s = steps[step]
+        if let anchor = anchors[s.target] {
+            let r = geo[anchor].insetBy(dx: -8, dy: -8)
+            let upper = r.midY < geo.size.height / 2
+            ZStack {
+                // Four dim pieces so the hole passes taps to the real control.
+                dim(CGRect(x: 0, y: 0, width: geo.size.width, height: max(0, r.minY)))
+                dim(CGRect(x: 0, y: r.maxY, width: geo.size.width, height: max(0, geo.size.height - r.maxY)))
+                dim(CGRect(x: 0, y: r.minY, width: max(0, r.minX), height: r.height))
+                dim(CGRect(x: r.maxX, y: r.minY, width: max(0, geo.size.width - r.maxX), height: r.height))
 
-        if let norm = current.frame {
-            let abs  = norm.toAbsolute(in: geo.size)
-            let hole = abs.insetBy(dx: -12, dy: -12)
+                if s.swallow {
+                    Color.clear.contentShape(Rectangle())
+                        .frame(width: r.width, height: r.height)
+                        .position(x: r.midX, y: r.midY)
+                        .onTapGesture { advanceSoon() }
+                }
 
-            // Dark scrim with even-odd oval hole
-            Path { p in
-                p.addRect(CGRect(origin: .zero, size: geo.size))
-                p.addEllipse(in: hole)
+                RoundedRectangle(cornerRadius: min(r.width, r.height) > 60 ? 16 : r.height / 2)
+                    .strokeBorder(gold, lineWidth: 2)
+                    .frame(width: r.width, height: r.height)
+                    .shadow(color: gold.opacity(0.8), radius: pulse ? 16 : 6)
+                    .scaleEffect(pulse ? 1.05 : 1.0)
+                    .position(x: r.midX, y: r.midY)
+                    .allowsHitTesting(false)
+
+                Image(systemName: upper ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
+                    .font(.system(size: 22)).foregroundColor(gold)
+                    .shadow(color: gold.opacity(0.8), radius: 6)
+                    .offset(y: pulse ? (upper ? 6 : -6) : 0)
+                    .position(x: r.midX, y: upper ? r.maxY + 22 : r.minY - 22)
+                    .allowsHitTesting(false)
+
+                card(s)
+                    .frame(maxWidth: 360)
+                    .padding(.horizontal, 16)
+                    .position(x: geo.size.width / 2, y: upper ? geo.size.height - 120 : 150)
             }
-            .fill(Color.black.opacity(0.82), style: FillStyle(eoFill: true))
-            .ignoresSafeArea()
-
-            // Pulsing gold glow ring (oval)
-            Ellipse()
-                .strokeBorder(gold.opacity(glowPulse), lineWidth: 2)
-                .frame(width: hole.width, height: hole.height)
-                .shadow(color: gold.opacity(0.6), radius: 12)
-                .shadow(color: gold.opacity(0.3), radius: 24)
-                .position(x: hole.midX, y: hole.midY)
-
-            // Tooltip card above or below
-            tooltipCard(step: current, hole: hole, geo: geo)
-
         } else {
-            // Centered card — full scrim
-            Color.black.opacity(0.88)
-                .ignoresSafeArea()
-                .onTapGesture { } // swallow taps
-
-            centeredCard(step: current)
-        }
-    }
-
-    // MARK: - Tooltip card (above or below spotlight)
-
-    @ViewBuilder
-    private func tooltipCard(step: TutorialStep, hole: CGRect, geo: GeometryProxy) -> some View {
-        let cardW: CGFloat = min(geo.size.width - 40, 310)
-        let arrowH: CGFloat = 9
-        let gap: CGFloat = 10
-
-        let spaceBelow = geo.size.height - hole.maxY
-        let placeBelow = spaceBelow >= 200
-
-        let idealX   = hole.midX
-        let clampedX = max(cardW / 2 + 16, min(geo.size.width - cardW / 2 - 16, idealX))
-        let arrowDX  = idealX - clampedX
-
-        let approxCardH: CGFloat = 160
-        let centerY: CGFloat = placeBelow
-            ? hole.maxY + gap + arrowH + approxCardH / 2
-            : hole.minY - gap - arrowH - approxCardH / 2
-
-        VStack(spacing: 0) {
-            if placeBelow  { arrowTriangle(.up,   dx: arrowDX) }
-            cardBody(step: step, width: cardW)
-            if !placeBelow { arrowTriangle(.down, dx: arrowDX) }
-        }
-        .frame(width: cardW)
-        .position(x: clampedX, y: centerY)
-    }
-
-    // MARK: - Arrow triangle
-
-    private func arrowTriangle(_ dir: ArrowDir, dx: CGFloat) -> some View {
-        HStack(spacing: 0) {
-            Spacer().frame(width: max(8, 22 + dx))
-            ArrowShape(direction: dir)
-                .fill(Color(white: 0.11))
-                .frame(width: 16, height: 9)
-            Spacer()
-        }
-    }
-
-    // MARK: - Tooltip card body
-
-    private func cardBody(step: TutorialStep, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(step.title)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(gold)
-
-            bulletList(step.bullets)
-
-            HStack {
-                pageDots
-                Spacer()
-                nextButton
-            }
-        }
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    // MARK: - Centered card (welcome / done)
-
-    private func centeredCard(step: TutorialStep) -> some View {
-        VStack(spacing: 20) {
-            Image(systemName: step.title.contains("Set") ? "checkmark.circle" : "sparkles")
-                .font(.system(size: 30, weight: .bold))
-                .foregroundColor(gold)
-                .shadow(color: gold.opacity(0.5), radius: 10)
-
-            Text(step.title)
-                .font(.system(size: 21, weight: .bold))
-                .foregroundColor(.white)
-                .multilineTextAlignment(.center)
-
-            bulletList(step.bullets)
-                .frame(maxWidth: 280, alignment: .leading)
-
-            pageDots.padding(.top, 2)
-            nextButton
-        }
-        .padding(26)
-        .frame(maxWidth: 340)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.5), radius: 28)
-    }
-
-    // MARK: - Bullet list with glowing gold circles
-
-    private func bulletList(_ bullets: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            ForEach(bullets, id: \.self) { bullet in
-                HStack(alignment: .top, spacing: 10) {
-                    Circle()
-                        .fill(gold)
-                        .frame(width: 5, height: 5)
-                        .shadow(color: gold.opacity(0.9), radius: 5)
-                        .shadow(color: gold.opacity(0.5), radius: 10)
-                        .padding(.top, 5)
-                    Text(bullet)
-                        .font(.system(size: 13))
-                        .foregroundColor(.white.opacity(0.80))
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            ZStack {
+                Color.black.opacity(0.8).ignoresSafeArea()
+                card(s).frame(maxWidth: 360).padding(.horizontal, 16)
+                    .position(x: geo.size.width / 2, y: geo.size.height - 120)
             }
         }
     }
 
-    // MARK: - Page dots
+    private func dim(_ rect: CGRect) -> some View {
+        Color.black.opacity(0.8)
+            .frame(width: rect.width, height: rect.height)
+            .position(x: rect.midX, y: rect.midY)
+    }
 
-    private var pageDots: some View {
-        HStack(spacing: 5) {
-            ForEach(0..<steps.count, id: \.self) { i in
-                if i == self.step {
-                    Capsule()
-                        .fill(gold)
-                        .frame(width: 14, height: 5)
-                        .shadow(color: gold.opacity(0.6), radius: 4)
-                } else {
-                    Circle()
-                        .fill(Color.white.opacity(0.20))
-                        .frame(width: 5, height: 5)
-                }
+    private func card(_ s: TourStep) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("STEP \(step + 1) OF \(steps.count)")
+                .font(.system(size: 10, weight: .bold)).tracking(1.5).foregroundColor(.white.opacity(0.4))
+            Text(s.title).font(.system(size: 17, weight: .heavy)).foregroundColor(.white)
+            Text(s.body).font(.system(size: 13)).foregroundColor(.white.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+            if missing {
+                Button { advance() } label: {
+                    Text("Next").font(.system(size: 12, weight: .heavy)).foregroundColor(.black)
+                        .padding(.horizontal, 16).padding(.vertical, 9)
+                        .background(gold).clipShape(RoundedRectangle(cornerRadius: 10))
+                }.padding(.top, 8)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18).padding(.vertical, 16)
+        .background(Color(white: 0.08))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.12)))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.6), radius: 24)
     }
 
-    // MARK: - Next button
+    // MARK: Actions
 
-    private var nextButton: some View {
-        Button(step < steps.count - 1 ? "NEXT" : "GET STARTED") {
-            advance()
+    private func advanceSoon() {
+        let current = step
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            if step == current { advance() }
         }
-        .font(.system(size: 11, weight: .heavy))
-        .tracking(0.8)
-        .foregroundColor(.black)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(gold)
-        .clipShape(Capsule())
-        .shadow(color: gold.opacity(0.4), radius: 8)
     }
-
-    // MARK: - Actions
 
     private func advance() {
-        if step < steps.count - 1 {
-            withAnimation(.easeInOut(duration: 0.25)) { step += 1 }
-        } else {
-            dismiss()
-        }
+        if step >= steps.count - 1 { dismiss() } else { withAnimation(.easeInOut(duration: 0.2)) { step += 1 } }
     }
 
     private func dismiss() {
+        if step >= steps.count - 1 { Task { await ReferralManager.shared.claimAfterOnboarding() } }
         withAnimation(.easeOut(duration: 0.2)) { isPresented = false }
     }
 }
 
-// MARK: - Arrow direction
+// MARK: - Instagram gate (lives here so the Xcode project needs no new file reference)
 
-private enum ArrowDir { case up, down }
 
-// MARK: - Arrow triangle shape
+/// First-run gate: every new user must enter a valid Instagram handle and the
+/// profile scrub must succeed before they can continue. Not skippable.
+/// Reuses ScrubService (same endpoint as the Scrub sheet) and writes the result
+/// into the AI style profile, so the taste profile starts pre-filled.
+struct InstagramGateView: View {
+    @Binding var isDone: Bool
+    @ObservedObject private var auth = AuthManager.shared
+    @AppStorage("ai_style_profile") private var styleProfile = ""
+    @AppStorage("dumpster_ig_handle") private var savedHandle = ""
 
-private struct ArrowShape: Shape {
-    let direction: ArrowDir
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        switch direction {
-        case .up:
-            p.move(to: CGPoint(x: rect.midX, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        case .down:
-            p.move(to: CGPoint(x: rect.minX, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        }
-        p.closeSubpath()
-        return p
+    @State private var input = ""
+    @State private var busy = false
+    @State private var errorText: String?
+    @State private var showSignIn = false
+
+    private let gold = Color(red: 0.784, green: 0.663, blue: 0.431)
+
+    /// "@name", "name" or an instagram.com/name link -> "name"; nil if invalid.
+    static func handle(from raw: String) -> String? {
+        let pattern = "^(?:https?://)?(?:www\\.)?(?:instagram\\.com/)?@?([A-Za-z0-9._]{1,30})/?(?:\\?.*)?$"
+        guard let re = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return nil }
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let range = NSRange(s.startIndex..., in: s)
+        guard let m = re.firstMatch(in: s, range: range), let r = Range(m.range(at: 1), in: s) else { return nil }
+        return String(s[r])
     }
-}
 
-// MARK: - CGRect helper
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Your Instagram")
+                    .font(.system(size: 26, weight: .heavy)).foregroundColor(.white)
+                Text("Dumpster reads your account to learn your style, so your captions and carousels sound like you. Required.")
+                    .font(.system(size: 14)).foregroundColor(.white.opacity(0.65))
+                TextField("@yourhandle", text: $input)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundColor(.white)
+                    .padding(14)
+                    .background(Color(white: 0.09))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.12)))
+                if let errorText {
+                    Text(errorText).font(.system(size: 13)).foregroundColor(.red.opacity(0.9))
+                }
+                Button { Task { await run() } } label: {
+                    HStack {
+                        if busy { ProgressView().tint(.black) }
+                        Text(busy ? "Reading your profile" : "Continue")
+                            .font(.system(size: 14, weight: .heavy))
+                    }
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity).padding(.vertical, 14)
+                    .background(gold.opacity(busy ? 0.6 : 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .disabled(busy)
+                if !auth.isSignedIn {
+                    Button("Sign in first") { showSignIn = true }
+                        .font(.system(size: 13, weight: .semibold)).foregroundColor(gold)
+                }
+            }
+            .padding(28).frame(maxWidth: 400)
+        }
+        .sheet(isPresented: $showSignIn) { SignInView() }
+    }
 
-private extension CGRect {
-    func toAbsolute(in size: CGSize) -> CGRect {
-        CGRect(
-            x: minX * size.width,
-            y: minY * size.height,
-            width: width  * size.width,
-            height: height * size.height
-        )
+    private func run() async {
+        guard let h = Self.handle(from: input) else {
+            errorText = "That doesn't look like an Instagram handle. Use @name or your profile link."
+            return
+        }
+        errorText = nil
+        busy = true
+        defer { busy = false }
+        do {
+            let result = try await ScrubService.shared.scrub(profileURL: "https://instagram.com/" + h)
+            let pieces = [result.description, result.engagementPlaybook].filter { !$0.isEmpty }.joined(separator: "\n\n")
+            guard !pieces.isEmpty else {
+                errorText = "Nothing usable came back. Check the handle (it must be public) and try again."
+                return
+            }
+            let merged = styleProfile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? pieces : styleProfile + "\n\n" + pieces
+            styleProfile = String(merged.prefix(AIProfileLimits.tasteProfileMax))
+            savedHandle = h
+            withAnimation { isDone = true }
+        } catch {
+            errorText = (error as? ScrubService.ScrubError)?.message
+                ?? "Couldn't scrub that profile. Check the handle (it must be public) and try again."
+        }
     }
 }

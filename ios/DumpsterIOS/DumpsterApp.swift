@@ -63,6 +63,7 @@ struct DumpsterApp: App {
                 // Handle Supabase magic link deep link:
                 // dumpster://auth/callback?token_hash=...&type=magiclink
                 .onOpenURL { url in
+                    ReferralManager.shared.capture(url: url)
                     if url.scheme == "dumpster", url.host == "auth" {
                         Task { await AuthManager.shared.handleCallback(url: url) }
                     }

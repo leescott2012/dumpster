@@ -400,10 +400,10 @@ struct DumpChatSheet: View {
         Task {
             do {
                 let chatPhotos = dumpPhotos.map {
-                    LLMService.ChatPhoto(id: $0.id, category: $0.category, labels: $0.labels)
+                    LLMService.ChatPhoto(id: $0.id, category: $0.category, labels: $0.promptLabels)
                 }
                 let chatPool = poolPhotos.map {
-                    LLMService.ChatPhoto(id: $0.id, category: $0.category, labels: $0.labels)
+                    LLMService.ChatPhoto(id: $0.id, category: $0.category, labels: $0.promptLabels)
                 }
                 let history = messages.filter { $0.role == "user" || $0.role == "assistant" }
                     .dropLast()

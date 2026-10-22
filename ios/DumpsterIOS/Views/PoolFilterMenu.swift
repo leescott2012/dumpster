@@ -56,6 +56,7 @@ struct PoolFilterMenu: View {
         case .huji:   return "Huji"
         case .used:   return "Used"
         case .videos: return "Videos"
+        case .starred: return "★ Starred"
         }
     }
 }

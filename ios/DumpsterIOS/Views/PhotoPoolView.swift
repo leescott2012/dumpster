@@ -404,7 +404,6 @@ struct PhotoPoolView: View {
 
             PhotosPicker(
                 selection: $pickerItems,
-                maxSelectionCount: 50,
                 selectionBehavior: .ordered,
                 matching: .images
             ) {
@@ -506,7 +505,6 @@ struct PhotoPoolView: View {
             let accent = appState.accentColor
             PhotosPicker(
                 selection: $pickerItems,
-                maxSelectionCount: 50,
                 selectionBehavior: .ordered,
                 matching: .images
             ) {

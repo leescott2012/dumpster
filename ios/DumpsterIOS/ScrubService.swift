@@ -147,7 +147,7 @@ final class ScrubService {
         return (200..<300).contains(http.statusCode)
     }
 
-    private func fetchScrub(profileURL: String, resultsLimit: Int) async throws -> ScrubResult {
+    private func fetchScrub(profileURL: String, resultsLimit: Int, attempt: Int = 0) async throws -> ScrubResult {
 
         // The production endpoint sits behind the credit gate — needs a signed-in session.
         guard let jwt = await AuthManager.shared.jwt else {
@@ -181,6 +181,11 @@ final class ScrubService {
         // failure the server refunds after responding): re-read now and in ~2.5s.
         await CreditManager.shared.noteAIResponse(http)
 
+        // One automatic retry on a transient server error (parity with web #95): every new user scans during onboarding.
+        if [500, 502, 503].contains(http.statusCode), attempt == 0 {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            return try await fetchScrub(profileURL: profileURL, resultsLimit: resultsLimit, attempt: 1)
+        }
         if http.statusCode == 402 {
             throw ScrubError(message: "Not enough credits for an Instagram scrub (\(CreditManager.Cost.igScrub) credits). Get more credits and try again.")
         }

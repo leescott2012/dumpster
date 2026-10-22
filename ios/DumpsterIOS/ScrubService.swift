@@ -119,7 +119,7 @@ final class ScrubService {
                 let o = old.trimmingCharacters(in: .whitespacesAndNewlines)
                 return String((o.isEmpty ? new : o + "\n\n" + new).prefix(750))
             }
-            d.set(merge(d.string(forKey: "ai_style_profile") ?? "", r.description), forKey: "ai_style_profile")
+            d.set(TasteMerge.merge(existing: d.string(forKey: "ai_style_profile") ?? "", scrubbed: r.description, handle: handle), forKey: "ai_style_profile")
             if !r.engagementPlaybook.isEmpty {
                 d.set(merge(d.string(forKey: "ai_engagement_playbook") ?? "", r.engagementPlaybook), forKey: "ai_engagement_playbook")
             }

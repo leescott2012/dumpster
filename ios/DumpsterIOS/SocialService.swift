@@ -50,6 +50,8 @@ struct SocialProfile: Hashable, Identifiable {
     let id: String
     let username: String?
     var avatarColor: String? = nil
+    var avatarIcon: String? = nil
+    var initial: String { String((username ?? "?").prefix(1)).uppercased() }
     var handle: String { "@" + (username ?? "someone") }
 }
 
@@ -166,7 +168,7 @@ final class SocialStore: ObservableObject {
             guard let o = c["other"] as? [String: Any], let oid = o["id"] as? String,
                   let last = c["last"] as? [String: Any] else { return nil }
             return Conversation(
-                other: SocialProfile(id: oid, username: o["username"] as? String),
+                other: SocialProfile(id: oid, username: o["username"] as? String, avatarColor: o["avatar_color"] as? String, avatarIcon: o["avatar_icon"] as? String),
                 lastBody: last["body"] as? String ?? "",
                 lastAt: (last["created_at"] as? String).flatMap(SocialLogic.parseDate) ?? Date(),
                 mine: last["mine"] as? Bool ?? false,
@@ -208,7 +210,7 @@ final class SocialStore: ObservableObject {
         friends = (j["connections"] as? [[String: Any]] ?? []).compactMap { r in
             guard let id = r["id"] as? String, let status = r["status"] as? String,
                   let o = r["other"] as? [String: Any], let oid = o["id"] as? String else { return nil }
-            return FriendRow(connectionId: id, other: SocialProfile(id: oid, username: o["username"] as? String, avatarColor: o["avatar_color"] as? String),
+            return FriendRow(connectionId: id, other: SocialProfile(id: oid, username: o["username"] as? String, avatarColor: o["avatar_color"] as? String, avatarIcon: o["avatar_icon"] as? String),
                              status: status, incoming: r["addressee_id"] as? String != oid)
         }
     }

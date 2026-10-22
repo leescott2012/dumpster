@@ -129,7 +129,8 @@ struct FriendsView: View {
                 if !incoming.isEmpty {
                     Section("Requests") {
                         ForEach(incoming) { r in
-                            HStack {
+                            HStack(spacing: 10) {
+                                AvatarView(icon: r.other.avatarIcon, colorHex: r.other.avatarColor, initial: r.other.initial, size: 32)
                                 Text(r.other.handle).foregroundColor(.white)
                                 Spacer()
                                 Button("Accept") { Task { await social.respond(r, accept: true) } }
@@ -148,6 +149,7 @@ struct FriendsView: View {
                     ForEach(social.conversations) { c in
                         Button { thread = c.other } label: {
                             HStack(spacing: 10) {
+                                AvatarView(icon: c.other.avatarIcon, colorHex: c.other.avatarColor, initial: c.other.initial, size: 32)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(c.other.handle).font(.system(size: 14, weight: c.unread > 0 ? .bold : .medium)).foregroundColor(.white)
                                     Text((c.mine ? "You: " : "") + c.lastBody)
@@ -171,7 +173,8 @@ struct FriendsView: View {
                     ForEach(accepted) { f in
                         HStack(spacing: 12) {
                             Button { thread = f.other } label: {
-                                HStack {
+                                HStack(spacing: 10) {
+                                    AvatarView(icon: f.other.avatarIcon, colorHex: f.other.avatarColor, initial: f.other.initial, size: 32)
                                     Text(f.other.handle).foregroundColor(.white)
                                     Spacer()
                                 }
@@ -388,7 +391,6 @@ struct FriendProfileSheet: View {
     @State private var sending = false
     @State private var sendError: String?
 
-    private var avatar: Color { Color(hex: person.avatarColor ?? "#C8A96E") }
     private var initial: String { String((person.username ?? "?").prefix(1)).uppercased() }
 
     var body: some View {
@@ -417,9 +419,7 @@ struct FriendProfileSheet: View {
                 Button { open = nil } label: { Image(systemName: "chevron.left").foregroundColor(.white.opacity(0.6)) }
                     .accessibilityLabel("Back")
             }
-            Text(String(initial))
-                .font(.system(size: 12, weight: .bold)).foregroundColor(Color(white: 0.055))
-                .frame(width: 32, height: 32).background(avatar).clipShape(Circle())
+            AvatarView(icon: person.avatarIcon, colorHex: person.avatarColor, initial: initial, size: 32)
             Text(open?.title ?? person.handle)
                 .font(.system(size: 15, weight: .bold)).foregroundColor(.white).lineLimit(1)
             Spacer()
@@ -434,11 +434,7 @@ struct FriendProfileSheet: View {
 
     @ViewBuilder private var list: some View {
         VStack(spacing: 4) {
-            Text(initial)
-                .font(.system(size: 32, weight: .heavy)).foregroundColor(Color(white: 0.055))
-                .frame(width: 84, height: 84)
-                .background(LinearGradient(colors: [avatar, Color(white: 0.1)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                .clipShape(Circle())
+            AvatarView(icon: person.avatarIcon, colorHex: person.avatarColor, initial: initial, size: 84, fallbackColor: "#C8A96E")
                 .overlay(Circle().strokeBorder(appState.accentColor, lineWidth: 2))
                 .padding(.bottom, 8)
             Text(person.handle).font(.system(size: 20, weight: .heavy)).foregroundColor(.white)

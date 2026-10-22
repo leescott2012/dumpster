@@ -8,15 +8,37 @@ import PhotosUI
 /// Photos required before a user can finish setup (web: MIN_PHOTOS).
 let onboardingMinPhotos = 30
 
-/// Mirror of web avatarIcons.ts (lucide names -> nearest SF Symbols).
+/// Mirror of web avatarIcons.ts. Each name is the exact lucide icon (same name string web stores in
+/// profiles.avatar_icon), bundled as the real lucide SVG: Assets.xcassets/avatar-<name>.imageset.
 enum AvatarCatalog {
-    static let icons: [(name: String, symbol: String)] = [
-        ("camera", "camera.fill"), ("image", "photo"), ("star", "star.fill"), ("heart", "heart.fill"),
-        ("sun", "sun.max.fill"), ("moon", "moon.fill"), ("zap", "bolt.fill"), ("flame", "flame.fill"),
-        ("sparkles", "sparkles"), ("palette", "paintpalette.fill"), ("music", "music.note"), ("coffee", "cup.and.saucer.fill"),
-        ("rocket", "paperplane.fill"), ("feather", "leaf.fill"), ("aperture", "camera.aperture"), ("smile", "face.smiling"),
-    ]
+    static let iconNames = ["camera", "image", "star", "heart", "sun", "moon", "zap", "flame",
+                            "sparkles", "palette", "music", "coffee", "rocket", "feather", "aperture", "smile"]
     static let colors = ["#f5c518", "#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899", "#9ca3af"]
+}
+
+/// The single place an avatar is drawn (onboarding, friends, DMs, friend profile). Shows the lucide icon for a known
+/// `icon` name, otherwise the username initial (what web does for accounts with no icon).
+struct AvatarView: View {
+    let icon: String?
+    let colorHex: String?
+    let initial: String
+    let size: CGFloat
+    var glyphRatio: CGFloat = 0.5
+    var fallbackColor = "#333333"
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Color(hex: colorHex ?? fallbackColor))
+            if let icon, AvatarCatalog.iconNames.contains(icon) {
+                Image("avatar-\(icon)").renderingMode(.template).resizable().scaledToFit()
+                    .frame(width: size * glyphRatio, height: size * glyphRatio)
+                    .foregroundColor(Color(white: 0.055))
+            } else {
+                Text(initial).font(.system(size: size * 0.38, weight: .bold)).foregroundColor(Color(white: 0.055))
+            }
+        }
+        .frame(width: size, height: size)
+    }
 }
 
 /// Reads the signed-in user's profile row to decide whether to show the flow (web: Home.tsx `onboardingOpen`).
@@ -56,7 +78,7 @@ struct OnboardingView: View {
     @State private var username = ""
     @State private var checkState: CheckState = .idle
     @State private var checkReason: String?
-    @State private var icon = AvatarCatalog.icons[0].name
+    @State private var icon = AvatarCatalog.iconNames[0]
     @State private var color = AvatarCatalog.colors[0]
     @State private var saving = false
     @State private var saveError: String?
@@ -170,18 +192,15 @@ struct OnboardingView: View {
             title("Choose a username")
             sub("Needed so other users can find and connect with you. 3-20 characters, letters/numbers/underscore.")
 
-            let selectedSymbol = AvatarCatalog.icons.first { $0.name == icon }?.symbol ?? AvatarCatalog.icons[0].symbol
-            ZStack {
-                Circle().fill(Color(hex: color)).frame(width: 64, height: 64)
-                Image(systemName: selectedSymbol).font(.system(size: 26, weight: .semibold)).foregroundColor(Color(white: 0.055))
-            }
-            .frame(maxWidth: .infinity).padding(.bottom, 18)
+            AvatarView(icon: icon, colorHex: color, initial: "?", size: 64, glyphRatio: 0.45)
+                .frame(maxWidth: .infinity).padding(.bottom, 18)
 
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(34), spacing: 8), count: 8), spacing: 8) {
-                ForEach(AvatarCatalog.icons, id: \.name) { a in
-                    let sel = a.name == icon
-                    Button { icon = a.name } label: {
-                        Image(systemName: a.symbol).font(.system(size: 14))
+                ForEach(AvatarCatalog.iconNames, id: \.self) { name in
+                    let sel = name == icon
+                    Button { icon = name } label: {
+                        Image("avatar-\(name)").renderingMode(.template).resizable().scaledToFit()
+                            .frame(width: 16, height: 16)
                             .foregroundColor(sel ? Color(white: 0.055) : Color(white: 0.54))
                             .frame(width: 34, height: 34)
                             .background(Circle().fill(sel ? Color(hex: color) : Color(white: 0.1)))

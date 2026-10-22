@@ -118,8 +118,12 @@ struct PaywallView: View {
                 .foregroundColor(gold)
             Text("Earn 10 credits for each friend who finishes setup \u{2014} enough for a new AI dump. Up to 5 friends.")
                 .font(.system(size: 12)).foregroundColor(.white.opacity(0.55))
-            if let link = referral.myLink {
-                ShareLink(item: link, message: Text("Join me on Dumpster")) {
+            if let link = referral.myLink, let code = referral.myCode {
+                Text(link.absoluteString)
+                    .font(.system(size: 12, design: .monospaced)).foregroundColor(.white.opacity(0.9))
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(10)
+                    .background(Color.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 8))
+                ShareLink(item: link, message: Text("Join me on Dumpster \u{2014} use my invite code \(code)")) {
                     Text("Share invite link")
                         .font(.system(size: 13, weight: .heavy)).foregroundColor(.black)
                         .frame(maxWidth: .infinity).padding(.vertical, 11)

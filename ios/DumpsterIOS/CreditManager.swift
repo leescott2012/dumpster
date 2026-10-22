@@ -126,7 +126,7 @@ final class CreditManager: ObservableObject {
                 table: "profiles",
                 query: "id=eq.\(uid)&select=credits,daily_credits_remaining,daily_credits_reset_at,subscription_tier",
                 jwt: jwt)
-            guard let row = (try JSONSerialization.jsonObject(with: data) as? [[String: Any]])?.first else { return }
+            guard let row = SupabaseClient.firstRow(data) else { return }
             let purchased = (row["credits"] as? NSNumber)?.intValue ?? 0
             var daily = (row["daily_credits_remaining"] as? NSNumber)?.intValue ?? 0
             // Display only — the server performs the real 24h reset on the next spend.
@@ -276,7 +276,7 @@ final class ReferralManager: ObservableObject {
     func loadMyCode() async {
         guard let uid = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt else { return }
         guard let data = try? await SupabaseClient.shared.get(table: "profiles", query: "id=eq.\(uid)&select=referral_code", jwt: jwt),
-              let row = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]])?.first else { return }
+              let row = SupabaseClient.firstRow(data) else { return }
         myCode = row["referral_code"] as? String
     }
 

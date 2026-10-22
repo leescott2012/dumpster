@@ -384,11 +384,12 @@ final class LLMService: ObservableObject {
         if !playbook.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             parts.append("Engagement playbook (what wins for this creator's audience — apply this when shaping hooks and structure):\n\(playbook.trimmingCharacters(in: .whitespacesAndNewlines))")
         }
+        // Style first, rules AFTER: a Dump Style must never override the user's rules (parity with web #82).
+        if let styleBlock = DumpStyle.activeBlock() {
+            parts.append(styleBlock + "\n(The rules below override this style if they conflict.)")
+        }
         if !rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             parts.append("Rules you MUST follow:\n\(rules.trimmingCharacters(in: .whitespacesAndNewlines))")
-        }
-        if let styleBlock = DumpStyle.activeBlock() {
-            parts.append(styleBlock)
         }
         if !tasteBlock.isEmpty {
             parts.append(tasteBlock)

@@ -246,17 +246,11 @@ struct FileCabinetMenuView: View {
 
                     // The tab itself
                     VStack(spacing: 0) {
-                        HStack(spacing: 5) {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 9, weight: .semibold))
-                            Text(tab.title)
-                                .font(.system(size: 8, weight: .bold))
-                                .tracking(1.2)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
+                        // Web parity: gold, icon-only tab
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(fixedDarkText)
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(
                             UnevenRoundedRectangle(
@@ -265,7 +259,7 @@ struct FileCabinetMenuView: View {
                                 bottomTrailingRadius: 0,
                                 topTrailingRadius: 7
                             )
-                            .fill(tab.tabColor)
+                            .fill(gold)
                         )
                     }
                     .offset(y: -22)

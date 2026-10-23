@@ -82,6 +82,20 @@ struct FileCabinetMenuView: View {
             }
         }
 
+        /// Same emoji the web SettingsPanel uses for the four shared rows.
+        var emoji: String {
+            switch self {
+            case .handle:     return "👤"
+            case .appearance: return "🎨"
+            case .rules:      return "📋"
+            case .style:      return "✍️"
+            case .aiSettings: return "🧠"
+            case .myDumps:    return "🗂️"
+            case .photoPool:  return "🖼️"
+            case .aboutHelp:  return "ℹ️"
+            }
+        }
+
         var tabColor: Color {
             switch self {
             case .handle:     return Color(hex: "#C8A96E")
@@ -162,6 +176,8 @@ struct FileCabinetMenuView: View {
 
                     Rectangle().fill(subtleBorder).frame(height: 1).padding(.vertical, 8)
 
+                    tutorialRow
+
                     ForEach(CabinetTab.allCases.filter { !$0.isWebParity }) { tab in
                         menuRow(tab)
                     }
@@ -171,20 +187,6 @@ struct FileCabinetMenuView: View {
             }
 
             Spacer(minLength: 0)
-
-            HStack(spacing: 6) {
-                Image(systemName: "archivebox")
-                    .font(.system(size: 10))
-                    .foregroundColor(gold.opacity(0.3))
-                Text("DUMPSTER")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(3)
-                    .foregroundColor(gold.opacity(0.3))
-                Text("v1.0")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(tertiaryText.opacity(0.5))
-            }
-            .padding(.bottom, 40)
         }
         .background(darkBg)
     }
@@ -217,6 +219,35 @@ struct FileCabinetMenuView: View {
         }
     }
 
+    /// Web "View Tutorial" row: 👁️, gold label, chevron; closes the menu and starts the tutorial.
+    private var tutorialRow: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            appState.showOnboarding = true
+            dismissMenu()
+        } label: {
+            HStack(spacing: 16) {
+                Text("👁️")
+                    .font(.system(size: 20))
+                    .frame(width: 28)
+                Text("View Tutorial")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(gold)
+                    .frame(maxWidth: .infinity)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(tertiaryText)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(subtleBorder).frame(height: 1)
+            }
+        }
+        .buttonStyle(FolderButtonStyle())
+    }
+
     // MARK: - Menu Row (web parity: icon, label, subtitle, chevron)
 
     private func menuRow(_ tab: CabinetTab) -> some View {
@@ -227,9 +258,8 @@ struct FileCabinetMenuView: View {
             }
         } label: {
             HStack(spacing: 16) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 18))
-                    .foregroundColor(tab.tabColor)
+                Text(tab.emoji)
+                    .font(.system(size: 20))
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tab.title.capitalized.replacingOccurrences(of: "Ai ", with: "AI "))

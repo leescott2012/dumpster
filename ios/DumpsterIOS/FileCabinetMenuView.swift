@@ -11,7 +11,11 @@ struct FileCabinetMenuView: View {
     @Binding var isPresented: Bool
     @ObservedObject var appState: AppState
     @StateObject private var llmService = LLMService.shared
+    @ObservedObject private var auth = AuthManager.shared
+    @ObservedObject private var credits = CreditManager.shared
+    @ObservedObject private var subscription = SubscriptionManager.shared
     @Environment(\.colorScheme) private var cs
+    @State private var showSignIn = false
 
     @State private var selectedTab: CabinetTab? = nil
     @State private var appearAnimation = false
@@ -30,42 +34,58 @@ struct FileCabinetMenuView: View {
     private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
     private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
 
+    /// Same six folders, same order, same titles/subtitles as web's MainMenu.
     enum CabinetTab: Int, CaseIterable, Identifiable {
-        case aiSettings = 0
-        case myDumps = 1
-        case photoPool = 2
-        case appearance = 3
-        case aboutHelp = 4
+        case aiTools = 0
+        case friends = 1
+        case appearance = 2
+        case aiKeys = 3
+        case socialMedia = 4
+        case aboutHelp = 5
 
         var id: Int { rawValue }
 
         var title: String {
             switch self {
-            case .aiSettings: return "AI SETTINGS"
-            case .myDumps:    return "MY DUMPS"
-            case .photoPool:  return "PHOTO POOL"
-            case .appearance: return "APPEARANCE"
-            case .aboutHelp:  return "ABOUT / HELP"
+            case .aiTools:     return "AI TOOLS"
+            case .friends:     return "FRIENDS"
+            case .appearance:  return "APPEARANCE"
+            case .aiKeys:      return "YOUR AI KEYS"
+            case .socialMedia: return "SOCIAL MEDIA"
+            case .aboutHelp:   return "ABOUT / HELP"
+            }
+        }
+
+        var subtitle: String {
+            switch self {
+            case .aiTools:     return "Taste Profile · Instagram Scrub · Dump Styles"
+            case .friends:     return "Find friends · Profiles · Comments"
+            case .appearance:  return "Accent color"
+            case .aiKeys:      return "Add & verify your own keys"
+            case .socialMedia: return "Connect & export"
+            case .aboutHelp:   return "Dumpster · Version 1.0"
             }
         }
 
         var icon: String {
             switch self {
-            case .aiSettings: return "brain.head.profile"
-            case .myDumps:    return "tray.full"
-            case .photoPool:  return "photo.on.rectangle.angled"
-            case .appearance: return "paintbrush"
-            case .aboutHelp:  return "questionmark.circle"
+            case .aiTools:     return "sparkles"
+            case .friends:     return "person.2"
+            case .appearance:  return "paintbrush"
+            case .aiKeys:      return "key"
+            case .socialMedia: return "square.and.arrow.up"
+            case .aboutHelp:   return "info.circle"
             }
         }
 
         var tabColor: Color {
             switch self {
-            case .aiSettings: return Color(hex: "#C8A96E")
-            case .myDumps:    return Color(hex: "#A8C8A0")
-            case .photoPool:  return Color(hex: "#A0B8C8")
-            case .appearance: return Color(hex: "#C8A0C0")
-            case .aboutHelp:  return Color(hex: "#C8B8A0")
+            case .aiTools:     return Color(hex: "#C8A96E")
+            case .friends:     return Color(hex: "#A8C8A0")
+            case .appearance:  return Color(hex: "#C8A0C0")
+            case .aiKeys:      return Color(hex: "#A0B8C8")
+            case .socialMedia: return Color(hex: "#C8A8A0")
+            case .aboutHelp:   return Color(hex: "#C8B8A0")
             }
         }
     }
@@ -132,8 +152,11 @@ struct FileCabinetMenuView: View {
             // File Cabinet Body
             ScrollView {
                 VStack(spacing: 0) {
+                    accountCard
+                        .padding(.top, 8)
+
                     ForEach(Array(CabinetTab.allCases.enumerated()), id: \.element.id) { index, tab in
-                        if tab == .aiSettings {
+                        if tab == .aiTools {
                             tabFolder(tab: tab, index: index).tourAnchor(.cabinetAI)
                         } else {
                             tabFolder(tab: tab, index: index)
@@ -200,6 +223,7 @@ struct FileCabinetMenuView: View {
     private func tabFolder(tab: CabinetTab, index: Int) -> some View {
         Button {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            if tab == .friends { openFriends(); return }
             withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                 selectedTab = tab
             }
@@ -260,7 +284,7 @@ struct FileCabinetMenuView: View {
                             Text(tab.title)
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(primaryText.opacity(0.8))
-                            Text(tabSubtitle(for: tab))
+                            Text(tab.subtitle)
                                 .font(.system(size: 11))
                                 .foregroundColor(secondaryText)
                         }
@@ -288,24 +312,6 @@ struct FileCabinetMenuView: View {
         .buttonStyle(FolderButtonStyle())
     }
 
-    private func tabSubtitle(for tab: CabinetTab) -> String {
-        switch tab {
-        case .aiSettings:
-            if let provider = llmService.preferredProvider() {
-                return "\(provider.displayName) active"
-            }
-            return "No API keys configured"
-        case .myDumps:
-            return "\(appState.dumpCount) dumps saved"
-        case .photoPool:
-            return "Upload & label settings"
-        case .appearance:
-            return "Theme & colors"
-        case .aboutHelp:
-            return "Version 1.0.0"
-        }
-    }
-
     // MARK: - Folder Content View
 
     @ViewBuilder
@@ -319,20 +325,22 @@ struct FileCabinetMenuView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         switch tab {
-                        case .aiSettings:
-                            AISettingsTabView(llmService: llmService, appState: appState)
-                        case .myDumps:
-                            MyDumpsTabView(appState: appState)
-                        case .photoPool:
-                            PhotoPoolTabView()
+                        case .aiTools:
+                            AISettingsTabView(mode: .tools, llmService: llmService, appState: appState)
+                        case .friends:
+                            EmptyView()   // opens the Friends sheet instead of a panel
                         case .appearance:
                             AppearanceTabView(appState: appState, onDone: {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                                     selectedTab = nil
                                 }
                             })
+                        case .aiKeys:
+                            AISettingsTabView(mode: .keys, llmService: llmService, appState: appState)
+                        case .socialMedia:
+                            SocialMediaTabView(appState: appState)
                         case .aboutHelp:
-                            AboutHelpTabView(llmService: llmService, appState: appState, onDismiss: { dismissMenu() })
+                            AboutHelpTabView(appState: appState, onDismiss: { dismissMenu() })
                         }
                     }
                     .padding(.bottom, 60)
@@ -392,6 +400,91 @@ struct FileCabinetMenuView: View {
                 )
                 .ignoresSafeArea()
         )
+    }
+
+    // MARK: - Account block (web: avatar initial, email, "FREE · N CREDITS" / PRO, Sign out; guest sign-in card)
+
+    @ViewBuilder
+    private var accountCard: some View {
+        let accent = appState.accentColor
+        if auth.isSignedIn {
+            HStack(spacing: 12) {
+                Text(String((auth.userEmail ?? "U").prefix(1)).uppercased())
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundColor(.black)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(accent))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(auth.userEmail ?? "User")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(primaryText.opacity(0.85))
+                        .lineLimit(1)
+                    Text("\(subscription.isPro ? "PRO" : "FREE") · \(credits.balance) CREDITS")
+                        .font(.system(size: 10))
+                        .tracking(0.6)
+                        .foregroundColor(accent)
+                }
+                Spacer()
+                Button {
+                    Task { await auth.signOut() }
+                    dismissMenu()
+                } label: {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.system(size: 14))
+                        .foregroundColor(tertiaryText)
+                        .padding(6)
+                }
+                .accessibilityLabel("Sign out")
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(cardBg)
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(subtleBorder, lineWidth: 1))
+            )
+            .padding(.top, 8)
+        } else {
+            Button { showSignIn = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person")
+                        .font(.system(size: 16))
+                        .foregroundColor(accent)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(accent.opacity(0.15)))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Sign In")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(accent)
+                        Text("Save dumps · Get 15 free AI credits")
+                            .font(.system(size: 10))
+                            .foregroundColor(tertiaryText)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                        .foregroundColor(accent.opacity(0.4))
+                }
+                .padding(.horizontal, 16).padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(accent.opacity(0.08))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(accent.opacity(0.2), lineWidth: 1))
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 8)
+            .sheet(isPresented: $showSignIn) {
+                SignInView().presentationDetents([.large])
+            }
+        }
+    }
+
+    /// Web: closes the menu, then opens Connections (signed in) or the sign-in sheet.
+    private func openFriends() {
+        guard auth.isSignedIn else { showSignIn = true; return }
+        dismissMenu()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            SocialStore.shared.openFriends = true
+        }
     }
 
     // MARK: - Helpers
@@ -455,6 +548,9 @@ struct CabinetSectionHeader: View {
 // MARK: - ═══════════════════════════════════════════
 
 struct AISettingsTabView: View {
+    /// Web has two separate folders: AI TOOLS (taste / rules / scrub / styles) and YOUR AI KEYS (keys only).
+    enum Mode { case tools, keys }
+    var mode: Mode = .tools
     @ObservedObject var llmService: LLMService
     @ObservedObject var appState: AppState
     @Environment(\.colorScheme) private var cs
@@ -479,6 +575,11 @@ struct AISettingsTabView: View {
     @FocusState private var newRuleFocused: Bool
     @State private var savedToast: Bool = false
 
+    // Build from Instagram (free) — same box as web's Taste Profile card
+    @State private var igHandleInput: String = UserDefaults.standard.string(forKey: "ig_handle") ?? ""
+    @State private var igBuilding = false
+    @State private var igBuildMsg: String? = nil
+
     private let gold = Color(hex: "#C8A96E")
     // Theme-aware chrome (NATIVE_PORT.md §G — was hardcoded dark-only white-alpha).
     private var primaryText: Color { Theme.text(appState.colorMode, cs) }
@@ -489,58 +590,7 @@ struct AISettingsTabView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-
-            // Account & Cloud Sync (NATIVE_PORT.md §1)
-            CabinetSectionHeader("ACCOUNT & SYNC", icon: "icloud.and.arrow.up")
-            SyncAccountCard()
-                .padding(.horizontal, 24)
-
-            // AI Taste Profile — describes the user
-            CabinetSectionHeader("AI TASTE PROFILE", icon: "person.text.rectangle")
-            sectionNote("Who you are. Valet, captions and Auto Gen read this.")
-            styleProfileCard
-                .tourAnchor(.yourStyle)
-                .padding(.horizontal, 24)
-
-            // AI Rules (belongs with the profile)
-            CabinetSectionHeader("AI RULES", icon: "list.bullet.rectangle")
-            aiRulesCard
-                .padding(.horizontal, 24)
-
-            // Instagram Scrub — directly above Dump Styles
-            CabinetSectionHeader("INSTAGRAM SCRUB", icon: "bookmark")
-            sectionNote("Pull photos or a whole account's style from Instagram.")
-            scrubLibraryCard
-                .padding(.horizontal, 24)
-
-            // Dump Styles — formed from scrubs
-            CabinetSectionHeader("DUMP STYLES", icon: "square.stack.3d.up")
-            sectionNote("Looks you borrowed from scrubs. Turn one on to apply it.")
-            DumpStylesCard(appState: appState)
-                .tourAnchor(.dumpStyles)
-                .padding(.horizontal, 24)
-
-            // Active Provider Status
-            activeProviderBanner
-
-            // API Key Cards — optional for everyone (free users get AI through the Dumpster server)
-            CabinetSectionHeader("YOUR OWN API KEY (OPTIONAL)", icon: "key")
-
-            ForEach(LLMService.LLMProvider.allCases) { provider in
-                apiKeyCard(for: provider)
-            }
-
-            // Labeling Sensitivity
-            CabinetSectionHeader("LABELING SENSITIVITY", icon: "slider.horizontal.3")
-            labelingSensitivityControl
-
-            // Caption Style
-            CabinetSectionHeader("CAPTION STYLE", icon: "text.quote")
-            captionStylePicker
-
-            // Intelligence Level
-            CabinetSectionHeader("AUTO-DUMP INTELLIGENCE", icon: "brain")
-            intelligenceLevelPicker
+            if mode == .tools { toolsContent } else { keysContent }
         }
         .onAppear {
             // Load current API keys into inputs
@@ -548,6 +598,61 @@ struct AISettingsTabView: View {
                 apiKeyInputs[provider] = llmService.apiKey(for: provider)
                 keyVisibility[provider] = false
             }
+        }
+    }
+
+    // MARK: - AI TOOLS folder (web order: Taste Profile + Build -> AI Rules -> Instagram Scrub -> Dump Styles)
+
+    @ViewBuilder
+    private var toolsContent: some View {
+        sectionNote("Powered by Claude Haiku & Apify").padding(.top, 12)
+
+        // AI Taste Profile — describes the user
+        CabinetSectionHeader("AI TASTE PROFILE", icon: "person.text.rectangle")
+        sectionNote("Who you are. Valet, captions and Auto Gen read this.")
+        styleProfileCard
+            .tourAnchor(.yourStyle)
+            .padding(.horizontal, 24)
+
+        // AI Rules (belongs with the profile)
+        CabinetSectionHeader("AI RULES", icon: "list.bullet.rectangle")
+        aiRulesCard
+            .padding(.horizontal, 24)
+
+        // Instagram Scrub — directly above Dump Styles
+        CabinetSectionHeader("INSTAGRAM SCRUB", icon: "bookmark")
+        sectionNote("Pull photos or a whole account's style from Instagram.")
+        scrubLibraryCard
+            .padding(.horizontal, 24)
+
+        // Dump Styles — formed from scrubs
+        CabinetSectionHeader("DUMP STYLES", icon: "square.stack.3d.up")
+        sectionNote("Looks you borrowed from scrubs. Turn one on to apply it.")
+        DumpStylesCard(appState: appState)
+            .tourAnchor(.dumpStyles)
+            .padding(.horizontal, 24)
+
+        // iOS-only AI behaviour controls (not on web) — kept here after the web items.
+        CabinetSectionHeader("LABELING SENSITIVITY", icon: "slider.horizontal.3")
+        labelingSensitivityControl
+
+        CabinetSectionHeader("CAPTION STYLE", icon: "text.quote")
+        captionStylePicker
+
+        CabinetSectionHeader("AUTO-DUMP INTELLIGENCE", icon: "brain")
+        intelligenceLevelPicker
+    }
+
+    // MARK: - YOUR AI KEYS folder
+
+    @ViewBuilder
+    private var keysContent: some View {
+        activeProviderBanner
+
+        CabinetSectionHeader("YOUR OWN API KEY (OPTIONAL)", icon: "key")
+
+        ForEach(LLMService.LLMProvider.allCases) { provider in
+            apiKeyCard(for: provider)
         }
     }
 
@@ -579,6 +684,31 @@ struct AISettingsTabView: View {
                 Text("\(styleProfile.count)/\(AIProfileLimits.tasteProfileMax)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(tertiaryText)
+            }
+
+            // Free: build the profile from YOUR public Instagram account
+            HStack(spacing: 8) {
+                TextField("Build from Instagram: @username (free)", text: $igHandleInput)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.system(size: 12))
+                    .foregroundColor(primaryText)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(cardFill))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(cardBorder, lineWidth: 1))
+                Button { buildFromInstagram() } label: {
+                    Text(igBuilding ? "Reading…" : "Build")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(gold))
+                        .opacity(igHandleInput.trimmingCharacters(in: .whitespaces).isEmpty || igBuilding ? 0.5 : 1)
+                }
+                .buttonStyle(.plain)
+                .disabled(igHandleInput.trimmingCharacters(in: .whitespaces).isEmpty || igBuilding)
+            }
+            if let m = igBuildMsg {
+                Text(m).font(.system(size: 11)).foregroundColor(.red.opacity(0.85)).lineSpacing(2)
             }
         }
         .padding(16)
@@ -627,6 +757,29 @@ struct AISettingsTabView: View {
     private func scheduleCloudSync() {
         guard let userId = AuthManager.shared.userId, let jwt = AuthManager.shared.jwt else { return }
         AIProfileSync.shared.scheduleSave(userId: userId, jwt: jwt)
+    }
+
+    /// Free taste-profile build (same path onboarding uses). Taste Profile is about YOU, so a handle that
+    /// isn't the linked account is pointed at Instagram Scrub (Dump Style) instead.
+    private func buildFromInstagram() {
+        guard let handle = ScrubService.parseHandle(igHandleInput) else {
+            igBuildMsg = "That doesn't look like an Instagram handle. Enter it like @yourname."
+            return
+        }
+        let linked = (UserDefaults.standard.string(forKey: "ig_handle") ?? "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@/ ")).lowercased()
+        if !linked.isEmpty && linked != handle.lowercased() {
+            igBuildMsg = "Taste Profile is about YOU, and your linked Instagram is @\(linked). Use Instagram Scrub below to save @\(handle) as a Dump Style."
+            return
+        }
+        igBuilding = true
+        igBuildMsg = nil
+        Task { @MainActor in
+            let r = await ScrubService.shared.linkInstagramAndBuildTaste(handle: handle)
+            igBuilding = false
+            if r.ok { igHandleInput = ""; HapticManager.shared.playAdded() }
+            else { igBuildMsg = r.error ?? "Couldn't read that profile." }
+        }
     }
 
     private var generateFromInstagramButton: some View {
@@ -1387,174 +1540,93 @@ struct AISettingsTabView: View {
 }
 
 // MARK: - ═══════════════════════════════════════════
-// MARK: Tab 2 — My Dumps
+// MARK: Folder 5 — Social Media ("Connect & export")
 // MARK: - ═══════════════════════════════════════════
 
-struct MyDumpsTabView: View {
+struct SocialMediaTabView: View {
     @ObservedObject var appState: AppState
+    @Environment(\.colorScheme) private var cs
 
-    // Same SwiftData store MainAppView reads from — same sort order too, so
-    // this tab shows the real title/thumbnail/count MainAppView is showing,
-    // not a stale/placeholder copy (NATIVE_PORT.md source-of-truth pattern).
-    @Query(sort: \PhotoDump.createdAt, order: .forward) private var dumps: [PhotoDump]
-    @Query private var allPhotos: [DumpPhoto]
-
-    private let gold = Color(hex: "#C8A96E")
-
-    // Non-archived dumps, capped at 5 (mirrors the old placeholder's cap).
-    private var savedDumps: [PhotoDump] {
-        Array(dumps.filter { !$0.archived }.prefix(5))
-    }
-
-    private var photosById: [String: DumpPhoto] {
-        Dictionary(uniqueKeysWithValues: allPhotos.map { ($0.id, $0) })
-    }
-
-    // "Photos in use" = distinct photos assigned to at least one dump.
-    private var photosInUseCount: Int {
-        Set(dumps.flatMap { $0.photoIDs }).count
-    }
+    private var accent: Color { appState.accentColor }
+    private var primaryText: Color { Theme.text(appState.colorMode, cs) }
+    private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
+    private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
+    private var cardFill: Color { Theme.bg2(appState.colorMode, cs) }
+    private var cardBorder: Color { Theme.border(appState.colorMode, cs) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
 
-            // Stats Banner
-            HStack(spacing: 20) {
-                statBox(value: "\(dumps.count)", label: "DUMPS")
-                statBox(value: "\(photosInUseCount)", label: "PHOTOS")
-                // ponytail: shares aren't persisted anywhere — Analytics.track(.dumpExported)
-                // is a fire-and-forget POST to Supabase, not a local/queryable count — so "—"
-                // is honest rather than a fabricated number. Add a local share counter on
-                // PhotoDump if this needs to be a real value.
-                statBox(value: "—", label: "SHARED")
+            // Same three platforms, order and copy as web (all "SOON" there too).
+            CabinetSectionHeader("CONNECT YOUR ACCOUNTS", icon: "link")
+            VStack(spacing: 12) {
+                platformRow(name: "Instagram", icon: "camera", color: Color(hex: "#E1306C"),
+                            desc: "Export carousels directly to Instagram")
+                platformRow(name: "TikTok", icon: "play.rectangle", color: primaryText,
+                            desc: "Share photo dumps as TikTok slideshows")
+                platformRow(name: "Twitter / X", icon: "bubble.left.and.bubble.right", color: Color(hex: "#999999"),
+                            desc: "Post carousel threads to X")
             }
+            .padding(.horizontal, 24)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("COMING IN V1.1")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1)
+                    .foregroundColor(accent)
+                Text("Connect your social accounts to export carousels directly. Schedule posts, manage captions, and track engagement.")
+                    .font(.system(size: 11))
+                    .foregroundColor(tertiaryText)
+                    .lineSpacing(3)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(accent.opacity(0.04))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(accent.opacity(0.12), lineWidth: 1))
+            )
             .padding(.horizontal, 24)
             .padding(.top, 16)
 
-            // Dump List
-            CabinetSectionHeader("SAVED DUMPS", icon: "tray.full")
-
-            if dumps.isEmpty {
-                emptyDumpsView
-            } else {
-                dumpList
-            }
-
-            // Export Options
+            // iOS-only: relocated from the removed MY DUMPS tab.
             CabinetSectionHeader("EXPORT", icon: "square.and.arrow.up")
-            exportOptions
-
-            // Dump History
-            CabinetSectionHeader("HISTORY", icon: "clock.arrow.circlepath")
-            historySection
+            VStack(spacing: 8) {
+                exportButton(icon: "square.and.arrow.up", title: "Export All Dumps", subtitle: "Save as JSON backup")
+                exportButton(icon: "photo.stack", title: "Export Photos", subtitle: "Save original photos to camera roll")
+                exportButton(icon: "doc.text", title: "Export Captions", subtitle: "Copy all captions to clipboard")
+            }
+            .padding(.horizontal, 24)
         }
+        .padding(.top, 4)
     }
 
-    private func statBox(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 24, weight: .black))
-                .foregroundColor(.white)
-            Text(label)
+    private func platformRow(name: String, icon: String, color: Color, desc: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(color)
+                .frame(width: 38, height: 38)
+                .background(RoundedRectangle(cornerRadius: 10).fill(color.opacity(0.1)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(color.opacity(0.25), lineWidth: 1))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.system(size: 14, weight: .bold)).foregroundColor(primaryText)
+                Text(desc).font(.system(size: 11)).foregroundColor(tertiaryText)
+            }
+            Spacer()
+            Text("SOON")
                 .font(.system(size: 9, weight: .bold))
-                .tracking(1.5)
-                .foregroundColor(.white.opacity(0.3))
+                .tracking(1)
+                .foregroundColor(tertiaryText)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 6).fill(cardBorder.opacity(0.5)))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 18).padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                )
+                .fill(cardFill)
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(cardBorder, lineWidth: 1))
         )
-    }
-
-    private var emptyDumpsView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "tray")
-                .font(.system(size: 32, weight: .light))
-                .foregroundColor(gold.opacity(0.3))
-            Text("No dumps yet")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundColor(.white.opacity(0.5))
-            Text("Use the AI Builder to create your first dump")
-                .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.3))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .padding(.horizontal, 24)
-    }
-
-    private var dumpList: some View {
-        VStack(spacing: 8) {
-            ForEach(savedDumps) { dump in
-                HStack(spacing: 12) {
-                    dumpThumbnail(for: dump)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(dump.title)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white.opacity(0.7))
-                            .lineLimit(1)
-                        Text("\(dump.photoIDs.count) photo\(dump.photoIDs.count == 1 ? "" : "s") · Tap to view in carousel")
-                            .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.3))
-                            .lineLimit(1)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.15))
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.03))
-                )
-            }
-        }
-        .padding(.horizontal, 24)
-    }
-
-    /// Real thumbnail: the dump's first actual photo (same resolution DumpCardView
-    /// uses — photoIDs.first looked up against the pool), not a generic icon.
-    /// Falls back to the placeholder icon only when the dump has no photos yet.
-    private func dumpThumbnail(for dump: PhotoDump) -> some View {
-        let firstPhoto = dump.photoIDs.first.flatMap { photosById[$0] }
-        let image = firstPhoto.flatMap { PhotoStorageManager.shared.loadImage(relativePath: $0.localPath) }
-        return RoundedRectangle(cornerRadius: 8)
-            .fill(Color.white.opacity(0.06))
-            .frame(width: 48, height: 48)
-            .overlay(
-                Group {
-                    if let image {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 48, height: 48)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } else {
-                        Image(systemName: "photo")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.15))
-                    }
-                }
-            )
-    }
-
-    private var exportOptions: some View {
-        VStack(spacing: 8) {
-            exportButton(icon: "square.and.arrow.up", title: "Export All Dumps", subtitle: "Save as JSON backup")
-            exportButton(icon: "photo.stack", title: "Export Photos", subtitle: "Save original photos to camera roll")
-            exportButton(icon: "doc.text", title: "Export Captions", subtitle: "Copy all captions to clipboard")
-        }
-        .padding(.horizontal, 24)
     }
 
     private func exportButton(icon: String, title: String, subtitle: String) -> some View {
@@ -1564,64 +1636,71 @@ struct MyDumpsTabView: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 14))
-                    .foregroundColor(gold.opacity(0.6))
+                    .foregroundColor(accent.opacity(0.6))
                     .frame(width: 32)
-
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.white.opacity(0.7))
-                    Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.3))
+                    Text(title).font(.system(size: 13, weight: .bold)).foregroundColor(secondaryText)
+                    Text(subtitle).font(.system(size: 11)).foregroundColor(tertiaryText)
                 }
-
                 Spacer()
             }
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                    )
+                    .fill(cardFill)
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(cardBorder, lineWidth: 1))
             )
         }
         .buttonStyle(.plain)
     }
+}
 
-    private var historySection: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 12) {
-                Image(systemName: "clock")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.2))
-                Text("Dump history will appear here as you create and share dumps.")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.3))
-                    .lineSpacing(3)
-                Spacer()
-            }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
-            )
+// MARK: - Library stats (relocated from MY DUMPS; lives in ABOUT / HELP)
+
+struct LibraryStatsRow: View {
+    @Query private var dumps: [PhotoDump]
+    @Environment(\.colorScheme) private var cs
+    @EnvironmentObject private var appState: AppState
+
+    // "Photos in use" = distinct photos assigned to at least one dump.
+    private var photosInUse: Int { Set(dumps.flatMap { $0.photoIDs }).count }
+
+    var body: some View {
+        HStack(spacing: 20) {
+            statBox(value: "\(dumps.count)", label: "DUMPS")
+            statBox(value: "\(photosInUse)", label: "PHOTOS IN USE")
         }
         .padding(.horizontal, 24)
+    }
+
+    private func statBox(value: String, label: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(size: 24, weight: .black))
+                .foregroundColor(Theme.text(appState.colorMode, cs))
+            Text(label)
+                .font(.system(size: 9, weight: .bold))
+                .tracking(1.5)
+                .foregroundColor(Theme.text3(appState.colorMode, cs))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Theme.bg2(appState.colorMode, cs))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.border(appState.colorMode, cs), lineWidth: 1))
+        )
     }
 }
 
 // MARK: - ═══════════════════════════════════════════
-// MARK: Tab 3 — Photo Pool
+// MARK: Photo import settings (relocated from the removed PHOTO POOL tab; lives in ABOUT / HELP)
 // MARK: - ═══════════════════════════════════════════
 
-struct PhotoPoolTabView: View {
+struct ImportSettingsSection: View {
     @AppStorage("pool_autoAnalyze") private var autoAnalyze = true
     @AppStorage("pool_preserveExif") private var preserveExif = true
     @AppStorage("pool_smartThumbnails") private var smartThumbnails = true
-    @StateObject private var llmService = LLMService.shared
     @AppStorage("custom_labels") private var customLabelsJSON = "[]"
     @State private var newLabelText = ""
 
@@ -1629,9 +1708,6 @@ struct PhotoPoolTabView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-
-            // Upload Settings
-            CabinetSectionHeader("UPLOAD SETTINGS", icon: "arrow.up.circle")
 
             VStack(alignment: .leading, spacing: 14) {
                 settingToggle(title: "Auto-Analyze on Import", subtitle: "Run Vision AI when photos are added", isOn: $autoAnalyze)
@@ -1738,46 +1814,6 @@ struct PhotoPoolTabView: View {
                     }
                     .disabled(newLabelText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-
-            // Labeling Sensitivity
-            CabinetSectionHeader("LABELING SENSITIVITY", icon: "slider.horizontal.3")
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Permissive")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.3))
-                    Spacer()
-                    Text(String(format: "%.0f%%", llmService.labelingSensitivity * 100))
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(gold)
-                    Spacer()
-                    Text("Strict")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.3))
-                }
-
-                Slider(value: Binding(
-                    get: { llmService.labelingSensitivity },
-                    set: { llmService.labelingSensitivity = $0 }
-                ), in: 0...1, step: 0.05)
-                .tint(gold)
-
-                Text("Controls the confidence threshold for AI photo auto-labeling. Higher values require more confidence before applying a label.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.25))
-                    .lineSpacing(3)
             }
             .padding(16)
             .background(
@@ -1955,72 +1991,6 @@ struct AppearanceTabView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
 
-            // Theme Selection
-            CabinetSectionHeader("THEME MODE", icon: "circle.lefthalf.filled")
-
-            HStack(spacing: 10) {
-                ForEach(ThemeMode.allCases) { mode in
-                    let isSelected = selectedTheme == mode
-                    Button {
-                        switch mode {
-                        case .light:  appState.colorMode = .day
-                        case .dark:   appState.colorMode = .dark
-                        case .system: appState.colorMode = .system
-                        }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        VStack(spacing: 10) {
-                            // Theme preview
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(
-                                    mode == .light
-                                        ? Color.white
-                                        : mode == .dark
-                                            ? Color(hex: "#1A1A1A")
-                                            : LinearGradient(
-                                                colors: [Color.white, Color(hex: "#1A1A1A")],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                              ).asColor
-                                )
-                                .frame(height: 60)
-                                .overlay(
-                                    VStack(spacing: 4) {
-                                        Image(systemName: mode.icon)
-                                            .font(.system(size: 16))
-                                            .foregroundColor(
-                                                mode == .light ? .black.opacity(0.6) : .white.opacity(0.6)
-                                            )
-                                    }
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(
-                                            isSelected ? gold : cardBorder,
-                                            lineWidth: isSelected ? 2 : 1
-                                        )
-                                )
-
-                            Text(mode.rawValue)
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(isSelected ? primaryText : tertiaryText)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-
             // Accent Color
             CabinetSectionHeader("ACCENT COLOR", icon: "paintpalette")
 
@@ -2112,6 +2082,72 @@ struct AppearanceTabView: View {
                     )
             )
             .padding(.horizontal, 24)
+
+            // Theme Selection
+            CabinetSectionHeader("THEME MODE", icon: "circle.lefthalf.filled")
+
+            HStack(spacing: 10) {
+                ForEach(ThemeMode.allCases) { mode in
+                    let isSelected = selectedTheme == mode
+                    Button {
+                        switch mode {
+                        case .light:  appState.colorMode = .day
+                        case .dark:   appState.colorMode = .dark
+                        case .system: appState.colorMode = .system
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        VStack(spacing: 10) {
+                            // Theme preview
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(
+                                    mode == .light
+                                        ? Color.white
+                                        : mode == .dark
+                                            ? Color(hex: "#1A1A1A")
+                                            : LinearGradient(
+                                                colors: [Color.white, Color(hex: "#1A1A1A")],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                              ).asColor
+                                )
+                                .frame(height: 60)
+                                .overlay(
+                                    VStack(spacing: 4) {
+                                        Image(systemName: mode.icon)
+                                            .font(.system(size: 16))
+                                            .foregroundColor(
+                                                mode == .light ? .black.opacity(0.6) : .white.opacity(0.6)
+                                            )
+                                    }
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(
+                                            isSelected ? gold : cardBorder,
+                                            lineWidth: isSelected ? 2 : 1
+                                        )
+                                )
+
+                            Text(mode.rawValue)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(isSelected ? primaryText : tertiaryText)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(cardFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(cardBorder, lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
         }
     }
 }
@@ -2122,17 +2158,15 @@ extension LinearGradient {
 }
 
 // MARK: - ═══════════════════════════════════════════
-// MARK: Tab 5 — About / Help
+// MARK: Folder 6 — About / Help (web parity + iOS-only device settings)
 // MARK: - ═══════════════════════════════════════════
 
 struct AboutHelpTabView: View {
-    @ObservedObject var llmService: LLMService
     @ObservedObject var appState: AppState
     var onDismiss: () -> Void = {}
     @Environment(\.colorScheme) private var cs
 
-    private let gold = Color(hex: "#C8A96E")
-    // Theme-aware chrome (NATIVE_PORT.md §G — was hardcoded dark-only white-alpha).
+    private var accent: Color { appState.accentColor }
     private var primaryText: Color { Theme.text(appState.colorMode, cs) }
     private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
     private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
@@ -2142,182 +2176,71 @@ struct AboutHelpTabView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
 
-            // App Info
-            VStack(spacing: 16) {
-                Image(systemName: "archivebox.fill")
-                    .font(.system(size: 40, weight: .light))
-                    .foregroundColor(gold)
-
-                Text("DUMPSTER")
-                    .font(.system(size: 20, weight: .black))
-                    .tracking(6)
-                    .foregroundColor(primaryText)
-
-                Text("Photo Carousel Curation Tool")
-                    .font(.system(size: 13))
-                    .foregroundColor(tertiaryText)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 32)
-
-            // Version Info
-            CabinetSectionHeader("VERSION INFO", icon: "info.circle")
-
+            // Same rows, same order as web's About panel.
             VStack(spacing: 0) {
+                infoRow("App", value: "Dumpster")
+                Divider().background(cardBorder)
                 infoRow("Version", value: "1.0.0")
                 Divider().background(cardBorder)
-                infoRow("Build", value: "2025.05")
+                infoRow("Platform", value: "iOS")
                 Divider().background(cardBorder)
-                infoRow("Vision AI", value: "VNClassifyImageRequest")
+                infoRow("AI Model", value: "Claude Haiku Vision")
                 Divider().background(cardBorder)
-                infoRow("AI Provider", value: llmService.preferredProvider()?.displayName ?? "None")
-                Divider().background(cardBorder)
-                infoRow("Active Model", value: {
-                    if let p = llmService.preferredProvider() {
-                        return llmService.selectedModel(for: p)
-                    }
-                    return "Local fallback"
-                }())
+                infoRow("Made by", value: "Lee Scott")
             }
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(cardFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(cardBorder, lineWidth: 1))
             )
             .padding(.horizontal, 24)
+            .padding(.top, 16)
 
-            // Connected Providers
-            CabinetSectionHeader("CONNECTED PROVIDERS", icon: "link")
-
-            VStack(spacing: 6) {
-                ForEach(LLMService.LLMProvider.allCases) { provider in
-                    HStack(spacing: 10) {
-                        Image(systemName: provider.iconName)
-                            .font(.system(size: 12))
-                            .foregroundColor(llmService.hasAPIKey(for: provider) ? gold : tertiaryText)
-                            .frame(width: 24)
-
-                        Text(provider.displayName)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(secondaryText)
-
-                        Spacer()
-
-                        if llmService.hasAPIKey(for: provider) {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 5, height: 5)
-                                Text("Connected")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.green.opacity(0.7))
-                            }
-                        } else {
-                            Text("Not connected")
-                                .font(.system(size: 10))
-                                .foregroundColor(tertiaryText)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 14)
-                }
-            }
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-
-            // Help
-            CabinetSectionHeader("HELP", icon: "questionmark.circle")
-
-            VStack(spacing: 8) {
-                helpRow(icon: "sparkles", title: "How AI Suggest Works",
-                        text: "Select photos, Vision AI classifies them, then your chosen LLM generates captions and titles.")
-                helpRow(icon: "key", title: "API Keys",
-                        text: "Keys are stored locally on your device in UserDefaults. For production, migrate to Keychain.")
-                helpRow(icon: "arrow.triangle.2.circlepath", title: "Multi-Provider Support",
-                        text: "Add keys for multiple providers. Dumpster uses the first available provider in priority order: OpenAI, Claude, Gemini, Manus, Perplexity.")
-            }
-            .padding(.horizontal, 24)
-
-            // Production Note
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 12))
-                        .foregroundColor(.yellow.opacity(0.7))
-                    Text("PRODUCTION NOTE")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1)
-                        .foregroundColor(.yellow.opacity(0.7))
-                }
-                Text("For production, migrate API key storage to iOS Keychain and consider using a server-side proxy to avoid embedding keys in the app.")
-                    .font(.system(size: 12))
-                    .foregroundColor(tertiaryText)
-                    .lineSpacing(4)
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.yellow.opacity(0.04))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.yellow.opacity(0.12), lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
-
-            // Replay Tutorial
-            CabinetSectionHeader("TUTORIAL", icon: "graduationcap")
-
+            // Replay the tour
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 appState.showOnboarding = true
                 onDismiss()
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "play.circle")
-                        .font(.system(size: 14))
-                        .foregroundColor(gold.opacity(0.6))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Replay Tutorial")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(secondaryText)
-                        Text("Walk through the onboarding guide again")
-                            .font(.system(size: 11))
-                            .foregroundColor(tertiaryText)
-                    }
-                    Spacer()
-                }
-                .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(cardFill)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(cardBorder, lineWidth: 1)
-                        )
-                )
+                Text("REPLAY THE TOUR")
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundColor(accent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(accent.opacity(0.1))
+                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(accent.opacity(0.25), lineWidth: 1))
+                    )
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 24)
+            .padding(.top, 20)
 
-            // Cache
+            // Legal links (same three as web)
+            HStack(spacing: 16) {
+                if let u = URL(string: "\(ReferralManager.webBase)/privacy") { Link("Privacy", destination: u) }
+                if let u = URL(string: "\(ReferralManager.webBase)/terms") { Link("Terms", destination: u) }
+                Spacer()
+                if let u = URL(string: "mailto:axiomonellc@outlook.com") { Link("Contact", destination: u) }
+            }
+            .font(.system(size: 11))
+            .tracking(0.4)
+            .foregroundColor(secondaryText)
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+
+            // ── iOS-only (not on web): relocated from the removed MY DUMPS / PHOTO POOL tabs ──
+            CabinetSectionHeader("YOUR LIBRARY", icon: "tray.full")
+            LibraryStatsRow()
+
+            CabinetSectionHeader("PHOTO IMPORT", icon: "arrow.up.circle")
+            ImportSettingsSection()
+
             CabinetSectionHeader("STORAGE", icon: "internaldrive")
-
             Button {
-                let tempDir = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("dumpster_ai")
+                let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("dumpster_ai")
                 try? FileManager.default.removeItem(at: tempDir)
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             } label: {
@@ -2339,10 +2262,7 @@ struct AboutHelpTabView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(cardFill)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(cardBorder, lineWidth: 1)
-                        )
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(cardBorder, lineWidth: 1))
                 )
             }
             .buttonStyle(.plain)
@@ -2353,40 +2273,15 @@ struct AboutHelpTabView: View {
     private func infoRow(_ label: String, value: String) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: 13))
+                .font(.system(size: 12))
+                .tracking(0.5)
                 .foregroundColor(tertiaryText)
             Spacer()
             Text(value)
-                .font(.system(size: 13, design: .monospaced))
-                .foregroundColor(secondaryText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(primaryText)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-
-    private func helpRow(icon: String, title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 12))
-                    .foregroundColor(gold.opacity(0.5))
-                Text(title)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(secondaryText)
-            }
-            Text(text)
-                .font(.system(size: 12))
-                .foregroundColor(tertiaryText)
-                .lineSpacing(3)
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(cardFill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(cardBorder, lineWidth: 1)
-                )
-        )
+        .padding(.vertical, 14)
     }
 }

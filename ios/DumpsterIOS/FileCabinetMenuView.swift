@@ -13,6 +13,10 @@ struct FileCabinetMenuView: View {
     @StateObject private var llmService = LLMService.shared
     @Environment(\.colorScheme) private var cs
 
+    @AppStorage("user_handle") private var userHandle = ""
+    @AppStorage("ai_style_profile") private var styleProfile = ""
+    @AppStorage("ai_rules") private var aiRules = ""
+
     @State private var selectedTab: CabinetTab? = nil
     @State private var appearAnimation = false
     @State private var tabsVisible = false
@@ -30,41 +34,63 @@ struct FileCabinetMenuView: View {
     private var secondaryText: Color { Theme.text2(appState.colorMode, cs) }
     private var tertiaryText: Color { Theme.text3(appState.colorMode, cs) }
 
+    /// Order mirrors the web SettingsPanel (handle, appearance, rules, style) with the
+    /// native-only sections below the divider. Raw values are stable for deep-links.
     enum CabinetTab: Int, CaseIterable, Identifiable {
+        case handle = 5
+        case appearance = 3
+        case rules = 6
+        case style = 7
         case aiSettings = 0
         case myDumps = 1
         case photoPool = 2
-        case appearance = 3
         case aboutHelp = 4
 
         var id: Int { rawValue }
 
+        /// Web-parity pages come first; the rest are native-only extras.
+        var isWebParity: Bool {
+            switch self {
+            case .handle, .appearance, .rules, .style: return true
+            default: return false
+            }
+        }
+
         var title: String {
             switch self {
+            case .handle:     return "YOUR HANDLE"
+            case .appearance: return "APPEARANCE"
+            case .rules:      return "THE RULES"
+            case .style:      return "AI STYLE PROFILE"
             case .aiSettings: return "AI SETTINGS"
             case .myDumps:    return "MY DUMPS"
             case .photoPool:  return "PHOTO POOL"
-            case .appearance: return "APPEARANCE"
             case .aboutHelp:  return "ABOUT / HELP"
             }
         }
 
         var icon: String {
             switch self {
+            case .handle:     return "person.crop.circle"
+            case .appearance: return "paintpalette"
+            case .rules:      return "list.bullet.clipboard"
+            case .style:      return "signature"
             case .aiSettings: return "brain.head.profile"
             case .myDumps:    return "tray.full"
             case .photoPool:  return "photo.on.rectangle.angled"
-            case .appearance: return "paintbrush"
             case .aboutHelp:  return "questionmark.circle"
             }
         }
 
         var tabColor: Color {
             switch self {
+            case .handle:     return Color(hex: "#C8A96E")
+            case .appearance: return Color(hex: "#C8A0C0")
+            case .rules:      return Color(hex: "#A8C8A0")
+            case .style:      return Color(hex: "#A0B8C8")
             case .aiSettings: return Color(hex: "#C8A96E")
             case .myDumps:    return Color(hex: "#A8C8A0")
             case .photoPool:  return Color(hex: "#A0B8C8")
-            case .appearance: return Color(hex: "#C8A0C0")
             case .aboutHelp:  return Color(hex: "#C8B8A0")
             }
         }
@@ -126,24 +152,26 @@ struct FileCabinetMenuView: View {
 
     private var cabinetView: some View {
         VStack(spacing: 0) {
-            // Header
             cabinetHeader
 
-            // File Cabinet Body
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(Array(CabinetTab.allCases.enumerated()), id: \.element.id) { index, tab in
-                        tabFolder(tab: tab, index: index)
+                    ForEach(CabinetTab.allCases.filter(\.isWebParity)) { tab in
+                        menuRow(tab)
+                    }
+
+                    Rectangle().fill(subtleBorder).frame(height: 1).padding(.vertical, 8)
+
+                    ForEach(CabinetTab.allCases.filter { !$0.isWebParity }) { tab in
+                        menuRow(tab)
                     }
                 }
-                .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 20)
             }
 
             Spacer(minLength: 0)
 
-            // Bottom branding
             HStack(spacing: 6) {
                 Image(systemName: "archivebox")
                     .font(.system(size: 10))
@@ -161,130 +189,81 @@ struct FileCabinetMenuView: View {
         .background(darkBg)
     }
 
+    /// Centered title with a hairline underneath, like the web Settings header.
     private var cabinetHeader: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("MAIN MENU")
-                    .font(.system(size: 22, weight: .black))
-                    .tracking(4)
+        VStack(spacing: 0) {
+            HStack {
+                Color.clear.frame(width: 44, height: 44)
+                Spacer()
+                Text("SETTINGS")
+                    .font(.system(size: 13, weight: .bold))
+                    .tracking(2)
                     .foregroundColor(primaryText)
-                Text("Tap a folder to open")
-                    .font(.system(size: 12))
-                    .foregroundColor(secondaryText)
+                Spacer()
+                Button {
+                    dismissMenu()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(tertiaryText)
+                        .frame(width: 44, height: 44)
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 56)
+            .padding(.bottom, 8)
 
-            Spacer()
-
-            Button {
-                dismissMenu()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(secondaryText)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(subtleBorder))
-            }
+            Rectangle().fill(subtleBorder).frame(height: 1)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 70)
-        .padding(.bottom, 20)
     }
 
-    // MARK: - Tab Folder
+    // MARK: - Menu Row (web parity: icon, label, subtitle, chevron)
 
-    private func tabFolder(tab: CabinetTab, index: Int) -> some View {
+    private func menuRow(_ tab: CabinetTab) -> some View {
         Button {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                 selectedTab = tab
             }
         } label: {
-            ZStack(alignment: .topLeading) {
-                // Folder body
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(cardBg)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(subtleBorder, lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.3), radius: 8, y: 4)
-
-                // Tab sticking out
-                HStack(spacing: 0) {
-                    // Spacer to offset each tab — tighter stagger so tabs don't run off screen
-                    Spacer()
-                        .frame(width: CGFloat(index) * 40 + 16)
-
-                    // The tab itself
-                    VStack(spacing: 0) {
-                        HStack(spacing: 5) {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 9, weight: .semibold))
-                            Text(tab.title)
-                                .font(.system(size: 8, weight: .bold))
-                                .tracking(1.2)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .foregroundColor(fixedDarkText)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: 7,
-                                bottomLeadingRadius: 0,
-                                bottomTrailingRadius: 0,
-                                topTrailingRadius: 7
-                            )
-                            .fill(tab.tabColor)
-                        )
-                    }
-                    .offset(y: -22)
-
-                    Spacer()
+            HStack(spacing: 16) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(tab.tabColor)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tab.title.capitalized.replacingOccurrences(of: "Ai ", with: "AI "))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(primaryText)
+                    Text(tabSubtitle(for: tab))
+                        .font(.system(size: 11))
+                        .foregroundColor(tertiaryText)
                 }
-
-                // Folder content preview
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: tab.icon)
-                            .font(.system(size: 18, weight: .light))
-                            .foregroundColor(tab.tabColor.opacity(0.6))
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(tab.title)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(primaryText.opacity(0.8))
-                            Text(tabSubtitle(for: tab))
-                                .font(.system(size: 11))
-                                .foregroundColor(secondaryText)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(tertiaryText)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(tertiaryText)
             }
-            .frame(height: 72)
-            .padding(.top, 24) // Space for the tab (must be >= tab offset of 22)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(subtleBorder).frame(height: 1)
+            }
             .opacity(tabsVisible ? 1 : 0)
-            .offset(y: tabsVisible ? 0 : 20)
-            .animation(
-                .spring(response: 0.5, dampingFraction: 0.8)
-                    .delay(Double(index) * 0.08),
-                value: tabsVisible
-            )
         }
         .buttonStyle(FolderButtonStyle())
     }
 
     private func tabSubtitle(for tab: CabinetTab) -> String {
         switch tab {
+        case .handle:
+            return userHandle.isEmpty ? "Set your IG handle" : "@\(userHandle)"
+        case .rules:
+            let n = aiRules.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count
+            return "\(n) rule\(n == 1 ? "" : "s")"
+        case .style:
+            return styleProfile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Not set" : "Trained"
         case .aiSettings:
             if let provider = llmService.preferredProvider() {
                 return "\(provider.displayName) active"
@@ -295,7 +274,11 @@ struct FileCabinetMenuView: View {
         case .photoPool:
             return "Upload & label settings"
         case .appearance:
-            return "Theme & colors"
+            switch appState.colorMode {
+            case .dark: return "Dark"
+            case .day: return "Day"
+            case .system: return "System"
+            }
         case .aboutHelp:
             return "Version 1.0.0"
         }
@@ -314,6 +297,12 @@ struct FileCabinetMenuView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         switch tab {
+                        case .handle:
+                            HandleTabView(appState: appState)
+                        case .rules:
+                            AISettingsTabView(llmService: llmService, appState: appState, section: .rules)
+                        case .style:
+                            AISettingsTabView(llmService: llmService, appState: appState, section: .style)
                         case .aiSettings:
                             AISettingsTabView(llmService: llmService, appState: appState)
                         case .myDumps:
@@ -444,13 +433,61 @@ struct CabinetSectionHeader: View {
     }
 }
 
+// MARK: - Handle page (web parity: "Your Handle")
+
+struct HandleTabView: View {
+    @ObservedObject var appState: AppState
+    @Environment(\.colorScheme) private var cs
+    @AppStorage("user_handle") private var handle = ""
+
+    private let gold = Color(hex: "#C8A96E")
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your Instagram handle. Used for captions and sharing.")
+                .font(.system(size: 11))
+                .foregroundColor(Theme.text3(appState.colorMode, cs))
+                .lineSpacing(3)
+
+            HStack(spacing: 4) {
+                Text("@")
+                    .font(.system(size: 16))
+                    .foregroundColor(Theme.text3(appState.colorMode, cs))
+                TextField("geniusscott2", text: Binding(
+                    get: { handle },
+                    set: { handle = $0.hasPrefix("@") ? String($0.dropFirst()) : $0 }
+                ))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.system(size: 16))
+                .foregroundColor(Theme.text(appState.colorMode, cs))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 14)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.bg2(appState.colorMode, cs)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border(appState.colorMode, cs), lineWidth: 1))
+
+            if !handle.isEmpty {
+                Text("✓ Handle saved: @\(handle)")
+                    .font(.system(size: 12))
+                    .foregroundColor(gold)
+            }
+        }
+        .padding(20)
+    }
+}
+
 // MARK: - ═══════════════════════════════════════════
 // MARK: Tab 1 — AI Settings
 // MARK: - ═══════════════════════════════════════════
 
 struct AISettingsTabView: View {
+    /// Rules / style render alone as their own menu pages (web parity); nil = the full AI Settings page.
+    enum Page { case rules, style }
+
     @ObservedObject var llmService: LLMService
     @ObservedObject var appState: AppState
+    var section: Page? = nil
     @Environment(\.colorScheme) private var cs
     @State private var expandedProvider: LLMService.LLMProvider? = nil
     @State private var apiKeyInputs: [LLMService.LLMProvider: String] = [:]
@@ -483,27 +520,39 @@ struct AISettingsTabView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            switch section {
+            case .rules:
+                CabinetSectionHeader("AI RULES", icon: "list.bullet.rectangle")
+                aiRulesCard
+                    .padding(.horizontal, 24)
+            case .style:
+                CabinetSectionHeader("AI STYLE PROFILE", icon: "person.text.rectangle")
+                styleProfileCard
+                    .padding(.horizontal, 24)
+                if !savedScrubs.isEmpty {
+                    CabinetSectionHeader("SCRUB LIBRARY", icon: "bookmark")
+                    scrubLibraryCard
+                        .padding(.horizontal, 24)
+                }
+            case nil:
+                fullSettings
+            }
+        }
+        .onAppear {
+            // Load current API keys into inputs
+            for provider in LLMService.LLMProvider.allCases {
+                apiKeyInputs[provider] = llmService.apiKey(for: provider)
+                keyVisibility[provider] = false
+            }
+        }
+    }
 
+    @ViewBuilder
+    private var fullSettings: some View {
+        Group {
             // Account & Cloud Sync (NATIVE_PORT.md §1)
             CabinetSectionHeader("ACCOUNT & SYNC", icon: "icloud.and.arrow.up")
             SyncAccountCard()
-                .padding(.horizontal, 24)
-
-            // AI Style Profile
-            CabinetSectionHeader("AI STYLE PROFILE", icon: "person.text.rectangle")
-            styleProfileCard
-                .padding(.horizontal, 24)
-
-            // Scrub Library
-            if !savedScrubs.isEmpty {
-                CabinetSectionHeader("SCRUB LIBRARY", icon: "bookmark")
-                scrubLibraryCard
-                    .padding(.horizontal, 24)
-            }
-
-            // AI Rules
-            CabinetSectionHeader("AI RULES", icon: "list.bullet.rectangle")
-            aiRulesCard
                 .padding(.horizontal, 24)
 
             // Dump Styles
@@ -532,13 +581,6 @@ struct AISettingsTabView: View {
             // Intelligence Level
             CabinetSectionHeader("AUTO-DUMP INTELLIGENCE", icon: "brain")
             intelligenceLevelPicker
-        }
-        .onAppear {
-            // Load current API keys into inputs
-            for provider in LLMService.LLMProvider.allCases {
-                apiKeyInputs[provider] = llmService.apiKey(for: provider)
-                keyVisibility[provider] = false
-            }
         }
     }
 

@@ -217,9 +217,12 @@ struct PhotoPoolView: View {
                 if let icon { Image(systemName: icon).font(.system(size: 10, weight: .semibold)) }
                 Text(label)
                     .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)                 // "★ Starred" / "Used" were wrapping onto two lines
+                    .minimumScaleFactor(0.8)
             }
+            .fixedSize(horizontal: true, vertical: false)
             .foregroundColor(isSelected ? .black : Theme.text(appState.colorMode, cs))
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 11)
             .padding(.vertical, 7)
             .background(isSelected ? appState.accentColor : Theme.bg2(appState.colorMode, cs))
             .clipShape(Capsule())

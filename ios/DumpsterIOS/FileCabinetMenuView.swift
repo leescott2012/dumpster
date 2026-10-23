@@ -1660,7 +1660,7 @@ struct SocialMediaTabView: View {
 struct LibraryStatsRow: View {
     @Query private var dumps: [PhotoDump]
     @Environment(\.colorScheme) private var cs
-    @EnvironmentObject private var appState: AppState
+    @ObservedObject var appState: AppState
 
     // "Photos in use" = distinct photos assigned to at least one dump.
     private var photosInUse: Int { Set(dumps.flatMap { $0.photoIDs }).count }
@@ -2233,7 +2233,7 @@ struct AboutHelpTabView: View {
 
             // ── iOS-only (not on web): relocated from the removed MY DUMPS / PHOTO POOL tabs ──
             CabinetSectionHeader("YOUR LIBRARY", icon: "tray.full")
-            LibraryStatsRow()
+            LibraryStatsRow(appState: appState)
 
             CabinetSectionHeader("PHOTO IMPORT", icon: "arrow.up.circle")
             ImportSettingsSection()

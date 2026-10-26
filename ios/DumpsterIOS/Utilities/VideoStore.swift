@@ -44,8 +44,29 @@ enum VideoStore {
             let tURL = dir.appendingPathComponent("thumbs/\(id).jpg")
             if (try? jpeg.write(to: tURL)) != nil { thumbRel = "videos/thumbs/\(id).jpg" }
         }
-        return VideoItem(id: id, name: name, relativePath: rel(fileURL), thumbPath: thumbRel,
-                         duration: dur.isFinite ? dur : 0)
+        let item = VideoItem(id: id, name: name, relativePath: rel(fileURL), thumbPath: thumbRel,
+                             duration: dur.isFinite ? dur : 0)
+        item.tags = await autoTags(id: item.id, thumbPath: item.thumbPath, thumbURL: item.thumbURL)
+        return item
+    }
+
+    /// Label a video from its thumbnail. OWNER EXCEPTION (Lee, 2026-10-25): the ≤480px poster
+    /// still — never the video — may go to the paid label scan (1 credit, Claude Vision) for
+    /// accurate labels. Signed out / out of credits / offline → on-device Apple Vision instead.
+    static func autoTags(id: String, thumbPath: String, thumbURL: URL?, allowCloud: Bool = true) async -> [String] {
+        guard let url = thumbURL else { return [] }
+        if allowCloud, !thumbPath.isEmpty, let jwt = await MainActor.run(body: { AuthManager.shared.jwt }),
+           let r = await LabelService.shared.label(photos: [(id: id, relativePath: thumbPath)], jwt: jwt).first {
+            let label = r.label.count > 32 ? String(r.label.prefix(32)) : r.label
+            return [r.category.capitalized, label].filter { !$0.isEmpty }
+        }
+        return await Task.detached(priority: .utility) {
+            guard let img = UIImage(contentsOfFile: url.path) else { return [String]() }
+            let r = PhotoAnalyzer.classifySingle(image: img)
+            var out = [r.category.capitalized]
+            for l in r.labels where out.count < 4 && !out.contains(where: { $0.lowercased() == l }) { out.append(l.capitalized) }
+            return out
+        }.value
     }
 
     static func deleteFiles(_ v: VideoItem) {

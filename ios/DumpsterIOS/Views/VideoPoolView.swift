@@ -33,6 +33,7 @@ struct VideoPoolView: View {
                 .padding(.horizontal, 14)
             }
         }
+        .task { await backfillTags() }
         .onChange(of: pickerItems) { _, items in
             guard !items.isEmpty else { return }
             Task { await importPicked(items) }
@@ -184,6 +185,15 @@ struct VideoPoolView: View {
                 await add(dest, name: u.deletingPathExtension().lastPathComponent)
             } else { importError = "Couldn't copy \(u.lastPathComponent)." }
         }
+    }
+
+    /// Videos added before auto-labels existed: label each once, on-device only (free — never spends credits).
+    private func backfillTags() async {
+        for v in videos where v.tags.isEmpty {
+            let t = await VideoStore.autoTags(id: v.id, thumbPath: v.thumbPath, thumbURL: v.thumbURL, allowCloud: false)
+            if !t.isEmpty { v.tags = t }
+        }
+        try? modelContext.save()
     }
 
     private func add(_ fileURL: URL, name: String) async {

@@ -104,6 +104,7 @@ struct PhotoPoolView: View {
             if newValue != nil { highlightedPhotoId = nil }
         }
         .task(id: allPhotos.count) {
+            backfillMetadata()
             // Perceptual-hash any unhashed photos off-main; bump the version so
             // duplicatePhotoIds picks up the new hash groups.
             let items = allPhotos.map { (id: $0.id, relativePath: $0.localPath) }
@@ -520,6 +521,24 @@ struct PhotoPoolView: View {
             }
         }
         .padding(.horizontal, 14)
+    }
+
+    /// Photos imported before metadata extraction existed: read time/GPS/camera from the saved
+    /// original once each (ids remembered so photos with no EXIF aren't re-read every launch).
+    private func backfillMetadata() {
+        let key = "exifBackfillTried"
+        var tried = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+        var changed = false
+        for p in allPhotos where p.takenAt == nil && p.lat == nil && p.camera == nil
+            && !tried.contains(p.id) && !VideoStore.isVideoPath(p.localPath) {
+            _ = PhotoEXIF.backfill(p)
+            tried.insert(p.id)
+            changed = true
+        }
+        if changed {
+            try? modelContext.save()
+            UserDefaults.standard.set(Array(tried), forKey: key)
+        }
     }
 
     private func importPickedPhotos(_ items: [PhotosPickerItem]) async {

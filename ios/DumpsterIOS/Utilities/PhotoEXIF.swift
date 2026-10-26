@@ -44,6 +44,16 @@ enum PhotoEXIF {
         }
     }
 
+    /// Re-read metadata from an already-saved original, for photos imported before extraction
+    /// existed (PhotoStorageManager keeps the original bytes, so the EXIF is still in the file).
+    /// Memory-mapped — only the header is touched. Returns true if anything useful was found.
+    static func backfill(_ photo: DumpPhoto) -> Bool {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        guard let data = try? Data(contentsOf: docs.appendingPathComponent(photo.localPath), options: .mappedIfSafe) else { return false }
+        populate(photo, from: data)
+        return photo.takenAt != nil || photo.lat != nil || photo.camera != nil
+    }
+
     // MARK: - Format
 
     private static func formatName(forUTI uti: String) -> String {

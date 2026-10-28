@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Security
 
 // MARK: - Unified Multi-Provider LLM Service
 
@@ -11,6 +12,8 @@ final class LLMService: ObservableObject {
     // MARK: - Singleton
 
     static let shared = LLMService()
+
+    private init() { migrateAPIKeysToKeychain() }
 
     // MARK: - Published State
 
@@ -154,12 +157,60 @@ final class LLMService: ObservableObject {
 
     // MARK: - API Key Management
 
+    // BYO keys live in the Keychain (same generic-password pattern as AuthManager).
+    private static let keychainService = "com.leescott.dumpster.ios.llm"
+
+    private func keychainQuery(_ provider: LLMProvider) -> [CFString: Any] {
+        [kSecClass: kSecClassGenericPassword,
+         kSecAttrService: Self.keychainService,
+         kSecAttrAccount: provider.storageKey]
+    }
+
+    private func keychainRead(_ provider: LLMProvider) -> String? {
+        var q = keychainQuery(provider)
+        q[kSecReturnData] = true
+        q[kSecMatchLimit] = kSecMatchLimitOne
+        var result: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    @discardableResult
+    private func keychainWrite(_ key: String, _ provider: LLMProvider) -> Bool {
+        let q = keychainQuery(provider)
+        SecItemDelete(q as CFDictionary)
+        if key.isEmpty { return true }
+        let attrs = q.merging([kSecValueData: Data(key.utf8),
+                               kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]) { $1 }
+        return SecItemAdd(attrs as CFDictionary, nil) == errSecSuccess
+    }
+
+    /// One-time: UserDefaults → Keychain. Old value is removed only after a verified readback.
+    func migrateAPIKeysToKeychain() {
+        for p in LLMProvider.allCases {
+            guard let old = UserDefaults.standard.string(forKey: p.storageKey) else { continue }
+            if old.isEmpty || (keychainWrite(old, p) && keychainRead(p) == old) {
+                UserDefaults.standard.removeObject(forKey: p.storageKey)
+            }
+        }
+    }
+
+    /// Account deletion: wipe every stored key (Keychain + any un-migrated UserDefaults copy).
+    func deleteAllAPIKeys() {
+        for p in LLMProvider.allCases {
+            keychainWrite("", p)
+            UserDefaults.standard.removeObject(forKey: p.storageKey)
+        }
+        objectWillChange.send()
+    }
+
     func apiKey(for provider: LLMProvider) -> String {
-        UserDefaults.standard.string(forKey: provider.storageKey) ?? ""
+        keychainRead(provider) ?? ""
     }
 
     func setAPIKey(_ key: String, for provider: LLMProvider) {
-        UserDefaults.standard.set(key, forKey: provider.storageKey)
+        keychainWrite(key, provider)
         objectWillChange.send()
     }
 

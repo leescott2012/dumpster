@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Settings View (Legacy — Redirects to File Cabinet)
 
@@ -13,6 +14,11 @@ struct SettingsView: View {
     @State private var showSavedConfirmation = false
 
     @ObservedObject private var llmService = LLMService.shared
+    @ObservedObject private var auth = AuthManager.shared
+    @Environment(\.modelContext) private var modelContext
+    @State private var showDeleteConfirm = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
 
     private let gold = Color(red: 200/255, green: 169/255, blue: 110/255)
 
@@ -216,6 +222,33 @@ struct SettingsView: View {
                     .padding(.horizontal, 24)
                     .padding(.bottom, 32)
 
+                    // Account Section (Apple 5.1.1(v): in-app account deletion)
+                    if auth.isSignedIn {
+                        sectionHeader("ACCOUNT")
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(auth.userEmail ?? "")
+                                .font(.system(size: 13))
+                                .foregroundColor(.white.opacity(0.4))
+
+                            Button(role: .destructive) {
+                                showDeleteConfirm = true
+                            } label: {
+                                Text(isDeleting ? "DELETING..." : "DELETE ACCOUNT")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .tracking(2)
+                                    .foregroundColor(.red)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                                    .background(Color.red.opacity(0.08))
+                                    .cornerRadius(8)
+                            }
+                            .disabled(isDeleting)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 32)
+                    }
+
                     // About Section
                     sectionHeader("ABOUT")
 
@@ -276,11 +309,57 @@ struct SettingsView: View {
             .padding(.top, 50)
         }
         .preferredColorScheme(.dark)
+        .alert("Delete Account?", isPresented: $showDeleteConfirm) {
+            Button("Delete Forever", role: .destructive) { Task { await deleteAccount() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("All your photos, dumps, credits and profile will be permanently deleted. This can't be undone.\n\nIf you have an Apple subscription, deleting your account does NOT stop billing. Cancel it in iPhone Settings > Subscriptions.")
+        }
+        .alert("Couldn't delete account", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteError ?? "")
+        }
         .onAppear {
             let currentKey = llmService.apiKey(for: .openai)
             if !currentKey.isEmpty {
                 apiKeyInput = currentKey
             }
+        }
+    }
+
+    // MARK: - Account deletion
+
+    private static let apiBaseURL: URL = {
+        if let override = Bundle.main.object(forInfoDictionaryKey: "DumpsterAPIBaseURL") as? String,
+           let u = URL(string: override) {
+            return u
+        }
+        return URL(string: "https://dumpster-web-manus.vercel.app")!
+    }()
+
+    private func deleteAccount() async {
+        guard let jwt = auth.jwt else { deleteError = "Please sign in again."; return }
+        isDeleting = true
+        defer { isDeleting = false }
+        var req = URLRequest(url: Self.apiBaseURL.appendingPathComponent("api/delete-account"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["confirm": "DELETE"])
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                deleteError = msg ?? "Something went wrong. Please try again."
+                return
+            }
+            llmService.deleteAllAPIKeys()
+            try? modelContext.container.deleteAllData()   // local photos/dumps (SwiftData)
+            await auth.signOut()
+            isPresented = false
+        } catch {
+            deleteError = error.localizedDescription
         }
     }
 

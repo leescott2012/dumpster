@@ -118,7 +118,9 @@ final class SubscriptionManager: ObservableObject {
         Task.detached { [weak self] in
             for await result in Transaction.updates {
                 guard let self else { return }
-                if case .verified(let tx) = result {
+                // Credit packs are finished by CreditManager only after the server confirms.
+                if case .verified(let tx) = result,
+                   !CreditManager.CreditPack.all.contains(where: { $0.id == tx.productID }) {
                     await tx.finish()
                     await self.refreshEntitlement()
                 }

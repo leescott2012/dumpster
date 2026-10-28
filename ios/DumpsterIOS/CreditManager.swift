@@ -57,6 +57,7 @@ final class CreditManager: ObservableObject {
 
     // MARK: - Init
     private init() {
+        listenForCreditTransactions()
         Task { await fetchProducts() }
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
@@ -68,6 +69,7 @@ final class CreditManager: ObservableObject {
         refresh()
     }
     private var authSub: AnyCancellable?
+    private var listenerTask: Task<Void, Never>?
 
     // MARK: - Server verification
 
@@ -186,10 +188,15 @@ final class CreditManager: ObservableObject {
                     // skips this call — the server independently re-verifies the JWS.
                     // (The signed JWS lives on the VerificationResult, not the unwrapped
                     // Transaction — that's what re-verifying the signature needs.)
-                    await reportPurchaseToServer(jws: verification.jwsRepresentation)
-                    refreshSoonAndLater()   // server credited the pack; show it
-                    lastPurchaseSuccess = pack
-                    await transaction.finish()
+                    // Finish ONLY after the server confirms (200). Otherwise leave it
+                    // unfinished so the Transaction.updates / unfinished listener re-reports.
+                    if await reportPurchaseToServer(jws: verification.jwsRepresentation) {
+                        refreshSoonAndLater()   // server credited the pack; show it
+                        lastPurchaseSuccess = pack
+                        await transaction.finish()
+                    } else {
+                        purchaseError = "Your purchase is pending and will be credited automatically."
+                    }
                 case .unverified:
                     purchaseError = "Purchase could not be verified. Please contact support."
                 }
@@ -211,8 +218,9 @@ final class CreditManager: ObservableObject {
     /// recorded (and re-verified independently) in Supabase. Never blocks or fails the
     /// purchase — the user already paid Apple, so a network hiccup here shouldn't cost
     /// them credits they're owed. Failures are logged, not surfaced to the UI.
-    private func reportPurchaseToServer(jws: String) async {
-        guard let jwt = AuthManager.shared.jwt else { return }
+    /// Returns true only on HTTP 200. Server dedupes by Apple transactionId, so retries are safe.
+    private func reportPurchaseToServer(jws: String) async -> Bool {
+        guard let jwt = AuthManager.shared.jwt else { return false }
 
         var req = URLRequest(url: baseURL.appendingPathComponent("api/iap-verify"))
         req.httpMethod = "POST"
@@ -223,15 +231,38 @@ final class CreditManager: ObservableObject {
                 "signedTransaction": jws
             ])
             let (_, response) = try await URLSession.shared.data(for: req)
-            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                CrashReporter.shared.capture(
-                    NSError(domain: "CreditManager", code: http.statusCode),
-                    tags: ["op": "iap_verify", "status": String(http.statusCode)]
-                )
-            }
+            if let http = response as? HTTPURLResponse, http.statusCode == 200 { return true }
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            CrashReporter.shared.capture(
+                NSError(domain: "CreditManager", code: code),
+                tags: ["op": "iap_verify", "status": String(code)]
+            )
         } catch {
             CrashReporter.shared.capture(error, tags: ["op": "iap_verify"])
         }
+        return false
+    }
+
+    /// Re-reports credit-pack transactions left unfinished (failed report, app killed, offline).
+    /// Finishes only on server 200. Covers Transaction.unfinished at launch + Transaction.updates.
+    private func listenForCreditTransactions() {
+        listenerTask = Task.detached { [weak self] in
+            await self?.drainCreditTransaction(Transaction.unfinished)
+            await self?.drainCreditTransaction(Transaction.updates)
+        }
+    }
+
+    private func drainCreditTransaction<S: AsyncSequence>(_ seq: S) async where S.Element == VerificationResult<Transaction> {
+        do {
+            for try await result in seq {
+                guard case .verified(let tx) = result,
+                      CreditPack.all.contains(where: { $0.id == tx.productID }) else { continue }
+                if await reportPurchaseToServer(jws: result.jwsRepresentation) {
+                    await tx.finish()
+                    await MainActor.run { refreshSoonAndLater() }
+                }
+            }
+        } catch {}
     }
 
     func restorePurchases() async {

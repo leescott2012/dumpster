@@ -972,10 +972,11 @@ final class LLMService: ObservableObject {
     struct SuggestPhoto { let id: String; let dataURL: String; let category: String; let alt: String }
     struct SuggestCluster { let name: String; let subtitle: String; let photoIds: [String] }
 
-    func serverSuggest(photos: [SuggestPhoto], targetCount: Int?, tasteBlock: String) async throws -> [SuggestCluster] {
+    func serverSuggest(photos: [SuggestPhoto], targetCount: Int?, tasteBlock: String, variation: Int = 0, avoidIds: [String] = []) async throws -> [SuggestCluster] {
         var body: [String: Any] = [
             "photos": photos.prefix(20).map { ["id": $0.id, "url": $0.dataURL, "category": $0.category, "alt": $0.alt] },
-            "variation": 0,
+            "variation": variation,
+            "avoidIds": avoidIds,
             "tasteBlock": userContextBlock(tasteBlock: tasteBlock),
         ]
         if let targetCount { body["targetCount"] = targetCount }

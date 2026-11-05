@@ -29,7 +29,6 @@
 		899A545CBDFD326B1D36AE1B /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 20EB35E970F37EC576DA7F90 /* Sentry */; };
 		8D6DA427EE2682893A8F3B19 /* PhotoPoolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08A4384BC616EBDE1702D74 /* PhotoPoolView.swift */; };
 		925E6F2365D0473D98F167C5 /* ConfettiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA341A66087474A8CB27607 /* ConfettiView.swift */; };
-		9E2EED52E28C46B9AE8D816E /* DumpFlipIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */; };
 		9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */; };
 		A1C0FEC0DEAD00000000CA02 /* CaptionSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FEC0DEAD00000000CA01 /* CaptionSheetView.swift */; };
 		A1A2A3A4B5B6B7B8C9C0D1D2 /* AITasteExample.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E2E3E4F5F6A7A8B9B0C1C2 /* AITasteExample.swift */; };
@@ -120,7 +119,6 @@
 		AA01BB02CC03DD04EE05FF07 /* PhotoMenuSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoMenuSheet.swift; sourceTree = "<group>"; };
 		AA11000000000000000000A1 /* LabelHealth.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LabelHealth.swift; sourceTree = "<group>"; };
 		AA11000000000000000000B1 /* LabelHealthSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LabelHealthSheet.swift; sourceTree = "<group>"; };
-		AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DumpFlipIntroView.swift; sourceTree = "<group>"; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* PhotoAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoAnalyzer.swift; sourceTree = "<group>"; };
 		BB11CC22DD33EE44FF550012 /* OnboardingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		C08A4384BC616EBDE1702D74 /* PhotoPoolView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoPoolView.swift; sourceTree = "<group>"; };
@@ -210,7 +208,6 @@
 				202A316C5E1892E09EBE6F49 /* LightboxView.swift */,
 				7FA341A66087474A8CB27607 /* ConfettiView.swift */,
 				F3115232C67E460CA16F1007 /* Dump3DCarouselView.swift */,
-				AA57C5D7A1C34F599B049BEE /* DumpFlipIntroView.swift */,
 				223192BCF27CDE352446D2CF /* DumpCaptionBubble.swift */,
 				A1C0FEC0DEAD00000000CA01 /* CaptionSheetView.swift */,
 				AA11000000000000000000B1 /* LabelHealthSheet.swift */,
@@ -439,7 +436,6 @@
 				E0A7AAA1E3B6AAA770B95DF1 /* LightboxView.swift in Sources */,
 				925E6F2365D0473D98F167C5 /* ConfettiView.swift in Sources */,
 				E23526264EAF4A65A1FB719B /* Dump3DCarouselView.swift in Sources */,
-				9E2EED52E28C46B9AE8D816E /* DumpFlipIntroView.swift in Sources */,
 				9E8F8031BDA866D0700973B5 /* DumpCaptionBubble.swift in Sources */,
 				A1C0FEC0DEAD00000000CA02 /* CaptionSheetView.swift in Sources */,
 				AA11000000000000000000B2 /* LabelHealthSheet.swift in Sources */,

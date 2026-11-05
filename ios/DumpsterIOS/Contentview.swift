@@ -98,7 +98,6 @@ struct ContentView: View {
     @StateObject private var undoManager = DumpsterUndoManager()
 
     @State private var isExpanded = false
-    @State private var showAppIntro = true
     @AppStorage("dumpster_onboardingDone") private var onboardingDone = false
     /// Blocking first-run flow state: nil = not decided yet, else (has username).
     @State private var onboardingHasUsername: Bool?
@@ -173,21 +172,10 @@ struct ContentView: View {
             BugReportButton()
                 .zIndex(50)
                 .allowsHitTesting(true)
-
-            // "Marvel intro" flip-through of the user's own pool photos —
-            // plays once per cold launch, veiling the app underneath while
-            // it finishes initializing.
-            if showAppIntro {
-                DumpFlipIntroView(photos: allPhotos) {
-                    withAnimation(.easeOut(duration: 0.5)) { showAppIntro = false }
-                }
-                .zIndex(60)
-                .transition(.opacity)
-            }
         }
         .background(Color.black)
         .overlayPreferenceValue(TourAnchorKey.self) { anchors in
-            if appState.showOnboarding && !showAppIntro && !showFirstRun {
+            if appState.showOnboarding && !showFirstRun {
                 SpotlightTutorialView(isPresented: $appState.showOnboarding, anchors: anchors)
                     .environmentObject(appState)
                     .transition(.opacity)

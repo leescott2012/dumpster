@@ -62,6 +62,9 @@ struct AISuggestView: View {
     /// Refund token for the server-generated dump on screen; spent if the user
     /// leaves or regenerates without creating it (web parity: refund on reject).
     @State private var refundToken: String?
+    /// Photos from suggestions already shown this session; they go last so a refresh looks at fresh photos.
+    @State private var seenPhotoIds: Set<String> = []
+    @State private var suggestVariation = 0
 
     // MARK: - Advanced filters (NATIVE_PORT.md §C — port of web's AutoGenAdvanced.tsx)
     @State private var filters: AutoGenFilters = .empty
@@ -568,7 +571,9 @@ struct AISuggestView: View {
         let byId = Dictionary(allPhotos.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var analyzed: [String: AnalyzedPhoto] = [:]
         var sample: [LLMService.SuggestPhoto] = []
-        for (img, url) in loaded.shuffled().prefix(20) {
+        let fresh = loaded.shuffled()
+        let ordered = fresh.filter { !seenPhotoIds.contains(map[$0.1.lastPathComponent] ?? "") } + fresh.filter { seenPhotoIds.contains(map[$0.1.lastPathComponent] ?? "") }
+        for (img, url) in ordered.prefix(20) {
             guard let id = map[url.lastPathComponent], let jpeg = img.jpegData(compressionQuality: 0.6) else { continue }
             let p = byId[id]
             analyzed[id] = AnalyzedPhoto(image: img, localURL: url, filename: url.lastPathComponent,
@@ -580,11 +585,14 @@ struct AISuggestView: View {
         guard sample.count >= 2 else { return nil }
         let taste = AITasteExample.promptBlock(from: []) + AITasteExample.captionVoiceBlock()
         do {
-            let found = try await llmService.serverSuggest(photos: sample, targetCount: isAutoCount ? nil : maxPhotosPerDump, tasteBlock: taste)
+            let found = try await llmService.serverSuggest(photos: sample, targetCount: isAutoCount ? nil : maxPhotosPerDump, tasteBlock: taste,
+                                                   variation: suggestVariation, avoidIds: Array(seenPhotoIds))
+            suggestVariation += 1
             refundToken = LLMService.ServerAI.lastSuggestRefundToken
             guard let c = found.first else { return nil }
             let photos = c.photoIds.compactMap { analyzed[$0] }
             guard photos.count >= 2 else { return nil }
+            seenPhotoIds.formUnion(c.photoIds)
             let cat = Dictionary(grouping: photos, by: { $0.category }).max { $0.value.count < $1.value.count }?.key ?? "LIFESTYLE"
             return [PhotoCluster(title: c.name, category: cat, photos: photos)]
         } catch {

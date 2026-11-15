@@ -18,6 +18,7 @@ enum LabelHealthConst {
     static let lowConfidence = 0.6
     static let minChecksForScore = 5
     static let auditPerDay = 6
+    static let freeFirstScanPhotos = 100       // one-time free scan per account; server-enforced (shared/aiLabelCost.ts)
     static let batch = 6                       // photos per auto request (server cap)
     static let requestsPerRun = 3              // server burst limit: 3 req / 10 min
     static let runEvery: TimeInterval = 10 * 60
@@ -192,6 +193,9 @@ final class LabelHealthManager: ObservableObject {
 
     @Published private(set) var store: LabelHealthStore
     @Published private(set) var fix: FixStatus = .idle
+    /// The server said the one-time free first scan is used up. In memory on purpose:
+    /// the server is the source of truth and this is per account, not per install.
+    @Published private(set) var freeUsed = false
 
     private static let key = "label_health_v1"
     private var lastRun = Date.distantPast
@@ -332,7 +336,7 @@ final class LabelHealthManager: ObservableObject {
 
     /// Debounced background run — call on app open and when the photo set changes.
     func scheduleRun() {
-        guard store.autoFix else { return }
+        guard store.autoFix, !freeUsed else { return }
         debounce?.cancel()
         debounce = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 4_000_000_000)
@@ -341,10 +345,10 @@ final class LabelHealthManager: ObservableObject {
         }
     }
 
-    /// One run = at most 3 requests of ≤6 photos. Priority: unlabeled → suspect → audit sample.
+    /// One run = at most 3 requests of ≤6 photos, only while the free first scan lasts. Priority: unlabeled → suspect.
     /// Quota answers (402/429/503) pause quietly. Photos only, never videos.
     func runFix(force: Bool) async {
-        guard let jwt = AuthManager.shared.jwt, fix != .running, !isPaused else { return }
+        guard let jwt = AuthManager.shared.jwt, fix != .running, !isPaused, !freeUsed else { return }
         if !force && Date().timeIntervalSince(lastRun) < LabelHealthConst.runEvery { return }
         lastRun = Date()
 
@@ -357,8 +361,7 @@ final class LabelHealthManager: ObservableObject {
             return i == nil || now - i!.labeledAt > LabelHealthConst.relabelCooldown || i!.audit == "disagree"
         }.map { $0.photo }
         let queue = h.unlabeled + suspects
-        let auditLeft = LabelHealthConst.auditPerDay - (store.auditDay == LabelMetrics.dayKey() ? store.auditCount : 0)
-        if queue.isEmpty && auditLeft <= 0 { return }
+        if queue.isEmpty { return }
 
         fix = .running
         var requests = 0
@@ -368,27 +371,18 @@ final class LabelHealthManager: ObservableObject {
             switch await LabelService.shared.request(photos: Array(chunk), jwt: jwt, auto: true, audit: false) {
             case .ok(let r): applyAI(r)
             case .quota(let daily): handle(quota: daily); return
+            case .freeUsed: freeUsed = true; fix = .idle; return
             case .failed: fix = .idle; return
             }
             i += LabelHealthConst.batch
             requests += 1
         }
-        if requests < LabelHealthConst.requestsPerRun && auditLeft > 0 {
-            let sample = LabelMetrics.auditSample(Self.snapshot(allPhotos()), store.info, n: min(LabelHealthConst.batch, auditLeft))
-            if !sample.isEmpty {
-                let items = sample.map { (id: $0.id, relativePath: $0.path) }
-                switch await LabelService.shared.request(photos: items, jwt: jwt, auto: true, audit: true) {
-                case .ok(let r): recordAudit(r, photos: byId)
-                case .quota(let daily): handle(quota: daily); return
-                case .failed: fix = .idle; return
-                }
-            }
-        }
         fix = .idle
     }
 
-    /// "Fix now" on one photo — free path, respects pause. Returns an error message, or nil on success.
+    /// "Fix now" on one photo — only while the free first scan lasts. Returns an error message, or nil on success.
     func fixOne(_ photo: LabelPhoto) async -> String? {
+        if freeUsed { return "Your free first scan is used up — use Scan (1 credit per photo)." }
         let paused = "Auto-fix is paused — daily limit reached. Try again later."
         guard !photo.isVideo else { return "Videos stay on this device." }
         guard let jwt = AuthManager.shared.jwt else { return "Sign in to fix labels." }
@@ -396,6 +390,7 @@ final class LabelHealthManager: ObservableObject {
         switch await LabelService.shared.request(photos: [(photo.id, photo.path)], jwt: jwt, auto: true, audit: false) {
         case .ok(let r): applyAI(r); return nil
         case .quota(let daily): handle(quota: daily); return paused
+        case .freeUsed: freeUsed = true; return "Your free first scan is used up — use Scan (1 credit per photo)."
         case .failed: return "Couldn't fix that label — try again."
         }
     }

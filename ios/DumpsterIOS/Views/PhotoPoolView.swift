@@ -13,6 +13,8 @@ struct PhotoPoolView: View {
     let allDumps: [PhotoDump]
 
     @State private var showSearchField = false
+    @ObservedObject private var labelMgr = LabelHealthManager.shared
+    @State private var freeScanNotice: String? = nil
     @State private var pickerItems: [PhotosPickerItem] = []
     // Ordered (not a Set) so pick order is preserved for the ordinal badge —
     // matches web's `selectedIds: string[]` + `selectedIds.indexOf(photo.id)`
@@ -158,6 +160,12 @@ struct PhotoPoolView: View {
                 .padding(.top, 4)
         }
         .padding(.top, 4)
+        .alert("Free first scan", isPresented: Binding(get: { freeScanNotice != nil }, set: { if !$0 { freeScanNotice = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(freeScanNotice ?? "") }
+        .onChange(of: labelMgr.freeUsed) { _, used in
+            if used { showOnce("free_scan_used_notice", "Your free first scan is used up. Scanning now costs 1 credit per photo — tap Scan when you want it.") }
+        }
         .confirmationDialog("Photo Pool", isPresented: $showPoolMenu) {
             Button("Sort by Newest") { }
             Button("Show Used Photos") { appState.activeFilters = [.used] }
@@ -541,9 +549,16 @@ struct PhotoPoolView: View {
         }
     }
 
+    private func showOnce(_ key: String, _ message: String) {
+        guard AuthManager.shared.jwt != nil, !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        freeScanNotice = message
+    }
+
     private func importPickedPhotos(_ items: [PhotosPickerItem]) async {
         await importPickedPhotoItems(items, into: modelContext)
         pickerItems.removeAll()
+        showOnce("free_scan_notice", "Your first \(LabelHealthConst.freeFirstScanPhotos) photos are scanned and labeled free. After that, Scan costs 1 credit per photo, and only when you tap it.")
     }
 }
 

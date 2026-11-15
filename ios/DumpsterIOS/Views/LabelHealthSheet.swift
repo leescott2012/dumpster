@@ -180,18 +180,23 @@ struct LabelHealthSheet: View {
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.12), lineWidth: 1))
 
                     // Controls
+                    if mgr.freeUsed {
+                        Text("Your free first scan is used up. New photos are labeled only when you tap Scan (1 credit per photo).")
+                            .font(.system(size: 12)).foregroundColor(.white.opacity(0.75))
+                    } else {
                     HStack {
-                        Toggle("Auto-fix labels", isOn: Binding(get: { mgr.store.autoFix }, set: { mgr.setAutoFix($0) }))
+                        Toggle("Free first scan (auto)", isOn: Binding(get: { mgr.store.autoFix }, set: { mgr.setAutoFix($0) }))
                             .font(.system(size: 12)).tint(gold)
                         Button {
                             Task { await mgr.runFix(force: true) }
                         } label: {
-                            Label(mgr.fix == .running ? "Fixing…" : "Auto-fix now", systemImage: "wand.and.stars")
+                            Label(mgr.fix == .running ? "Fixing…" : "Scan free now", systemImage: "wand.and.stars")
                                 .font(.system(size: 11, weight: .bold)).foregroundColor(.black)
                                 .padding(.horizontal, 12).padding(.vertical, 6)
                                 .background(Capsule().fill(gold))
                         }
                         .disabled(mgr.fix == .running)
+                    }
                     }
                     if let message { Text(message).font(.system(size: 11)).foregroundColor(gold) }
 

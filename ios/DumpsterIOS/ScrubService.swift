@@ -288,6 +288,8 @@ final class LabelService {
         case ok([LabelResult])
         /// 402 / 429 / 503 — out of credits, burst/daily cap, or budget. `daily` = long back-off.
         case quota(daily: Bool)
+        /// 402 `free_scan_used` on the auto path — the one-time free first scan is used up.
+        case freeUsed
         case failed
     }
 
@@ -315,6 +317,7 @@ final class LabelService {
             if !auto { await CreditManager.shared.noteAIResponse(http) }   // paid path only
             if [402, 429, 503].contains(http.statusCode) {
                 let code = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["code"] as? String
+                if auto && code == "free_scan_used" { return .freeUsed }
                 return .quota(daily: code != "rate_limit_exceeded")
             }
             guard http.statusCode == 200 else { return .failed }
@@ -338,7 +341,7 @@ final class LabelService {
             i += Self.batchSize
             switch await request(photos: chunk, jwt: jwt, auto: false, audit: false) {
             case .ok(let r): results.append(contentsOf: r)
-            case .quota: return results   // out of credits — stop spending, caller falls back
+            case .quota, .freeUsed: return results   // out of credits — stop spending, caller falls back
             case .failed: continue
             }
         }

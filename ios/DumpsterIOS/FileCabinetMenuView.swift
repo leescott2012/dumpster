@@ -2217,7 +2217,7 @@ struct AboutHelpTabView: View {
                 if let u = URL(string: "\(ReferralManager.webBase)/privacy") { Link("Privacy", destination: u) }
                 if let u = URL(string: "\(ReferralManager.webBase)/terms") { Link("Terms", destination: u) }
                 Spacer()
-                if let u = URL(string: "mailto:axiomonellc@outlook.com") { Link("Contact", destination: u) }
+                if let u = URL(string: "mailto:support@chamillioncollective.com") { Link("Contact", destination: u) }
             }
             .font(.system(size: 11))
             .tracking(0.4)

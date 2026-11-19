@@ -316,7 +316,7 @@ function AppFooter() {
         <h3>Analytics</h3>
         <p>We may use anonymised analytics to understand how the app is used. No personally identifiable information is collected.</p>
         <h3>Contact</h3>
-        <p>Questions? Email us at support@dumpster.app</p>
+        <p>Questions? Email us at support@chamillioncollective.com</p>
         <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 16 }}>Last updated: May 2026</p>
       </LegalModal>}
 
